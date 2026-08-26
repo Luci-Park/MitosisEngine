@@ -1,0 +1,14 @@
+/**
+ * @file @FILE@
+ * @author @AUTHOR@
+ * @brief
+ *
+ * @copyright Copyright (c) @YEAR@ @ORG@
+ *
+ */
+#include "@INCLUDE@"
+
+namespace mts::@MODULE@ 
+{
+
+}

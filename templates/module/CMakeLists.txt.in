@@ -1,0 +1,2 @@
+engine_add_module(@MODULE@
+)

@@ -1,0 +1,13 @@
+/**
+ * @file @FILE@
+ * @author @AUTHOR@
+ * @brief
+ *
+ * @copyright Copyright (c) @YEAR@ @ORG@
+ *
+ */
+#pragma once
+
+namespace mts::@MODULE@ {
+
+}
