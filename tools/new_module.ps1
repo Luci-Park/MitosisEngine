@@ -48,16 +48,31 @@ foreach ($dir in @("include\$Name", "src\$Name")) {
     New-Item -ItemType Directory -Path (Join-Path $destRoot $dir) -Force | Out-Null
 }
 
-# Register the module with the root build.
+# Register the module with the root build, next to its siblings.
 $rootLists = Join-Path $repoRoot 'CMakeLists.txt'
 $entry     = "add_subdirectory(modules/$Name)"
-$rootText  = Get-Content -Raw -Path $rootLists
-if ($rootText -notmatch [regex]::Escape($entry)) {
-    if (-not $rootText.EndsWith("`n")) { $rootText += "`n" }
-    Set-Content -Path $rootLists -Value ($rootText + $entry + "`n") -Encoding utf8 -NoNewline
+
+# '#?' keeps a commented-out module inside the run instead of splitting it in two.
+if (Add-SortedEntry -File $rootLists -Entry $entry `
+        -BlockStart '^\s*#?\s*add_subdirectory\(\s*modules/') {
     Write-Host "registered: $entry"
 } else {
     Write-Host "already registered: $entry"
+}
+
+# Link the new module into the executable.
+$exe = [regex]::Match((Get-Content -Raw -Path $rootLists), '(?m)^\s*add_executable\(\s*([A-Za-z0-9_]+)')
+if (-not $exe.Success) {
+    throw "No add_executable(...) found in $rootLists"
+}
+$exeName = $exe.Groups[1].Value
+
+if (Add-SortedEntry -File $rootLists -Entry "mts::$Name" `
+        -BlockStart "^\s*target_link_libraries\(\s*$([regex]::Escape($exeName))\s+PRIVATE\b" `
+        -BlockEnd '^\s*\)\s*$') {
+    Write-Host "linked: $exeName <- mts::$Name"
+} else {
+    Write-Host "already linked: $exeName <- mts::$Name"
 }
 
 Write-Host "created module '$Name':"

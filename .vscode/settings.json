@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.tmpl": "plaintext"
+    },
+    // Ninja + cl.exe need the MSVC developer environment. CMake presets cannot
+    // express "run vcvars first", so the extension has to do it.
+    "cmake.useVsDeveloperEnvironment": "always"
+}

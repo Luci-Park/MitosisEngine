@@ -15,7 +15,7 @@ function Expand-Placeholders {
 
 <#
     Copies every file under $TemplateRoot into $DestRoot, substituting placeholders
-    in both the relative path and the contents, and stripping a trailing .in.
+    in both the relative path and the contents, and stripping a trailing .tmpl.
     Returns the list of created paths. Never overwrites an existing file.
 #>
 function Copy-Template {
@@ -38,8 +38,8 @@ function Copy-Template {
     $plan = foreach ($file in $files) {
         $relative = $file.FullName.Substring($TemplateRoot.Length).TrimStart('\')
         $relative = Expand-Placeholders -Text $relative -Values $Values
-        if ($relative.EndsWith('.in')) {
-            $relative = $relative.Substring(0, $relative.Length - 3)
+        if ($relative.EndsWith('.tmpl')) {
+            $relative = $relative.Substring(0, $relative.Length - '.tmpl'.Length)
         }
         $destPath = Join-Path $DestRoot $relative
         if (Test-Path $destPath) {
@@ -93,9 +93,136 @@ function Get-CommonValues {
     }
 }
 
+# An entry compares equal whether or not it is commented out, so regenerating a
+# module never resurrects a line the author deliberately disabled.
+function Get-EntryKey {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Line)
+    return ($Line -replace '^\s*#\s*', '').Trim()
+}
+
 <#
-    Inserts a source entry into an existing engine_add_module(<Module> ... ) call,
-    keeping the list sorted. No-op when the entry is already listed.
+    Inserts $Entry into a sorted block of lines and rewrites $File.
+    No-op (returns $false) when the entry is already there, commented out or not.
+
+    Two block shapes, chosen by whether -BlockEnd is given:
+
+      * multi-line call - the block runs from the line matching $BlockStart to the
+        line matching $BlockEnd. A call written on one line, e.g.
+        "target_link_libraries(app PRIVATE foo)", is expanded into the multi-line
+        form first. $BlockStart must match the whole head of the call including any
+        PRIVATE/PUBLIC/INTERFACE keyword, because whatever follows the match on that
+        line is treated as entries.
+
+      * run of sibling lines - the block is the maximal contiguous run of lines
+        matching $BlockStart (e.g. every add_subdirectory(modules/...) line).
+
+    When the block is absent and -CreateAfter is given, a new one is written just
+    below the first line matching it, using -CreateHeader / -CreateFooter.
+#>
+function Add-SortedEntry {
+    param(
+        [Parameter(Mandatory)][string]$File,
+        [Parameter(Mandatory)][string]$Entry,
+        [Parameter(Mandatory)][string]$BlockStart,
+        [string]$BlockEnd,
+        [string]$CreateAfter,
+        [string]$CreateHeader,
+        [string]$CreateFooter,
+        [string]$Indent = '    '
+    )
+
+    $lines = @(Get-Content -Path $File)
+    $key   = Get-EntryKey $Entry
+
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match $BlockStart) { $start = $i; break }
+    }
+
+    if ($start -lt 0) {
+        if (-not $CreateAfter) {
+            throw "No block matching /$BlockStart/ in $File"
+        }
+        $anchor = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match $CreateAfter) { $anchor = $i; break }
+        }
+        if ($anchor -lt 0) {
+            throw "No block matching /$BlockStart/ and no anchor /$CreateAfter/ in $File"
+        }
+        $block = @('', $CreateHeader, "$Indent$Entry", $CreateFooter)
+        $head  = $lines[0..$anchor]
+        $tail  = if ($anchor + 1 -lt $lines.Count) { $lines[($anchor + 1)..($lines.Count - 1)] } else { @() }
+        Set-Content -Path $File -Value (@($head) + $block + @($tail)) -Encoding utf8
+        return $true
+    }
+
+    $head      = $lines[0..$start]
+    $entries   = @()
+    $footer    = @()
+    $collapsed = $false
+
+    if ($BlockEnd) {
+        $startLine = $lines[$start]
+        $matched   = [regex]::Match($startLine, $BlockStart).Value
+        $rest      = $startLine.Substring($matched.Length)
+
+        if ($rest -match '\)') {
+            # Collapsed onto one line - split it so the entries get their own lines.
+            $head    = if ($start -gt 0) { $lines[0..($start - 1)] } else { @() }
+            $head   += $matched
+            $entries = @($rest -replace '\).*$', '' -split '\s+' | Where-Object { $_ })
+            $footer    = @(')')
+            $tailAt    = $start + 1
+            $collapsed = $true
+        } else {
+            $end = -1
+            for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+                if ($lines[$i] -match $BlockEnd) { $end = $i; break }
+            }
+            if ($end -lt 0) {
+                throw "Could not find the closing line of the block starting at $($File):$($start + 1)"
+            }
+            if ($end -gt $start + 1) {
+                $entries = @($lines[($start + 1)..($end - 1)] | Where-Object { $_.Trim() -ne '' })
+            }
+            $footer = @($lines[$end])
+            $tailAt = $end + 1
+        }
+    } else {
+        # Maximal contiguous run of matching lines.
+        $end = $start
+        while ($end + 1 -lt $lines.Count -and $lines[$end + 1] -match $BlockStart) { $end++ }
+        $head    = if ($start -gt 0) { $lines[0..($start - 1)] } else { @() }
+        $entries = @($lines[$start..$end])
+        $tailAt  = $end + 1
+        $Indent  = ''
+    }
+
+    if ($entries | Where-Object { (Get-EntryKey $_) -eq $key }) {
+        return $false
+    }
+
+    if ($BlockEnd) {
+        # Keep the indent the block already uses, then apply it to every entry so a
+        # collapsed call that was just split lines up with the rest.
+        if (-not $collapsed -and $entries.Count -gt 0) {
+            $existingIndent = [regex]::Match($entries[0], '^\s*').Value
+            if ($existingIndent) { $Indent = $existingIndent }
+        }
+        $entries = @($entries | ForEach-Object { "$Indent$($_.Trim())" })
+    }
+
+    $entries = @($entries + "$Indent$Entry" | Sort-Object -Property { Get-EntryKey $_ })
+    $tail    = if ($tailAt -lt $lines.Count) { $lines[$tailAt..($lines.Count - 1)] } else { @() }
+
+    Set-Content -Path $File -Value (@($head) + $entries + $footer + @($tail)) -Encoding utf8
+    return $true
+}
+
+<#
+    Lists a source file in modules/<Module>'s target_sources(engine_<Module> PRIVATE ...)
+    call, creating that call below engine_add_module(<Module>) when it does not exist yet.
     Returns $true when the file was modified.
 #>
 function Add-ModuleSource {
@@ -105,44 +232,13 @@ function Add-ModuleSource {
         [Parameter(Mandatory)][string]$Entry
     )
 
-    $lines = @(Get-Content -Path $CMakeLists)
-
-    $start = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match "^\s*engine_add_module\(\s*$([regex]::Escape($Module))\b") {
-            $start = $i
-            break
-        }
-    }
-    if ($start -lt 0) {
-        throw "engine_add_module($Module ...) not found in $CMakeLists"
-    }
-
-    $end = -1
-    for ($i = $start + 1; $i -lt $lines.Count; $i++) {
-        if ($lines[$i].Trim() -eq ')') {
-            $end = $i
-            break
-        }
-    }
-    if ($end -lt 0) {
-        throw "Could not find the closing ')' of engine_add_module($Module ...) in $CMakeLists"
-    }
-
-    $existing = @()
-    if ($end -gt $start + 1) {
-        $existing = @($lines[($start + 1)..($end - 1)] | Where-Object { $_.Trim() -ne '' })
-    }
-    if ($existing | Where-Object { $_.Trim() -eq $Entry }) {
-        return $false
-    }
-
-    $sources = @($existing + "    $Entry" | Sort-Object -Property { $_.Trim() })
-
-    $head = if ($start -ge 0) { $lines[0..$start] } else { @() }
-    $tail = $lines[$end..($lines.Count - 1)]
-    Set-Content -Path $CMakeLists -Value (@($head) + $sources + @($tail)) -Encoding utf8
-    return $true
+    $target = "engine_$Module"
+    return Add-SortedEntry -File $CMakeLists -Entry $Entry `
+        -BlockStart "^\s*target_sources\(\s*$([regex]::Escape($target))\s+PRIVATE\b" `
+        -BlockEnd '^\s*\)\s*$' `
+        -CreateAfter "^\s*engine_add_module\(\s*$([regex]::Escape($Module))\s*\)" `
+        -CreateHeader "target_sources($target PRIVATE" `
+        -CreateFooter ')'
 }
 
-Export-ModuleMember -Function Expand-Placeholders, Copy-Template, Add-ModuleSource, Get-CommonValues
+Export-ModuleMember -Function Expand-Placeholders, Copy-Template, Add-SortedEntry, Add-ModuleSource, Get-CommonValues

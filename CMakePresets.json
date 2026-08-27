@@ -1,0 +1,67 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/builds/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
+            "name": "windows-cache",
+            "hidden": true,
+            "environment": {
+                "VCPKG_DOWNLOADS": "$env{LOCALAPPDATA}/vcpkg/downloads",
+                "VCPKG_DEFAULT_BINARY_CACHE": "$env{LOCALAPPDATA}/vcpkg/archives"
+            }
+        },
+        {
+            "name": "windows-msvc-debug",
+            "displayName": "Debug",
+            "inherits": [
+                "base",
+                "windows-cache"
+            ],
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-msvc-release",
+            "displayName": "Release",
+            "inherits": [
+                "base",
+                "windows-cache"
+            ],
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-msvc-debug",
+            "displayName": "Debug",
+            "configurePreset": "windows-msvc-debug"
+        },
+        {
+            "name": "windows-msvc-release",
+            "displayName": "Release",
+            "configurePreset": "windows-msvc-release"
+        }
+    ]
+}
