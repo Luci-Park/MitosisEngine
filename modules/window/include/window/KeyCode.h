@@ -1,5 +1,5 @@
 ﻿/**
- * @file Window.h
+ * @file KeyCode.h
  * @author Sumin Park
  * @brief
  *
@@ -10,9 +10,5 @@
 
 namespace mts
 {
-    class Window
-    {
-        public:
-            Window() = default;
-    };
+
 }
