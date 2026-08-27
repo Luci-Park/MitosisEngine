@@ -8,25 +8,19 @@ This is a CMake project built with VSCode. Everything is driven through presets 
 - VSCode extensions: `ms-vscode.cmake-tools`, `ms-vscode.cpptools`
 
 # Getting the Source
-vcpkg is vendored as a submodule and pinned to the `builtin-baseline` in `vcpkg.json`,
-so there is nothing to install and no `VCPKG_ROOT` to set.
 
 ```
-git clone --recurse-submodules <repo-url>
+git clone <repo-url>
 ```
 
-Already cloned without it:
+Dependencies come from vcpkg, which is not vendored here. You install it once
+per machine and set `VCPKG_ROOT`. Prerequisites, setup and troubleshooting:
+[docs/SETUP.md](docs/SETUP.md). Configure stops with an explanatory error if
+`VCPKG_ROOT` is missing.
 
-```
-git submodule update --init --recursive
-```
-
-The first configure bootstraps vcpkg and builds the dependencies; expect a few minutes.
-Later configures are cached.
-
-Downloads and prebuilt packages are kept in `%LOCALAPPDATA%\vcpkg` and shared with
-every other vcpkg on the machine, so the submodule stays small. Its `buildtrees/`
-directory is compile scratch and can be deleted at any time.
+First configure builds all dependencies and takes a few minutes. Downloads and
+prebuilt packages are cached in `%LOCALAPPDATA%\vcpkg` and shared with every other
+vcpkg project on the machine, so later configures are fast.
 
 # Adding Modules and Files
 This engine is aiming for modularity, therefore each part of the engine is its own static library. To make things easier VSCode tasks have been added.

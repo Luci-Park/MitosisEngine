@@ -2,35 +2,22 @@
     "files.associations": {
         "*.tmpl": "plaintext"
     },
-    // Ninja + cl.exe need the MSVC developer environment. CMake presets cannot
-    // express "run vcvars first", so the extension has to do it.
     "cmake.useVsDeveloperEnvironment": "always",
-
-    // external/vcpkg is the full vcpkg repo (~11k ports, >100k files) and
-    // builds/ holds a second copy of every installed header. Neither should be
-    // crawled by the file watcher, search, or the C++ tag parser.
     "files.watcherExclude": {
-        "**/external/vcpkg/**": true,
         "**/builds/**": true,
         "**/logs/**": true
     },
     "search.exclude": {
-        "**/external/vcpkg/**": true,
         "**/builds/**": true,
         "**/logs/**": true
     },
     "C_Cpp.files.exclude": {
-        "**/external/vcpkg/**": true,
         "**/builds/**": true,
         "**/logs/**": true,
         "**/.git/**": true
     },
-
-    // cmake-tools supplies every flag and include path. Without a provider
-    // cpptools falls back to recursively tag-parsing the whole workspace.
     "C_Cpp.intelliSenseEngineFallback": "disabled",
     "C_Cpp.autocompleteAddParentheses": true,
-
     // Throttle background workspace parsing so it does not compete with
     // the IntelliSense process for the open file.
     "C_Cpp.workspaceParsingPriority": "medium",

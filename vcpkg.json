@@ -5,7 +5,10 @@
     "dependencies": [
         "spdlog",
         "glfw3",
-        "glm"
+        "glm",
+        "vulkan",
+        "volk",
+        "vulkan-memory-allocator"
     ],
-    "$comment": "builtin-baseline = SHA of vckpkg"
+    "$comment": "builtin-baseline = SHA of vcpkg"
 }
