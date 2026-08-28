@@ -1,7 +1,7 @@
 ﻿/**
  * @file Renderer.h
  * @author Sumin Park
- * @brief Basic Renderer for vulkan-> will replace with rhi later
+ * @brief
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -12,7 +12,7 @@ namespace mts
 {
     class Renderer
     {
-    public:
-        Renderer() = default;
+        public:
+            Renderer() = default;
     };
 }

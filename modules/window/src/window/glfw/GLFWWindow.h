@@ -26,7 +26,7 @@ namespace mts
         uint32_t Width() const override { return m_width; }
         uint32_t Height() const override { return m_height; }
 
-        void *NativeWindow() const override;
+        NativeWindowHandle NativeWindow() const override;
 
     private:
         static void OnFramebufferSize(GLFWwindow *handle, int width, int height);

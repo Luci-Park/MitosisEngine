@@ -13,6 +13,23 @@
 
 namespace mts
 {
+    enum class WindowBackend
+    {
+        None,
+        Win32,   // windows
+        Xlib,    // old linux / unix
+        Wayland, // modern linux
+        Cocoa    // macOS
+    };
+
+    // for graphics borrowing
+    struct NativeWindowHandle
+    {
+        WindowBackend backend = WindowBackend::None;
+        void *display = nullptr; // null on Win32 & Cocoa
+        void *window = nullptr;
+    };
+
     struct WindowDesc
     {
         uint32_t m_width = 1280;
@@ -37,7 +54,7 @@ namespace mts
         virtual uint32_t Width() const = 0;
         virtual uint32_t Height() const = 0;
 
-        virtual void *NativeWindow() const = 0;
+        virtual NativeWindowHandle NativeWindow() const = 0;
 
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 

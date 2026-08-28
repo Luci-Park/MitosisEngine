@@ -8,20 +8,10 @@
  */
 #include "GLFWWindow.h"
 
-#include "core/Platform.h"
 #include "core/log/Assert.h"
 #include "core/log/Log.h"
 
 #include <GLFW/glfw3.h>
-
-#if ENGINE_PLATFORM_WINDOWS
-#define GLFW_EXPOSE_NATIVE_WIN32
-#elif ENGINE_PLATFORM_MACOS
-#define GLFW_EXPOSE_NATIVE_COCOA
-#elif ENGINE_PLATFORM_LINUX
-#define GLFW_EXPOSE_NATIVE_X11
-#endif
-#include <GLFW/glfw3native.h>
 
 namespace mts
 {
@@ -108,18 +98,5 @@ namespace mts
         // Minimizing reports 0x0. Keep it; the renderer decides to skip frames.
         self->m_width = static_cast<uint32_t>(width);
         self->m_height = static_cast<uint32_t>(height);
-    }
-
-    void *GLFWWindow::NativeWindow() const
-    {
-#if ENGINE_PLATFORM_WINDOWS
-        return glfwGetWin32Window(m_handle);
-#elif ENGINE_PLATFORM_MACOS
-        return glfwGetCocoaWindow(m_handle);
-#elif ENGINE_PLATFORM_LINUX
-        return reinterpret_cast<void *>(glfwGetX11Window(m_handle));
-#else
-        return nullptr;
-#endif
     }
 }

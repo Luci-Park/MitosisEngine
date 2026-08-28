@@ -12,7 +12,7 @@ int main()
 
     uint32_t lastWidth = window->Width();
     uint32_t lastHeight = window->Height();
-    MTS_LOG_INFO("Native handle: {}", window->NativeWindow());
+    MTS_LOG_INFO("Native handle: {}", window->NativeWindow().backend);
 
     while (!window->ShouldClose())
     {

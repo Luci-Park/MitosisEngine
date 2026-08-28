@@ -5,6 +5,7 @@ This is a CMake project built with VSCode. Everything is driven through presets 
 - CMake >= 3.25
 - Ninja
 - MSVC (Visual Studio 2026 or Build Tools)
+- Vulkan SDK >= 1.4.309 (supplies `slangc` for shader builds)
 - VSCode extensions: `ms-vscode.cmake-tools`, `ms-vscode.cpptools`
 
 # Getting the Source
