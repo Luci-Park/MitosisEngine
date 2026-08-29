@@ -25,6 +25,7 @@
 #include <optional>
 #include <array>
 #include <chrono>
+#include <format>
 
 namespace mts
 {
@@ -352,6 +353,18 @@ namespace mts
         if (!CreateVertexBuffer())
             return false;
 
+        NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(m_Device), "MitosisEngine device");
+        NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(m_GfxQueue), "Graphics+present queue");
+        NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(m_Swapchain), "Swapchain");
+        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(m_Pipeline), "Triangle pipeline");
+        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(m_VertexBuffer), "Triangle vertex buffer");
+
+        for (size_t i = 0; i < m_SwapchainImages.size(); ++i)
+        {
+            NameObject(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<uint64_t>(m_SwapchainImages[i]),
+                       std::format("Swapchain image {}", i).c_str());
+        }
+
         return true;
     }
     void VulkanRenderer::Shutdown()
@@ -500,9 +513,19 @@ namespace mts
         // temporary for instance creation.
         VkDebugUtilsMessengerCreateInfoEXT messengerInfo = MakeMessengerCreateInfo();
 
+        // Finds hazards the ordinary validation layers miss
+        const VkValidationFeatureEnableEXT syncValidationFeature =
+            VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
+
+        const VkValidationFeaturesEXT validationFeatures{
+            .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+            .pNext = &messengerInfo,
+            .enabledValidationFeatureCount = 1,
+            .pEnabledValidationFeatures = &syncValidationFeature};
+
         VkInstanceCreateInfo createInfo{
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            .pNext = m_ValidationEnabled ? &messengerInfo : nullptr,
+            .pNext = m_ValidationEnabled ? static_cast<const void *>(&validationFeatures) : nullptr,
             .pApplicationInfo = &appInfo,
             .enabledLayerCount = static_cast<uint32_t>(layers.size()),
             .ppEnabledLayerNames = layers.data(),
@@ -1069,6 +1092,21 @@ namespace mts
         }
     }
 
+    void VulkanRenderer::NameObject(VkObjectType type, uint64_t handle, const char *name)
+    {
+        // only when debugging
+        if (!m_ValidationEnabled || handle == 0)
+            return;
+
+        const VkDebugUtilsObjectNameInfoEXT info{
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .objectType = type,
+            .objectHandle = handle,
+            .pObjectName = name};
+
+        vkSetDebugUtilsObjectNameEXT(m_Device, &info);
+    }
+
     bool VulkanRenderer::CreateFrameResources()
     {
         const VkCommandPoolCreateInfo poolInfo{
@@ -1185,6 +1223,15 @@ namespace mts
 
         vkCmdBeginRendering(cmd, &renderingInfo);
 
+        if (m_ValidationEnabled)
+        {
+            const VkDebugUtilsLabelEXT label{
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+                .pLabelName = "Triangle Pass",
+                .color{1.0f, 0.0f, 1.0f, 1.0f}};
+            vkCmdBeginDebugUtilsLabelEXT(cmd, &label);
+        }
+
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
         const VkViewport viewport{
@@ -1206,8 +1253,8 @@ namespace mts
 
         static const auto startTime = std::chrono::steady_clock::now();
         const float elapsed = std::chrono::duration<float>(
-                                   std::chrono::steady_clock::now() - startTime)
-                                   .count();
+                                  std::chrono::steady_clock::now() - startTime)
+                                  .count();
 
         PushData pushData{
             .transform = glm::rotate(glm::mat4(1.0f), elapsed, glm::vec3(0.0f, 0.0f, 1.0f))};
@@ -1216,6 +1263,9 @@ namespace mts
                            0, sizeof(PushData), &pushData);
 
         vkCmdDraw(cmd, 3, 1, 0, 0);
+
+        if (m_ValidationEnabled)
+            vkCmdEndDebugUtilsLabelEXT(cmd);
 
         vkCmdEndRendering(cmd);
 
@@ -1299,7 +1349,7 @@ namespace mts
         const VkSemaphoreSubmitInfo signalSems[]{
             {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
              .semaphore = m_RenderComplete[imageIndex],
-             .stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT},
+             .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT},
             {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
              .semaphore = m_Timeline,
              .value = signalValue,

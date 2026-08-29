@@ -52,6 +52,7 @@ namespace mts
         bool CreateGraphicsPipeline();
         bool CreateVertexBuffer();
         void DestroyVertexBuffer();
+        void NameObject(VkObjectType type, uint64_t handle, const char *name);
         void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex);
 
     private:
