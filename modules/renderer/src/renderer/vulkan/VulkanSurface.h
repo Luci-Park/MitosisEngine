@@ -9,7 +9,7 @@
 
 #pragma once
 #include <volk.h>
-#include <window/Window.h>
+#include <core/platform/Surface.h>
 
 namespace mts::vk
 {

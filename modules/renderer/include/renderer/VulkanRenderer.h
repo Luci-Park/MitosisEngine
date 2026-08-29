@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <window/Window.h>
+#include <core/platform/Surface.h>
 
 #include <volk.h>
 
@@ -22,7 +22,7 @@ namespace mts
 {
     struct RendererDesc
     {
-        const Window *window;
+        const ISurfaceProvider *window;
         const char *appName;
         bool enableValidation;
     };
@@ -59,7 +59,7 @@ namespace mts
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
         constexpr static uint32_t kFramesInFlight = 2;
 
-        const Window *m_Window;
+        const ISurfaceProvider *m_Window;
         VkInstance m_VulkanInstance = VK_NULL_HANDLE;
         VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
         VkSurfaceKHR m_Surface = VK_NULL_HANDLE;

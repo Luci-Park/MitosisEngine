@@ -9,7 +9,6 @@ find_package(glm CONFIG REQUIRED)
 target_link_libraries(engine_renderer
     PUBLIC volk::volk_headers
             mts::core
-            mts::window
     PRIVATE GPUOpen::VulkanMemoryAllocator
             glm::glm
 )

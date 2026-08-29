@@ -212,7 +212,7 @@ namespace mts
             return VK_PRESENT_MODE_FIFO_KHR;
         }
 
-        VkExtent2D ChooseExtent(const VkSurfaceCapabilitiesKHR &caps, const Window &window)
+        VkExtent2D ChooseExtent(const VkSurfaceCapabilitiesKHR &caps, const ISurfaceProvider &window)
         {
             if (caps.currentExtent.width != UINT32_MAX)
                 return caps.currentExtent;
