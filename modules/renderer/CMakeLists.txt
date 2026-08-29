@@ -4,12 +4,14 @@
 find_package(volk CONFIG REQUIRED)
 # VMA : vulkan memory manager
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 
 target_link_libraries(engine_renderer
     PUBLIC volk::volk_headers
             mts::core
             mts::window
     PRIVATE GPUOpen::VulkanMemoryAllocator
+            glm::glm
 )
 
 # compile volk ourself instead of linking prebuilt library

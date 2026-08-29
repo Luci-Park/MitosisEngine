@@ -1,3 +1,9 @@
+struct VSInput
+{
+    float2 pos   : POSITION;
+    float3 color : COLOR;
+};
+
 struct VSOutput
 {
     // SV_Position is the clip-space position the rasteriser consumes.
@@ -5,25 +11,20 @@ struct VSOutput
     float3 color    : COLOR;
 };
 
-// counter clockwise is face
-static const float2 kPositions[3] = {
-    float2( 0.0, -0.5),
-    float2(-0.5,  0.5),
-    float2( 0.5,  0.5),
+struct PushData
+{
+    float4x4 transform;
 };
 
-static const float3 kColors[3] = {
-    float3(1.0, 0.0, 0.0),
-    float3(0.0, 1.0, 0.0),
-    float3(0.0, 0.0, 1.0),
-};
+[[vk::push_constant]]
+PushData pushData;
 
 [shader("vertex")]
-VSOutput vertexMain(uint vertexID : SV_VertexID)
+VSOutput vertexMain(VSInput input)
 {
     VSOutput output;
-    output.position = float4(kPositions[vertexID], 0.0, 1.0);
-    output.color = kColors[vertexID];
+    output.position = mul(pushData.transform, float4(input.pos, 0.0, 1.0));
+    output.color = input.color;
     return output;
 }
 

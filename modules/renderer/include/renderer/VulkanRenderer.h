@@ -16,6 +16,7 @@
 #include <vector>
 
 VK_DEFINE_HANDLE(VmaAllocator)
+VK_DEFINE_HANDLE(VmaAllocation)
 
 namespace mts
 {
@@ -49,6 +50,8 @@ namespace mts
         bool CreateRenderCompleteSemaphores();
         void DestroyRenderCompleteSemaphores();
         bool CreateGraphicsPipeline();
+        bool CreateVertexBuffer();
+        void DestroyVertexBuffer();
         void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex);
 
     private:
@@ -87,6 +90,9 @@ namespace mts
 
         VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_Pipeline = VK_NULL_HANDLE;
+
+        VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
+        VmaAllocation m_VertexBufferAllocation = VK_NULL_HANDLE;
 
         uint32_t m_FrameIndex = 0;
         bool m_NeedRecreate = false;

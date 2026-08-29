@@ -14,17 +14,40 @@
 
 #include <vk_mem_alloc.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <vector>
 #include <cstring>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <optional>
+#include <array>
+#include <chrono>
 
 namespace mts
 {
     namespace
     {
+        struct Vertex
+        {
+            glm::vec2 pos;
+            glm::vec3 color;
+        };
+
+        // frontface = counter-clockwise
+        const Vertex kTriangleVertices[3]{
+            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        };
+
+        // 64 bytes: inside the 128-byte guaranteed minimum for push constants.
+        struct PushData
+        {
+            glm::mat4 transform;
+        };
         VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT severity,
             VkDebugUtilsMessageTypeFlagsEXT,
@@ -326,6 +349,9 @@ namespace mts
         if (!CreateGraphicsPipeline())
             return false;
 
+        if (!CreateVertexBuffer())
+            return false;
+
         return true;
     }
     void VulkanRenderer::Shutdown()
@@ -348,6 +374,9 @@ namespace mts
                 if (m_CmdPools[i] != VK_NULL_HANDLE)
                     vkDestroyCommandPool(m_Device, m_CmdPools[i], nullptr);
             }
+
+            // before m_Allocator
+            DestroyVertexBuffer();
 
             if (m_Pipeline != VK_NULL_HANDLE)
             {
@@ -814,10 +843,20 @@ namespace mts
              .module = fragModule,
              .pName = "fragmentMain"}};
 
+        const VkVertexInputBindingDescription vertexBinding{
+            .binding = 0,
+            .stride = sizeof(Vertex),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
+
+        const std::array<VkVertexInputAttributeDescription, 2> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, pos)},
+                                                                                 {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, color)}}};
+
         const VkPipelineVertexInputStateCreateInfo vertexInput{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            .vertexBindingDescriptionCount = 0,
-            .vertexAttributeDescriptionCount = 0};
+            .vertexBindingDescriptionCount = 1,
+            .pVertexBindingDescriptions = &vertexBinding,
+            .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttributes.size()),
+            .pVertexAttributeDescriptions = vertexAttributes.data()};
 
         const VkPipelineInputAssemblyStateCreateInfo inputAssembly{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -866,10 +905,16 @@ namespace mts
             .dynamicStateCount = 2,
             .pDynamicStates = dynamicStates};
 
+        const VkPushConstantRange pushConstantRange{
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset = 0,
+            .size = sizeof(PushData)};
+
         const VkPipelineLayoutCreateInfo layoutInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .setLayoutCount = 0,
-            .pushConstantRangeCount = 0};
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pushConstantRange};
 
         if (vkCreatePipelineLayout(m_Device, &layoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
         {
@@ -916,6 +961,112 @@ namespace mts
 
         MTS_LOG_INFO("Graphics pipeline created");
         return true;
+    }
+
+    bool VulkanRenderer::CreateVertexBuffer()
+    {
+        const VkDeviceSize bufferSize = sizeof(kTriangleVertices);
+
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+
+        const VkBufferCreateInfo stagingInfo{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = bufferSize,
+            .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+
+        VmaAllocationCreateInfo stagingAllocInfo{
+            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
+            .usage = VMA_MEMORY_USAGE_AUTO};
+
+        VmaAllocationInfo stagingInfoOut{};
+        if (vmaCreateBuffer(m_Allocator, &stagingInfo, &stagingAllocInfo,
+                            &stagingBuffer, &stagingAllocation, &stagingInfoOut) != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vmaCreateBuffer failed for staging buffer");
+            return false;
+        }
+
+        std::memcpy(stagingInfoOut.pMappedData, kTriangleVertices, bufferSize);
+
+        const VkBufferCreateInfo deviceInfo{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = bufferSize,
+            .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+
+        // No host-access flags: that absence is what tells VMA this buffer
+        // should live in device-local memory.
+        const VmaAllocationCreateInfo deviceAllocInfo{
+            .usage = VMA_MEMORY_USAGE_AUTO};
+
+        if (vmaCreateBuffer(m_Allocator, &deviceInfo, &deviceAllocInfo,
+                            &m_VertexBuffer, &m_VertexBufferAllocation, nullptr) != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vmaCreateBuffer failed for device vertex buffer");
+            vmaDestroyBuffer(m_Allocator, stagingBuffer, stagingAllocation);
+            return false;
+        }
+
+        // One-shot upload: its own throwaway pool, not a frame pool, since
+        // those get reset by the frame loop and this runs before it starts.
+        VkCommandPool uploadPool = VK_NULL_HANDLE;
+        const VkCommandPoolCreateInfo poolInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .queueFamilyIndex = m_GfxQueueFamIdx};
+
+        if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &uploadPool) != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vkCreateCommandPool failed for vertex upload");
+            vmaDestroyBuffer(m_Allocator, stagingBuffer, stagingAllocation);
+            return false;
+        }
+
+        VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
+        const VkCommandBufferAllocateInfo cmdAllocInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool = uploadPool,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1};
+        vkAllocateCommandBuffers(m_Device, &cmdAllocInfo, &uploadCmd);
+
+        const VkCommandBufferBeginInfo beginInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+        vkBeginCommandBuffer(uploadCmd, &beginInfo);
+
+        const VkBufferCopy copyRegion{.size = bufferSize};
+        vkCmdCopyBuffer(uploadCmd, stagingBuffer, m_VertexBuffer, 1, &copyRegion);
+
+        vkEndCommandBuffer(uploadCmd);
+
+        const VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &uploadCmd};
+
+        vkQueueSubmit(m_GfxQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        // Blocking stall: fine once at init, never inside the frame loop.
+        // A staging ring is the eventual fix if repeated uploads are needed.
+        vkQueueWaitIdle(m_GfxQueue);
+
+        vkDestroyCommandPool(m_Device, uploadPool, nullptr);
+        vmaDestroyBuffer(m_Allocator, stagingBuffer, stagingAllocation);
+
+        MTS_LOG_INFO("Vertex buffer uploaded: {} bytes", bufferSize);
+        return true;
+    }
+
+    void VulkanRenderer::DestroyVertexBuffer()
+    {
+        if (m_VertexBuffer != VK_NULL_HANDLE)
+        {
+            vmaDestroyBuffer(m_Allocator, m_VertexBuffer, m_VertexBufferAllocation);
+            m_VertexBuffer = VK_NULL_HANDLE;
+            m_VertexBufferAllocation = VK_NULL_HANDLE;
+        }
     }
 
     bool VulkanRenderer::CreateFrameResources()
@@ -1049,6 +1200,20 @@ namespace mts
             .offset{0, 0},
             .extent = m_SwapchainExtent};
         vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+        const VkDeviceSize vertexOffset = 0;
+        vkCmdBindVertexBuffers(cmd, 0, 1, &m_VertexBuffer, &vertexOffset);
+
+        static const auto startTime = std::chrono::steady_clock::now();
+        const float elapsed = std::chrono::duration<float>(
+                                   std::chrono::steady_clock::now() - startTime)
+                                   .count();
+
+        PushData pushData{
+            .transform = glm::rotate(glm::mat4(1.0f), elapsed, glm::vec3(0.0f, 0.0f, 1.0f))};
+
+        vkCmdPushConstants(cmd, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                           0, sizeof(PushData), &pushData);
 
         vkCmdDraw(cmd, 3, 1, 0, 0);
 
