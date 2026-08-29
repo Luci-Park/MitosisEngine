@@ -48,6 +48,7 @@ namespace mts
         bool CreateFrameResources();
         bool CreateRenderCompleteSemaphores();
         void DestroyRenderCompleteSemaphores();
+        bool CreateGraphicsPipeline();
         void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex);
 
     private:
@@ -83,6 +84,9 @@ namespace mts
         // waitvalue = signalValue - kFramesInFlight
         // dont start at 0 or 1 or else underflows
         uint64_t m_NextSignalValue = kFramesInFlight + 1;
+
+        VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
+        VkPipeline m_Pipeline = VK_NULL_HANDLE;
 
         uint32_t m_FrameIndex = 0;
         bool m_NeedRecreate = false;

@@ -21,6 +21,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 
 include(cmake/EnginePlatform.cmake)
 include(cmake/EngineModule.cmake)
+include(cmake/Shaders.cmake)
 
 add_subdirectory(modules/core)
 add_subdirectory(modules/renderer)
@@ -28,6 +29,12 @@ add_subdirectory(modules/window)
 
 add_executable(HelloWorld)
 target_sources(HelloWorld PRIVATE main.cpp)
+
+engine_add_shaders(HelloWorld
+    SOURCE assets/shaders/triangle.slang
+    ENTRIES vertexMain:vertex fragmentMain:fragment)
+
+    
 
 target_link_libraries(HelloWorld PRIVATE
     mts::core

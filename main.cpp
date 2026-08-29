@@ -11,7 +11,7 @@ int main()
     auto window = mts::Window::Create(desc);
 
     mts::VulkanRenderer renderer;
-    if (!renderer.Initialize({.window = window.get()}))
+    if (!renderer.Initialize({.window = window.get(), .appName = "MitosisEngine", .enableValidation = true}))
     {
         mts::FlushLog();
         return -1;

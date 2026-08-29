@@ -10,6 +10,7 @@
 #include "vulkan/VulkanSurface.h"
 #include <core/log/Log.h>
 #include <core/log/Assert.h>
+#include <core/fs/Paths.h>
 
 #include <vk_mem_alloc.h>
 
@@ -17,6 +18,8 @@
 #include <cstring>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <optional>
 
 namespace mts
 {
@@ -103,15 +106,20 @@ namespace mts
                 .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
                 .pNext = &features13};
 
+            VkPhysicalDeviceVulkan11Features features11{
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+                .pNext = &features12};
+
             VkPhysicalDeviceFeatures2 features{
                 .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-                .pNext = &features12};
+                .pNext = &features11};
 
             vkGetPhysicalDeviceFeatures2(device, &features);
 
             return features13.dynamicRendering == VK_TRUE &&
                    features13.synchronization2 == VK_TRUE &&
-                   features12.timelineSemaphore == VK_TRUE;
+                   features12.timelineSemaphore == VK_TRUE &&
+                   features11.shaderDrawParameters == VK_TRUE;
         }
         bool HasSurfaceSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
         {
@@ -224,6 +232,53 @@ namespace mts
 
             vkCmdPipelineBarrier2(cmd, &dep);
         }
+        std::optional<std::vector<uint32_t>> ReadSpirv(const std::filesystem::path &path)
+        {
+            std::ifstream file(path, std::ios::binary | std::ios::ate);
+            if (!file)
+            {
+                MTS_LOG_CRITICAL("Cannot open SPIR-V: {}", path.string());
+                return std::nullopt;
+            }
+
+            const std::streamsize byteSize = file.tellg();
+            if (byteSize <= 0 || byteSize % 4 != 0)
+            {
+                MTS_LOG_CRITICAL("Bad SPIR-V size ({} bytes): {}", byteSize, path.string());
+                return std::nullopt;
+            }
+
+            std::vector<uint32_t> words(static_cast<size_t>(byteSize) / 4);
+            file.seekg(0);
+            file.read(reinterpret_cast<char *>(words.data()), byteSize);
+
+            if (!file)
+            {
+                MTS_LOG_CRITICAL("Short read on SPIR-V: {}", path.string());
+                return std::nullopt;
+            }
+            return words;
+        }
+
+        VkShaderModule CreateShaderModule(VkDevice device, const std::filesystem::path &path)
+        {
+            const std::optional<std::vector<uint32_t>> words = ReadSpirv(path);
+            if (!words.has_value())
+                return VK_NULL_HANDLE;
+
+            const VkShaderModuleCreateInfo info{
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = words->size() * sizeof(uint32_t),
+                .pCode = words->data()};
+
+            VkShaderModule module = VK_NULL_HANDLE;
+            if (vkCreateShaderModule(device, &info, nullptr, &module) != VK_SUCCESS)
+            {
+                MTS_LOG_CRITICAL("vkCreateShaderModule failed: {}", path.string());
+                return VK_NULL_HANDLE;
+            }
+            return module;
+        }
     }
 
     bool VulkanRenderer::Initialize(const RendererDesc &desc)
@@ -268,6 +323,9 @@ namespace mts
         if (!CreateFrameResources())
             return false;
 
+        if (!CreateGraphicsPipeline())
+            return false;
+
         return true;
     }
     void VulkanRenderer::Shutdown()
@@ -289,6 +347,18 @@ namespace mts
                 // Destroying the pool frees its command buffers too.
                 if (m_CmdPools[i] != VK_NULL_HANDLE)
                     vkDestroyCommandPool(m_Device, m_CmdPools[i], nullptr);
+            }
+
+            if (m_Pipeline != VK_NULL_HANDLE)
+            {
+                vkDestroyPipeline(m_Device, m_Pipeline, nullptr);
+                m_Pipeline = VK_NULL_HANDLE;
+            }
+
+            if (m_PipelineLayout != VK_NULL_HANDLE)
+            {
+                vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
+                m_PipelineLayout = VK_NULL_HANDLE;
             }
 
             DestroyRenderCompleteSemaphores();
@@ -476,7 +546,7 @@ namespace mts
             }
             if (!HasRequiredFeatures(device))
             {
-                MTS_LOG_INFO("Rejected {}: missing dynamicRendering / synchore", props.deviceName);
+                MTS_LOG_INFO("Rejected {}: missing dynamicRendering / sync2 / timeline / shaderDrawParameters", props.deviceName);
                 continue;
             }
             if (!HasSurfaceSupport(device, m_Surface))
@@ -549,9 +619,14 @@ namespace mts
             .timelineSemaphore = VK_TRUE,
             .bufferDeviceAddress = VK_TRUE};
 
+        VkPhysicalDeviceVulkan11Features features11{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+            .pNext = &features12,
+            .shaderDrawParameters = VK_TRUE};
+
         VkPhysicalDeviceFeatures2 features{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-            .pNext = &features12};
+            .pNext = &features11};
 
         const VkDeviceCreateInfo deviceInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -715,6 +790,134 @@ namespace mts
         return true;
     }
 
+    bool VulkanRenderer::CreateGraphicsPipeline()
+    {
+        VkShaderModule vertModule = CreateShaderModule(m_Device, ShaderPath("triangle.vertexMain.spv"));
+        VkShaderModule fragModule = CreateShaderModule(m_Device, ShaderPath("triangle.fragmentMain.spv"));
+
+        if (vertModule == VK_NULL_HANDLE || fragModule == VK_NULL_HANDLE)
+        {
+            if (vertModule != VK_NULL_HANDLE)
+                vkDestroyShaderModule(m_Device, vertModule, nullptr);
+            if (fragModule != VK_NULL_HANDLE)
+                vkDestroyShaderModule(m_Device, fragModule, nullptr);
+            return false;
+        }
+
+        const VkPipelineShaderStageCreateInfo stages[]{
+            {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+             .stage = VK_SHADER_STAGE_VERTEX_BIT,
+             .module = vertModule,
+             .pName = "vertexMain"},
+            {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+             .module = fragModule,
+             .pName = "fragmentMain"}};
+
+        const VkPipelineVertexInputStateCreateInfo vertexInput{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .vertexBindingDescriptionCount = 0,
+            .vertexAttributeDescriptionCount = 0};
+
+        const VkPipelineInputAssemblyStateCreateInfo inputAssembly{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .primitiveRestartEnable = VK_FALSE};
+
+        const VkPipelineViewportStateCreateInfo viewportState{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .viewportCount = 1,
+            .pViewports = nullptr,
+            .scissorCount = 1,
+            .pScissors = nullptr};
+
+        const VkPipelineRasterizationStateCreateInfo rasterizer{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .depthClampEnable = VK_FALSE,
+            .rasterizerDiscardEnable = VK_FALSE,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = VK_CULL_MODE_BACK_BIT,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .depthBiasEnable = VK_FALSE,
+            .lineWidth = 1.0f};
+
+        const VkPipelineMultisampleStateCreateInfo multisample{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+            .sampleShadingEnable = VK_FALSE};
+
+        const VkPipelineColorBlendAttachmentState blendAttachment{
+            .blendEnable = VK_FALSE,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
+
+        const VkPipelineColorBlendStateCreateInfo colorBlend{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .logicOpEnable = VK_FALSE,
+            .attachmentCount = 1,
+            .pAttachments = &blendAttachment};
+
+        const VkDynamicState dynamicStates[]{
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR};
+
+        const VkPipelineDynamicStateCreateInfo dynamicState{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = 2,
+            .pDynamicStates = dynamicStates};
+
+        const VkPipelineLayoutCreateInfo layoutInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .setLayoutCount = 0,
+            .pushConstantRangeCount = 0};
+
+        if (vkCreatePipelineLayout(m_Device, &layoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vkCreatePipelineLayout failed");
+            vkDestroyShaderModule(m_Device, vertModule, nullptr);
+            vkDestroyShaderModule(m_Device, fragModule, nullptr);
+            return false;
+        }
+
+        const VkPipelineRenderingCreateInfo renderingInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &m_SwapchainFormat};
+
+        const VkGraphicsPipelineCreateInfo pipelineInfo{
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = &renderingInfo,
+            .stageCount = 2,
+            .pStages = stages,
+            .pVertexInputState = &vertexInput,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisample,
+            .pDepthStencilState = nullptr,
+            .pColorBlendState = &colorBlend,
+            .pDynamicState = &dynamicState,
+            .layout = m_PipelineLayout,
+            .renderPass = VK_NULL_HANDLE,
+            .subpass = 0};
+
+        const VkResult result = vkCreateGraphicsPipelines(
+            m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline);
+
+        vkDestroyShaderModule(m_Device, vertModule, nullptr);
+        vkDestroyShaderModule(m_Device, fragModule, nullptr);
+
+        if (result != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vkCreateGraphicsPipelines failed: {}", static_cast<int>(result));
+            m_Pipeline = VK_NULL_HANDLE;
+            return false;
+        }
+
+        MTS_LOG_INFO("Graphics pipeline created");
+        return true;
+    }
+
     bool VulkanRenderer::CreateFrameResources()
     {
         const VkCommandPoolCreateInfo poolInfo{
@@ -830,7 +1033,25 @@ namespace mts
             .pColorAttachments = &colorAttachment};
 
         vkCmdBeginRendering(cmd, &renderingInfo);
-        // Milestone 8 puts the draw here.
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+
+        const VkViewport viewport{
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = static_cast<float>(m_SwapchainExtent.width),
+            .height = static_cast<float>(m_SwapchainExtent.height),
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f};
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+        const VkRect2D scissor{
+            .offset{0, 0},
+            .extent = m_SwapchainExtent};
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+        vkCmdDraw(cmd, 3, 1, 0, 0);
+
         vkCmdEndRendering(cmd);
 
         // give it back
