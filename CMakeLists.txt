@@ -6,7 +6,8 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/VcpkgToolchain.cmake)
 project(Mitosis
     VERSION 0.1.0
     DESCRIPTION "A modular 3D engine"
-    LANGUAGES CXX)
+    # C is needed for volk.c
+    LANGUAGES CXX C)
 
 # C++ 20
 set(CMAKE_CXX_STANDARD 20)

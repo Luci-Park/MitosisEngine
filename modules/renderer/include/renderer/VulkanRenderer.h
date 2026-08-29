@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file VulkanRenderer.h
  * @author Sumin Park
  * @brief Renderer with all Vulkan signatures.
@@ -8,29 +8,46 @@
  */
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include <window/Window.h>
+
+#include <volk.h>
+
+#include <cstdint>
 
 namespace mts
 {
+    struct RendererDesc
+    {
+        const Window *window;
+        const char *appName;
+        bool enableValidation;
+    };
+
     class VulkanRenderer
     {
     public:
         VulkanRenderer() = default;
+        bool Initialize(const RendererDesc &desc);
+        void Shutdown();
 
     private:
-        bool Initialize(void *window);
-        bool CreateVulkanInstance();
-        VkPhysicalDevice FindPhysicalDevice();
-        bool CreateDevice(VkPhysicalDevice physicalDevice);
+        bool CreateVulkanInstance(const RendererDesc &desc);
+        bool CreateDebugMessenger();
+        bool CreateSurface();
+        bool FindPhysicalDevice();
 
     private:
-        constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_4};
-        constexpr static uint32_t MaxFramesInFlight{2};
+        constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
+        const Window *m_Window;
+        VkInstance m_VulkanInstance = VK_NULL_HANDLE;
+        VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
+        VkSurfaceKHR m_Surface = VK_NULL_HANDLEE;
 
-        void *m_Window = nullptr;
+        VkPhysicalDevice m_PphysicalDevice = VK_NULL_HANDLE;
 
-        VkInstance m_VulkanInstance = nullptr;
-        VkPhysicalDevice m_PhysicalDevice = nullptr;
-        VkDevice m_Device = nullptr;
+        // render + present
+        uint32_t m_GfxQueueFamIdx = UINT32_MAX;
+
+        bool m_ValidationEnabled = false;
     };
 }

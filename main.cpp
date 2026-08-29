@@ -1,6 +1,6 @@
 #include <core/log/Log.h>
 #include <window/Window.h>
-
+#include <renderer/VulkanRenderer.h>
 int main()
 {
     mts::InitLog();
@@ -10,22 +10,17 @@ int main()
 
     auto window = mts::Window::Create(desc);
 
-    uint32_t lastWidth = window->Width();
-    uint32_t lastHeight = window->Height();
-    MTS_LOG_INFO("Native handle: {}", window->NativeWindow().backend);
-
+    mts::VulkanRenderer renderer;
+    if (!renderer.Initialize({.window = window.get()}))
+    {
+        mts::FlushLog();
+        return -1;
+    }
     while (!window->ShouldClose())
     {
         window->PollEvents();
-
-        // Only log on change; the loop is uncapped and would spam otherwise.
-        if (window->Width() != lastWidth || window->Height() != lastHeight)
-        {
-            lastWidth = window->Width();
-            lastHeight = window->Height();
-            MTS_LOG_INFO("Resized: {}x{}", lastWidth, lastHeight);
-        }
     }
+    renderer.Shutdown();
 
     MTS_LOG_INFO("Window closed");
     mts::FlushLog();

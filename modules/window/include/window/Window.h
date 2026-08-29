@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <format>
 #include <memory>
 
 namespace mts
@@ -21,6 +22,19 @@ namespace mts
         Wayland, // modern linux
         Cocoa    // macOS
     };
+
+    constexpr const char *ToString(WindowBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case WindowBackend::None:    return "None";
+        case WindowBackend::Win32:   return "Win32";
+        case WindowBackend::Xlib:    return "Xlib";
+        case WindowBackend::Wayland: return "Wayland";
+        case WindowBackend::Cocoa:   return "Cocoa";
+        }
+        return "Unknown";
+    }
 
     // for graphics borrowing
     struct NativeWindowHandle
@@ -61,4 +75,14 @@ namespace mts
     protected:
         Window() = default;
     };
+};
+
+// Lets WindowBackend be used directly in std::format / MTS_LOG_* calls.
+template <>
+struct std::formatter<mts::WindowBackend> : std::formatter<const char *>
+{
+    auto format(mts::WindowBackend backend, std::format_context &ctx) const
+    {
+        return std::formatter<const char *>::format(mts::ToString(backend), ctx);
+    }
 };

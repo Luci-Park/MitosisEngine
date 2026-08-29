@@ -1,117 +1,219 @@
-﻿/**
+/**
  * @file VulkanRenderer.cpp
  * @author Sumin Park
- * @brief
+ * @brief Renderer with all Vulkan signatures.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
  */
 #include "renderer/VulkanRenderer.h"
+#include "vulkan/VulkanSurface.h"
 #include <core/log/Log.h>
-
-#include <volk.h>
-#include <GLFW/glfw3.h>
+#include <core/log/Assert.h>
 
 #include <vector>
+#include <cstring>
 namespace mts
 {
-    bool VulkanRenderer::Initialize(void *window)
+    namespace
     {
-        m_Window = window;
-
-        if (!CreateVulkanInstance())
+        VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+            VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+            VkDebugUtilsMessageTypeFlagsEXT,
+            const VkDebugUtilsMessengerCallbackDataEXT *data,
+            void *)
         {
-            MTS_LOG_CRITICAL("Vulkan Instance creation failed");
+            if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+            {
+                MTS_LOG_ERROR("[vulkan] {}", data->pMessage);
+                MTS_DEBUG_BREAK();
+            }
+            else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+            {
+                MTS_LOG_WARN("[vulkan] {}", data->pMessage);
+            }
+            else
+            {
+                MTS_LOG_INFO("[vulkan] {}", data->pMessage);
+            }
+
+            // VK_TRUE would abort the call that triggered this. That is a layer
+            // self-test mechanism, not an error handler. Always VK_FALSE.
+            return VK_FALSE;
+        }
+
+        VkDebugUtilsMessengerCreateInfoEXT MakeMessengerCreateInfo()
+        {
+            return VkDebugUtilsMessengerCreateInfoEXT{
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                .pfnUserCallback = &DebugCallback};
+        }
+
+        bool HasLayer(const std::vector<VkLayerProperties> &layers, const char *name)
+        {
+            for (const VkLayerProperties &layer : layers)
+            {
+                if (std::strcmp(layer.layerName, name) == 0)
+                    return true;
+            }
             return false;
         }
 
-        if (m_PhysicalDevice = FindPhysicalDevice(); !m_PhysicalDevice)
+        bool HasExtension(const std::vector<VkExtensionProperties> &exts, const char *name)
         {
-            MTS_LOG_CRITICAL("Failed to find an appropriate Physical device");
-            return false;
-        }
-
-        if (!CreateDevice(m_PhysicalDevice))
-        {
-            MTS_LOG_CRITICAL("Logical GPU device creation failed");
+            for (const VkExtensionProperties &ext : exts)
+            {
+                if (std::strcmp(ext.extensionName, name) == 0)
+                    return true;
+            }
             return false;
         }
     }
 
-    bool VulkanRenderer::CreateVulkanInstance()
+    bool VulkanRenderer::Initialize(const RendererDesc &desc)
     {
-        // 1. using volk? always start with volk
-        if (volkInitialize() != VK_SUCCESS)
+        if (desc.window == nullptr)
         {
-            MTS_LOG_CRITICAL("Volk initialization failed");
+            MTS_LOG_ERROR("no window");
             return false;
         }
 
-        // 2. vulkan application instance
-        VkApplicationInfo appInfo{
-            // vk's type erasure method
-            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-            // TODO: read it from somewhere so it's synced to the window
-            .pApplicationName = "MitosisEngine - Window Test",
-            .apiVersion = VulkanVersion};
+        m_Window = desc.window;
 
-        // 3. get extensions from window
-        // TODO: sync window
-        uint32_t instExtCount = 0;
-
-        const char *const *extensions = glfwGetRequiredInstanceExtensions(&instExtCount);
-
-        std::vector<const char *> requestedLayers{
-            "VK_LAYER_KHRONOS_validation"};
-
-        // 4. instance creation
-        VkInstanceCreateInfo instCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            .pApplicationInfo = &appInfo,
-            .enabledLayerCount = static_cast<uint32_t>(requestedLayers.size()),
-            .ppEnabledLayerNames = requestedLayers.data(),
-            .enabledExtensionCount = instExtCount,
-            .ppEnabledExtensionNames = extensions};
-
-        if (vkCreateInstance(&instCreateInfo, nullptr, &m_VulkanInstance) != VK_SUCCESS)
+        if (volkInitialize() != VK_SUCCESS)
         {
+            MTS_LOG_ERROR("volk initialized failed");
+            return false;
+        }
+
+        if (!CreateVulkanInstance(desc))
+        {
+            MTS_LOG_ERROR("vulkan instance creation failed");
             return false;
         }
 
         volkLoadInstance(m_VulkanInstance);
+
+        if (m_ValidationEnabled && !CreateDebugMessenger())
+        {
+            MTS_LOG_ERROR("debug messenger creation failed");
+            return false;
+        }
+
         return true;
     }
-
-    VkPhysicalDevice VulkanRenderer::FindPhysicalDevice()
+    void VulkanRenderer::Shutdown()
     {
-        // enumerate all physical device
-        // once to get count, once to fill data
-        uint32_t physDeviceCount = 0;
-        vkEnumeratePhysicalDevices(m_VulkanInstance, &physDeviceCount, nullptr);
-        std::vector<VkPhysicalDevice> physicalDevices(physDeviceCount);
-        vkEnumeratePhysicalDevices(m_VulkanInstance, &physDeviceCount, physicalDevices.data());
-
-        VkPhysicalDevice physicalDevice = nullptr;
-        if (physDeviceCount)
+        if (m_DebugMessenger != VK_NULL_HANDLE)
         {
-            physicalDevice = physicalDevices[0];
+            vkDestroyDebugUtilsMessengerEXT(m_VulkanInstance, m_DebugMessenger, nullptr);
+            m_DebugMessenger = VK_NULL_HANDLE;
+        }
+        if (m_VulkanInstance != VK_NULL_HANDLE)
+        {
+            vkDestroyInstance(m_VulkanInstance, nullptr);
+            m_VulkanInstance = VK_NULL_HANDLE;
+        }
 
-            for (auto &pDev : physicalDevices)
+        volkFinalize();
+    }
+    bool VulkanRenderer::CreateVulkanInstance(const RendererDesc &desc)
+    {
+        // to fill data, read twice : once for count, once to fill
+        uint32_t layerCount = 0;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+        uint32_t extCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
+        std::vector<VkExtensionProperties> availableExts(extCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &extCount, availableExts.data());
+
+        std::vector<const char *> layers;
+        std::vector<const char *> extensions;
+
+        const WindowBackend backend = m_Window->NativeWindow().backend;
+
+        const char *platformExt = vk::PlatformSurfaceExtension(backend);
+        if (platformExt == nullptr)
+        {
+            MTS_LOG_CRITICAL("No Vulkan surface extension for window backend {}",
+                             static_cast<int>(backend));
+            return false;
+        }
+
+        extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+        extensions.push_back(platformExt);
+
+        for (const char *name : extensions)
+        {
+            if (!HasExtension(availableExts, name))
             {
-                VkPhysicalDeviceProperties props{};
-                vkGetPhysicalDeviceProperties(pDev, &props);
-                if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-                {
-                    physicalDevice = pDev;
-                    break;
-                }
+                MTS_LOG_CRITICAL("Required instance extension missing: {}", name);
+                return false;
             }
         }
 
-        uint32_t formatCount = 0;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+        // debug soft check
+        if (desc.enableValidation)
+        {
+            const bool hasLayer = HasLayer(availableLayers, "VK_LAYER_KHRONOS_validation");
+            const bool hasDebugUtils = HasExtension(availableExts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+            if (hasLayer && hasDebugUtils)
+            {
+                layers.push_back("VK_LAYER_KHRONOS_validation");
+                extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+                m_ValidationEnabled = true;
+            }
+            else
+            {
+                MTS_LOG_WARN("Validation unavailable (layer: {}, debug_utils: {}); "
+                             "install the Vulkan SDK to enable it",
+                             hasLayer, hasDebugUtils);
+            }
+        }
+
+        VkApplicationInfo appInfo{
+            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pApplicationName = desc.appName,
+            .apiVersion = VulkanVersion};
+
+        // temporary for instance creation.
+        VkDebugUtilsMessengerCreateInfoEXT messengerInfo = MakeMessengerCreateInfo();
+
+        VkInstanceCreateInfo createInfo{
+            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            .pNext = m_ValidationEnabled ? &messengerInfo : nullptr,
+            .pApplicationInfo = &appInfo,
+            .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+            .ppEnabledLayerNames = layers.data(),
+            .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+            .ppEnabledExtensionNames = extensions.data()};
+
+        if (vkCreateInstance(&createInfo, nullptr, &m_VulkanInstance) != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vkCreateInstance failed");
+            return false;
+        }
+
+        return true;
     }
-    bool VulkanRenderer::CreateDevice(VkPhysicalDevice physicalDevice)
+    bool VulkanRenderer::CreateDebugMessenger()
     {
+        const VkDebugUtilsMessengerCreateInfoEXT info = MakeMessengerCreateInfo();
+
+        if (vkCreateDebugUtilsMessengerEXT(m_VulkanInstance, &info, nullptr, &m_DebugMessenger) != VK_SUCCESS)
+        {
+            MTS_LOG_ERROR("vkCreateDebugUtilsMessengerEXT failed");
+            return false;
+        }
+        return true;
     }
 }

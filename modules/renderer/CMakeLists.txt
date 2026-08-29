@@ -1,30 +1,48 @@
 ﻿engine_add_module(renderer)
 
-target_sources(engine_renderer PRIVATE
-    src/renderer/Renderer.cpp
-    src/renderer/VulkanRenderer.cpp
-)
-
-find_package(Vulkan REQUIRED)
 # volk: function pointers w/o boiler plate
 find_package(volk CONFIG REQUIRED)
 # VMA : vulkan memory manager
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
-# temp for renderer
-find_package(glfw3 CONFIG REQUIRED)
-
 target_link_libraries(engine_renderer
     PUBLIC volk::volk_headers
             mts::core
             mts::window
-    PRIVATE volk::volk
-            GPUOpen::VulkanMemoryAllocator
-            glfw
+    PRIVATE GPUOpen::VulkanMemoryAllocator
 )
+
+# compile volk ourself instead of linking prebuilt library
+# due to platform definition issues
+get_target_property(_volk_includes volk::volk_headers INTERFACE_INCLUDE_DIRECTORIES)
+find_file(VOLK_SOURCE volk.c PATHS ${_volk_includes} NO_DEFAULT_PATH REQUIRED)
+target_sources(engine_renderer PRIVATE ${VOLK_SOURCE})
+
+# for volk macro definition
+if(ENGINE_PLATFORM STREQUAL "Windows")
+    target_compile_definitions(engine_renderer PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+elseif(ENGINE_PLATFORM STREQUAL "Linux")
+    target_compile_definitions(engine_renderer PRIVATE
+        VK_USE_PLATFORM_XLIB_KHR
+        VK_USE_PLATFORM_WAYLAND_KHR)
+endif()
 
 # makes VMA compatible with volk
 target_compile_definitions(engine_renderer PRIVATE
     VMA_STATIC_VULKAN_FUNCTIONS=0
     VMA_DYNAMIC_VULKAN_FUNCTIONS=1
 )
+
+target_sources(engine_renderer PRIVATE
+    src/renderer/Renderer.cpp
+    src/renderer/VulkanRenderer.cpp
+)
+if(ENGINE_FAMILY_DESKTOP)
+    if(ENGINE_PLATFORM STREQUAL "Windows")
+    target_sources(engine_renderer PRIVATE src/renderer/vulkan/VulkanSurfaceWin32.cpp)
+    elseif(ENGINE_PLATFORM STREQUAL "Linux")
+    target_sources(engine_renderer PRIVATE src/renderer/vulkan/VulkanSurfaceLinux.cpp)
+    else()
+        message(FATAL_ERROR "No native window backend for ${ENGINE_PLATFORM}")
+    endif()
+endif()
