@@ -8,7 +8,8 @@
         "glm",
         "vulkan",
         "volk",
-        "vulkan-memory-allocator"
+        "vulkan-memory-allocator",
+        "catch2"
     ],
     "$comment": "builtin-baseline = SHA of vcpkg"
 }
