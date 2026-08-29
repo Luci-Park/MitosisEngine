@@ -1,4 +1,9 @@
 {
+    "github.copilot.enable": {
+        "*": true,
+        "cpp": false,
+        "c": false
+    },
     "files.associations": {
         "*.tmpl": "plaintext"
     },
@@ -17,7 +22,7 @@
         "**/.git/**": true
     },
     "C_Cpp.intelliSenseEngineFallback": "disabled",
-    "C_Cpp.autocompleteAddParentheses": true,
+    "C_Cpp.autocompleteAddParentheses": false,
     // Throttle background workspace parsing so it does not compete with
     // the IntelliSense process for the open file.
     "C_Cpp.workspaceParsingPriority": "medium",

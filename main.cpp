@@ -19,6 +19,7 @@ int main()
     while (!window->ShouldClose())
     {
         window->PollEvents();
+        renderer.DrawFrame();
     }
     renderer.Shutdown();
 

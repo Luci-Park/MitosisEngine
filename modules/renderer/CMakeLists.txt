@@ -31,11 +31,13 @@ endif()
 target_compile_definitions(engine_renderer PRIVATE
     VMA_STATIC_VULKAN_FUNCTIONS=0
     VMA_DYNAMIC_VULKAN_FUNCTIONS=1
+    VMA_VULKAN_VERSION=1003000
 )
 
 target_sources(engine_renderer PRIVATE
     src/renderer/Renderer.cpp
     src/renderer/VulkanRenderer.cpp
+    src/renderer/vulkan/VmaImpl.cpp
 )
 if(ENGINE_FAMILY_DESKTOP)
     if(ENGINE_PLATFORM STREQUAL "Windows")
