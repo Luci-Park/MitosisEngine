@@ -1,0 +1,9 @@
+engine_add_module(app)
+
+target_link_libraries(engine_app
+    PUBLIC mts::core
+           mts::window
+           mts::renderer
+)
+
+target_sources(engine_app PRIVATE src/app/App.cpp)

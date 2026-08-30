@@ -34,6 +34,7 @@ endif()
 add_subdirectory(modules/core)
 add_subdirectory(modules/renderer)
 add_subdirectory(modules/window)
+add_subdirectory(modules/app)
 
 add_executable(HelloWorld)
 target_sources(HelloWorld PRIVATE main.cpp)
@@ -46,6 +47,5 @@ engine_add_shaders(HelloWorld
 
 target_link_libraries(HelloWorld PRIVATE
     mts::core
-    mts::renderer
-    mts::window
+    mts::app
 )

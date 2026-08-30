@@ -1,29 +1,25 @@
+#include <app/App.h>
 #include <core/log/Log.h>
-#include <window/Window.h>
-#include <renderer/VulkanRenderer.h>
+
 int main()
 {
+    // Logging lives outside App so early construction failures are still visible.
     mts::InitLog();
 
-    mts::WindowDesc desc{};
+    mts::App app;
+
+    mts::AppDesc desc{};
     desc.m_title = "MitosisEngine - Window Test";
 
-    auto window = mts::Window::Create(desc);
-
-    mts::VulkanRenderer renderer;
-    if (!renderer.Initialize({.window = window.get(), .appName = "MitosisEngine", .enableValidation = true}))
+    if (!app.Initialize(desc))
     {
         mts::FlushLog();
         return -1;
     }
-    while (!window->ShouldClose())
-    {
-        window->PollEvents();
-        renderer.DrawFrame();
-    }
-    renderer.Shutdown();
 
-    MTS_LOG_INFO("Window closed");
+    app.Run();
+    app.Shutdown();
+
     mts::FlushLog();
     return 0;
 }
