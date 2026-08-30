@@ -1,4 +1,5 @@
-
-/builds
+# build files
+/[Bb]uild
+/[Bb]uilds
 
 /logs
