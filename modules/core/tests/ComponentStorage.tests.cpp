@@ -18,11 +18,11 @@ namespace
         float y;
     };
 
-    using Storage = engine::SparseSetStorage<Position>;
+    using Storage = mts::SparseSetStorage<Position>;
 
-    engine::Entity MakeEntity(uint32_t index, uint32_t generation = 0)
+    mts::Entity MakeEntity(uint32_t index, uint32_t generation = 0)
     {
-        return engine::Entity{index, generation};
+        return mts::Entity{index, generation};
     }
 }
 
@@ -36,7 +36,7 @@ TEST_CASE("SparseSetStorage starts empty", "[ecs][storage]")
 TEST_CASE("SparseSetStorage Add makes the component visible", "[ecs][storage]")
 {
     Storage storage;
-    const engine::Entity entity = MakeEntity(3);
+    const mts::Entity entity = MakeEntity(3);
 
     storage.Add(entity, Position{1.0f, 2.0f});
 
@@ -49,7 +49,7 @@ TEST_CASE("SparseSetStorage Add makes the component visible", "[ecs][storage]")
 TEST_CASE("SparseSetStorage Remove clears the component", "[ecs][storage]")
 {
     Storage storage;
-    const engine::Entity entity = MakeEntity(3);
+    const mts::Entity entity = MakeEntity(3);
 
     storage.Add(entity, Position{1.0f, 2.0f});
     storage.Remove(entity);
@@ -61,9 +61,9 @@ TEST_CASE("SparseSetStorage Remove clears the component", "[ecs][storage]")
 TEST_CASE("SparseSetStorage keeps unrelated entities independent", "[ecs][storage]")
 {
     Storage storage;
-    const engine::Entity a = MakeEntity(1);
-    const engine::Entity b = MakeEntity(2);
-    const engine::Entity c = MakeEntity(3);
+    const mts::Entity a = MakeEntity(1);
+    const mts::Entity b = MakeEntity(2);
+    const mts::Entity c = MakeEntity(3);
 
     storage.Add(a, Position{1.0f, 1.0f});
     storage.Add(b, Position{2.0f, 2.0f});
@@ -84,7 +84,7 @@ TEST_CASE("SparseSetStorage keeps unrelated entities independent", "[ecs][storag
 TEST_CASE("SparseSetStorage Add after Remove reuses the entity index", "[ecs][storage]")
 {
     Storage storage;
-    const engine::Entity entity = MakeEntity(5);
+    const mts::Entity entity = MakeEntity(5);
 
     storage.Add(entity, Position{1.0f, 1.0f});
     storage.Remove(entity);

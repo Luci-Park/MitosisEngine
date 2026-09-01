@@ -11,18 +11,22 @@
 #include "Archetype.h"
 #include "Entity.h"
 #include "EntityPool.h"
+#include "QueryTerms.h"
 #include "Signature.h"
 #include "SparseSetStorage.h"
 #include "StorageInfo.h"
 #include "core/log/Assert.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
-namespace engine
+namespace mts
 {
     // where an entity's components live: which table, and which row of it
     struct EntityRecord
@@ -56,6 +60,17 @@ namespace engine
 
             SparseSetStorage<T> mStorage;
         };
+
+        // table bitmask
+        template <typename... Ts>
+        Signature TableSignatureOf()
+        {
+            Signature signature;
+
+            // strip const to have clean bitmask
+            ((kIsSparseComponent<Bare<Ts>> ? void() : void(signature.set(ComponentBit<Bare<Ts>>()))), ...);
+            return signature;
+        }
     }
 
     class World
@@ -66,6 +81,11 @@ namespace engine
             // every entity starts in a table with no columns
             mEmptyArchetype = &GetOrCreateArchetype(Signature{});
         }
+
+        World(const World &) = delete;
+        World &operator=(const World &) = delete;
+        World(World &&) = delete;
+        World &operator=(World &&) = delete;
 
         Entity CreateEntity()
         {
@@ -103,6 +123,10 @@ namespace engine
         }
 
         std::size_t ArchetypeCount() const { return mArchetypes.size(); }
+
+        // bumped once per archetype creation
+        // a query whose seen this generation needs no rescan
+        std::size_t Generation() const { return mArchetypeGeneration; }
 
         template <typename T>
         bool Has(Entity entity) const
@@ -189,7 +213,21 @@ namespace engine
                 RemoveTableComponent<T>(entity);
         }
 
+        // returns the world-owned query for this exact term + filter shape,
+        // use queries to iterate over storages
+        template <typename... Ts, typename... Filters>
+        Query<Ts...> &GetOrCreateQuery(Filters... filters);
+
+        // Use with GetOrCreateQuery<Ts...>().ForEach(cb); defined in Query.h.
+        template <typename... Ts, typename Fn>
+        void ForEach(Fn &&cb);
+
     protected:
+        template <typename...>
+        friend class Query;
+
+        const std::unordered_map<Signature, std::unique_ptr<Archetype>> &Archetypes() const { return mArchetypes; }
+
         // adding to archetype
         // move entityset to different table
         template <typename T>
@@ -295,6 +333,12 @@ namespace engine
             }
         }
 
+        Archetype &Insert(const Signature &signature, std::unique_ptr<Archetype> archetype)
+        {
+            ++mArchetypeGeneration;
+            return *mArchetypes.emplace(signature, std::move(archetype)).first->second;
+        }
+
         // return existing or create empty table of signature
         Archetype &GetOrCreateAdded(const Signature &signature, const Archetype &source, ComponentColumn added)
         {
@@ -311,7 +355,7 @@ namespace engine
                 archetype->AddColumn(column.CloneEmpty());
             archetype->AddColumn(std::move(added));
 
-            return *mArchetypes.emplace(signature, std::move(archetype)).first->second;
+            return Insert(signature, std::move(archetype));
         }
 
         // return existing or create empty table of signature
@@ -329,7 +373,7 @@ namespace engine
                     archetype->AddColumn(column.CloneEmpty());
             }
 
-            return *mArchetypes.emplace(signature, std::move(archetype)).first->second;
+            return Insert(signature, std::move(archetype));
         }
 
         Archetype &GetOrCreateArchetype(const Signature &signature)
@@ -338,8 +382,7 @@ namespace engine
             if (it != mArchetypes.end())
                 return *it->second;
 
-            auto archetype = std::make_unique<Archetype>(signature);
-            return *mArchetypes.emplace(signature, std::move(archetype)).first->second;
+            return Insert(signature, std::make_unique<Archetype>(signature));
         }
 
         // drops a row and repairs the record of whoever got swapped into it
@@ -355,5 +398,12 @@ namespace engine
         std::unordered_map<Signature, std::unique_ptr<Archetype>> mArchetypes;
         Archetype *mEmptyArchetype = nullptr;
         std::unordered_map<uint32_t, std::unique_ptr<detail::ISparseStorage>> mSparseStorages; // by TypeId::seq
+        std::unordered_map<uint32_t, std::unique_ptr<detail::IQuery>> mQueries;                // by detail::QueryKeyOf
+        std::size_t mArchetypeGeneration = 0;
     };
 }
+
+// Query needs a complete World, and World's query members need a complete Query.
+// Both headers are #pragma once, so whichever is included first pulls in the
+// other and this trailing include is a no-op on the way back up.
+#include "Query.h"

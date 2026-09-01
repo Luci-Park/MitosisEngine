@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace engine
+namespace mts
 {
     template <typename T>
     class SparseSetStorage

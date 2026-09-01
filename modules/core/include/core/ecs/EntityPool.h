@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace engine
+namespace mts
 {
     // recycle ids, distinguish them with generations
     class EntityPool

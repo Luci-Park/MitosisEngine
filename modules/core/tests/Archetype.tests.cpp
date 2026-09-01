@@ -37,17 +37,17 @@ namespace
 }
 
 template <>
-struct engine::ComponentStorageInfo<Frozen>
+struct mts::ComponentStorageInfo<Frozen>
 {
-    static constexpr engine::StorageKind kValue = engine::StorageKind::SparseSet;
+    static constexpr mts::StorageKind kValue = mts::StorageKind::SparseSet;
 };
 
 TEST_CASE("World starts with only the empty archetype", "[ecs][archetype]")
 {
-    engine::World world;
+    mts::World world;
     REQUIRE(world.ArchetypeCount() == 1);
 
-    const engine::Entity entity = world.CreateEntity();
+    const mts::Entity entity = world.CreateEntity();
     REQUIRE(world.IsAlive(entity));
     REQUIRE(world.ArchetypeCount() == 1);
     REQUIRE_FALSE(world.Has<Position>(entity));
@@ -55,8 +55,8 @@ TEST_CASE("World starts with only the empty archetype", "[ecs][archetype]")
 
 TEST_CASE("World AddComponent makes the component readable", "[ecs][archetype]")
 {
-    engine::World world;
-    const engine::Entity entity = world.CreateEntity();
+    mts::World world;
+    const mts::Entity entity = world.CreateEntity();
 
     world.AddComponent(entity, Position{1.0f, 2.0f});
 
@@ -69,8 +69,8 @@ TEST_CASE("World AddComponent makes the component readable", "[ecs][archetype]")
 
 TEST_CASE("World preserves existing component values across an archetype move", "[ecs][archetype]")
 {
-    engine::World world;
-    const engine::Entity entity = world.CreateEntity();
+    mts::World world;
+    const mts::Entity entity = world.CreateEntity();
 
     world.AddComponent(entity, Position{1.0f, 2.0f});
     world.AddComponent(entity, Velocity{3.0f, 4.0f});
@@ -86,13 +86,13 @@ TEST_CASE("World preserves existing component values across an archetype move", 
 
 TEST_CASE("World reuses one archetype regardless of add order", "[ecs][archetype]")
 {
-    engine::World world;
+    mts::World world;
 
-    const engine::Entity a = world.CreateEntity();
+    const mts::Entity a = world.CreateEntity();
     world.AddComponent(a, Position{1.0f, 1.0f});
     world.AddComponent(a, Velocity{1.0f, 1.0f});
 
-    const engine::Entity b = world.CreateEntity();
+    const mts::Entity b = world.CreateEntity();
     world.AddComponent(b, Velocity{2.0f, 2.0f});
     world.AddComponent(b, Position{2.0f, 2.0f});
 
@@ -103,8 +103,8 @@ TEST_CASE("World reuses one archetype regardless of add order", "[ecs][archetype
 
 TEST_CASE("World RemoveComponent drops only that component", "[ecs][archetype]")
 {
-    engine::World world;
-    const engine::Entity entity = world.CreateEntity();
+    mts::World world;
+    const mts::Entity entity = world.CreateEntity();
 
     world.AddComponent(entity, Position{1.0f, 2.0f});
     world.AddComponent(entity, Velocity{3.0f, 4.0f});
@@ -118,13 +118,13 @@ TEST_CASE("World RemoveComponent drops only that component", "[ecs][archetype]")
 
 TEST_CASE("World repairs the entity swapped into a vacated row", "[ecs][archetype]")
 {
-    engine::World world;
+    mts::World world;
 
     // three entities in the same archetype, so removing the first forces
     // the third to be swapped down into row 0
-    const engine::Entity a = world.CreateEntity();
-    const engine::Entity b = world.CreateEntity();
-    const engine::Entity c = world.CreateEntity();
+    const mts::Entity a = world.CreateEntity();
+    const mts::Entity b = world.CreateEntity();
+    const mts::Entity c = world.CreateEntity();
     world.AddComponent(a, Health{1});
     world.AddComponent(b, Health{2});
     world.AddComponent(c, Health{3});
@@ -140,8 +140,8 @@ TEST_CASE("World repairs the entity swapped into a vacated row", "[ecs][archetyp
 
 TEST_CASE("World destroys every component of an entity in one row removal", "[ecs][archetype]")
 {
-    engine::World world;
-    const engine::Entity entity = world.CreateEntity();
+    mts::World world;
+    const mts::Entity entity = world.CreateEntity();
 
     world.AddComponent(entity, Position{1.0f, 2.0f});
     world.AddComponent(entity, Velocity{3.0f, 4.0f});
@@ -154,13 +154,13 @@ TEST_CASE("World destroys every component of an entity in one row removal", "[ec
 
 TEST_CASE("World recycles entity indices with a bumped generation", "[ecs][archetype]")
 {
-    engine::World world;
+    mts::World world;
 
-    const engine::Entity first = world.CreateEntity();
+    const mts::Entity first = world.CreateEntity();
     world.AddComponent(first, Health{7});
     world.DestroyEntity(first);
 
-    const engine::Entity second = world.CreateEntity();
+    const mts::Entity second = world.CreateEntity();
 
     CHECK(second.mIndex == first.mIndex);
     CHECK(second.mGeneration != first.mGeneration);
@@ -172,10 +172,10 @@ TEST_CASE("World recycles entity indices with a bumped generation", "[ecs][arche
 
 TEST_CASE("World keeps sparse components out of the archetype", "[ecs][archetype][sparse]")
 {
-    engine::World world;
+    mts::World world;
 
-    const engine::Entity a = world.CreateEntity();
-    const engine::Entity b = world.CreateEntity();
+    const mts::Entity a = world.CreateEntity();
+    const mts::Entity b = world.CreateEntity();
     world.AddComponent(a, Position{1.0f, 1.0f});
     world.AddComponent(b, Position{2.0f, 2.0f});
 
@@ -197,11 +197,11 @@ TEST_CASE("World keeps sparse components out of the archetype", "[ecs][archetype
 
 TEST_CASE("World removes a sparse component without an archetype move", "[ecs][archetype][sparse]")
 {
-    engine::World world;
-    const engine::Entity entity = world.CreateEntity();
+    mts::World world;
+    const mts::Entity entity = world.CreateEntity();
 
     world.AddComponent(entity, Position{1.0f, 2.0f});
-    const engine::Archetype *before = world.ArchetypeOf(entity);
+    const mts::Archetype *before = world.ArchetypeOf(entity);
 
     world.AddComponent(entity, Frozen{5});
     world.RemoveComponent<Frozen>(entity);
@@ -214,14 +214,14 @@ TEST_CASE("World removes a sparse component without an archetype move", "[ecs][a
 
 TEST_CASE("World clears sparse components on destroy", "[ecs][archetype][sparse]")
 {
-    engine::World world;
+    mts::World world;
 
-    const engine::Entity first = world.CreateEntity();
+    const mts::Entity first = world.CreateEntity();
     world.AddComponent(first, Frozen{9});
     world.DestroyEntity(first);
 
     // the recycled index must not inherit the dead entity's sparse component
-    const engine::Entity second = world.CreateEntity();
+    const mts::Entity second = world.CreateEntity();
     REQUIRE(second.mIndex == first.mIndex);
     CHECK_FALSE(world.Has<Frozen>(second));
     CHECK(world.Get<Frozen>(second) == nullptr);

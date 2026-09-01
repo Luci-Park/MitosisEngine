@@ -9,7 +9,7 @@
 
 #pragma once
 
-namespace engine
+namespace mts
 {
     enum class StorageKind
     {
@@ -24,3 +24,13 @@ namespace engine
         static constexpr StorageKind kValue = StorageKind::Table;
     };
 }
+
+// Set T's storage to sparse
+// must always be in the in the same header as the component outside of a namespace
+#define MTS_COMPONENT_SPARSE(T)                    \
+    template <>                                    \
+    struct mts::ComponentStorageInfo<T>            \
+    {                                              \
+        static constexpr mts::StorageKind kValue = \
+            mts::StorageKind::SparseSet;           \
+    }

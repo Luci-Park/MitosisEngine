@@ -14,7 +14,7 @@
 #include <bitset>
 #include <cstddef>
 
-namespace engine
+namespace mts
 {
     inline constexpr std::size_t kMaxComponentTypes = 128;
 

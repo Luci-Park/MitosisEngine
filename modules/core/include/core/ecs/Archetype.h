@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace engine
+namespace mts
 {
     class Archetype
     {
@@ -27,7 +27,11 @@ namespace engine
 
         const Signature &GetSignature() const { return mSignature; }
         uint32_t RowCount() const { return static_cast<uint32_t>(mEntities.size()); }
-        Entity EntityAt(uint32_t row) const { return mEntities[row]; }
+        Entity EntityAt(uint32_t row) const
+        {
+            MTS_ASSERT(row < RowCount(), "Archetype::EntityAt: row {} out of range ({})", row, RowCount());
+            return mEntities[row];
+        }
 
         const std::vector<Entity> &Entities() const { return mEntities; }
         std::vector<ComponentColumn> &Columns() { return mColumns; }

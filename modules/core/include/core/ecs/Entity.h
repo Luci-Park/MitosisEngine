@@ -10,7 +10,7 @@
 #pragma once
 #include <cstdint>
 
-namespace engine
+namespace mts
 {
     struct Entity
     {
