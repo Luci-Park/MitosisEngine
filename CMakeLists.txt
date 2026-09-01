@@ -37,6 +37,8 @@ add_subdirectory(modules/core)
 add_subdirectory(modules/renderer)
 add_subdirectory(modules/window)
 
+add_subdirectory(tools/AssetCooker)
+
 add_executable(HelloWorld)
 target_sources(HelloWorld PRIVATE main.cpp)
 

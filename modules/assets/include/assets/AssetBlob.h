@@ -12,6 +12,9 @@ namespace mts
     inline constexpr uint32_t kAssetBlobMagic = 0x4D545341u;
     inline constexpr uint32_t kAssetBlobFormatVersion = 1u;
 
+    inline constexpr uint32_t kRawAssetTypeTag = 0x52415721u;
+    inline constexpr uint32_t kRawAssetContentVersion = 1u;
+
     struct AssetBlobHeader
     {
         uint32_t magic = kAssetBlobMagic;
