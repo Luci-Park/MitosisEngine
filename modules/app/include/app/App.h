@@ -8,6 +8,9 @@
  */
 #pragma once
 
+#include <core/ecs/CommandBuffer.h>
+#include <core/ecs/SystemScheduler.h>
+#include <core/ecs/World.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
@@ -23,6 +26,10 @@ namespace mts
         const char *m_title = "MitosisEngine";
         const char *m_appName = "MitosisEngine";
         bool m_enableValidation = true;
+
+        /// A stalled frame (breakpoint, window drag) would otherwise hand systems
+        /// a multi-second dt and teleport everything.
+        float m_maxDeltaSeconds = 0.25f;
     };
 
     /// Fixed-member composition root: no generic system registry until one is
@@ -42,9 +49,23 @@ namespace mts
         void Run();
         void Shutdown();
 
+        World &GetWorld() { return m_world; }
+        SystemScheduler &Systems() { return m_scheduler; }
+
     private:
+        // context is rebuilt per tick
+        SystemContext MakeContext(float dt);
+
         std::unique_ptr<Window> m_window;
         VulkanRenderer m_renderer;
+
+        World m_world;
+        CommandBuffer m_commands;
+        SystemScheduler m_scheduler;
+
+        AppDesc m_desc;
+        double m_elapsed = 0.0;
+        uint64_t m_frame = 0;
         bool m_initialized = false;
     };
 }

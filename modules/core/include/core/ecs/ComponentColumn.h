@@ -33,9 +33,12 @@ namespace mts
         ComponentColumn(TypeId type, uint32_t elementSize, uint32_t alignment)
             : mType(type), mElementSize(elementSize), mAlignment(alignment)
         {
-            // vector<std::byte> only guarantees max_align_t
+            // vector<std::byte> allocates through plain operator new, which
+            // guarantees __STDCPP_DEFAULT_NEW_ALIGNMENT__ (16 on x64). Not
+            // max_align_t: that is 8 on MSVC and 16 on GCC/Clang, so it would
+            // reject an alignas(16) component on Windows only.
             // over-aligned components need a custom allocator
-            MTS_ASSERT(alignment <= alignof(std::max_align_t),
+            MTS_ASSERT(alignment <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                        "ComponentColumn: component \"{}\" is over-aligned ({}), unsupported", type.name, alignment);
         }
 
