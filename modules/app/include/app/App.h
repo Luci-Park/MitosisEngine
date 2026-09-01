@@ -24,15 +24,15 @@ namespace mts
 {
     struct AppDesc
     {
-        uint32_t m_width = 1280;
-        uint32_t m_height = 720;
-        const char *m_title = "MitosisEngine";
-        const char *m_appName = "MitosisEngine";
-        bool m_enableValidation = true;
+        uint32_t mWidth = 1280;
+        uint32_t mHeight = 720;
+        const char *mTitle = "MitosisEngine";
+        const char *mAppName = "MitosisEngine";
+        bool mEnableValidation = true;
 
         /// A stalled frame (breakpoint, window drag) would otherwise hand systems
         /// a multi-second dt and teleport everything.
-        float m_maxDeltaSeconds = 0.25f;
+        float mMaxDeltaSeconds = 0.25f;
     };
 
     /// Fixed-member composition root: no generic system registry until one is
@@ -52,8 +52,8 @@ namespace mts
         void Run();
         void Shutdown();
 
-        World &GetWorld() { return m_world; }
-        SystemScheduler &Systems() { return m_scheduler; }
+        World &GetWorld() { return mWorld; }
+        SystemScheduler &Systems() { return mScheduler; }
 
         /// The asset cache, loading the manifest on first use.
         /// Returns nullptr when no manifest is available - a build with no cooked
@@ -66,22 +66,22 @@ namespace mts
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
 
-        std::unique_ptr<Window> m_window;
-        VulkanRenderer m_renderer;
+        std::unique_ptr<Window> mWindow;
+        VulkanRenderer mRenderer;
 
-        World m_world;
-        CommandBuffer m_commands;
-        SystemScheduler m_scheduler;
+        World mWorld;
+        CommandBuffer mCommands;
+        SystemScheduler mScheduler;
 
-        AppDesc m_desc;
-        double m_elapsed = 0.0;
-        uint64_t m_frame = 0;
-        // m_assetCache holds a raw pointer into m_assetManifest, so the two are
+        AppDesc mDesc;
+        double mElapsed = 0.0;
+        uint64_t mFrame = 0;
+        // mAssetCache holds a raw pointer into mAssetManifest, so the two are
         // created and torn down together, cache first. Declared in this order so
         // destruction (reverse of declaration) also destroys the cache first.
-        std::optional<AssetManifest> m_assetManifest;
-        std::optional<AssetCache> m_assetCache;
-        bool m_assetLoadFailed = false;
-        bool m_initialized = false;
+        std::optional<AssetManifest> mAssetManifest;
+        std::optional<AssetCache> mAssetCache;
+        bool mAssetLoadFailed = false;
+        bool mInitialized = false;
     };
 }

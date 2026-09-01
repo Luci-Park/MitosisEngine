@@ -42,35 +42,35 @@ namespace mts
 
         // No OpenGL context. The renderer owns the graphics API.
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, desc.m_resizable ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, desc.mResizable ? GLFW_TRUE : GLFW_FALSE);
 
-        m_handle = glfwCreateWindow(static_cast<int>(desc.m_width),
-                                    static_cast<int>(desc.m_height),
-                                    desc.m_title,
+        mHandle = glfwCreateWindow(static_cast<int>(desc.mWidth),
+                                    static_cast<int>(desc.mHeight),
+                                    desc.mTitle,
                                     nullptr,
                                     nullptr);
-        MTS_CHECK(m_handle != nullptr, "glfwCreateWindow failed");
+        MTS_CHECK(mHandle != nullptr, "glfwCreateWindow failed");
         ++g_windowCount;
 
         int fbWidth = 0;
         int fbHeight = 0;
-        glfwGetFramebufferSize(m_handle, &fbWidth, &fbHeight);
-        m_width = static_cast<uint32_t>(fbWidth);
-        m_height = static_cast<uint32_t>(fbHeight);
+        glfwGetFramebufferSize(mHandle, &fbWidth, &fbHeight);
+        mWidth = static_cast<uint32_t>(fbWidth);
+        mHeight = static_cast<uint32_t>(fbHeight);
 
         // Lets the static callbacks recover the owning instance.
-        glfwSetWindowUserPointer(m_handle, this);
-        glfwSetFramebufferSizeCallback(m_handle, &GLFWWindow::OnFramebufferSize);
+        glfwSetWindowUserPointer(mHandle, this);
+        glfwSetFramebufferSizeCallback(mHandle, &GLFWWindow::OnFramebufferSize);
 
-        MTS_LOG_INFO("Window created: {}x{} \"{}\"", m_width, m_height, desc.m_title);
+        MTS_LOG_INFO("Window created: {}x{} \"{}\"", mWidth, mHeight, desc.mTitle);
     }
 
     GLFWWindow::~GLFWWindow()
     {
-        if (m_handle != nullptr)
+        if (mHandle != nullptr)
         {
-            glfwDestroyWindow(m_handle);
-            m_handle = nullptr;
+            glfwDestroyWindow(mHandle);
+            mHandle = nullptr;
             --g_windowCount;
         }
 
@@ -87,7 +87,7 @@ namespace mts
 
     bool GLFWWindow::ShouldClose() const
     {
-        return glfwWindowShouldClose(m_handle) == GLFW_TRUE;
+        return glfwWindowShouldClose(mHandle) == GLFW_TRUE;
     }
 
     void GLFWWindow::OnFramebufferSize(GLFWwindow *handle, int width, int height)
@@ -96,7 +96,7 @@ namespace mts
         MTS_ASSERT(self != nullptr, "framebuffer callback without a user pointer");
 
         // Minimizing reports 0x0. Keep it; the renderer decides to skip frames.
-        self->m_width = static_cast<uint32_t>(width);
-        self->m_height = static_cast<uint32_t>(height);
+        self->mWidth = static_cast<uint32_t>(width);
+        self->mHeight = static_cast<uint32_t>(height);
     }
 }

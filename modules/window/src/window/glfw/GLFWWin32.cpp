@@ -16,6 +16,6 @@ namespace mts
 {
     NativeWindowHandle GLFWWindow::NativeWindow() const
     {
-        return {WindowBackend::Win32, nullptr, glfwGetWin32Window(m_handle)};
+        return {WindowBackend::Win32, nullptr, glfwGetWin32Window(mHandle)};
     }
 }

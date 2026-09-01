@@ -19,9 +19,9 @@ namespace mts
     {
         if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
         {
-            return {WindowBackend::Wayland, glfwGetWaylandDisplay(), glfwGetWaylandWindow(m_handle)};
+            return {WindowBackend::Wayland, glfwGetWaylandDisplay(), glfwGetWaylandWindow(mHandle)};
         }
         // X11 Window ids are unsigned long, need to change to pointers
-        return {WindowBackend::Xlib, glfwGetX11Display(), reinterpret_cast<void *>(static_cast<uintptr_t>(glfwGetX11Window(m_handle)))};
+        return {WindowBackend::Xlib, glfwGetX11Display(), reinterpret_cast<void *>(static_cast<uintptr_t>(glfwGetX11Window(mHandle)))};
     }
 }

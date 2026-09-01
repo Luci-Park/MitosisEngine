@@ -313,7 +313,7 @@ namespace mts
             return false;
         }
 
-        m_Window = desc.window;
+        mWindow = desc.window;
 
         if (volkInitialize() != VK_SUCCESS)
         {
@@ -324,9 +324,9 @@ namespace mts
         if (!CreateVulkanInstance(desc))
             return false;
 
-        volkLoadInstance(m_VulkanInstance);
+        volkLoadInstance(mVulkanInstance);
 
-        if (m_ValidationEnabled && !CreateDebugMessenger())
+        if (mValidationEnabled && !CreateDebugMessenger())
             return false;
 
         if (!CreateSurface())
@@ -353,15 +353,15 @@ namespace mts
         if (!CreateVertexBuffer())
             return false;
 
-        NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(m_Device), "MitosisEngine device");
-        NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(m_GfxQueue), "Graphics+present queue");
-        NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(m_Swapchain), "Swapchain");
-        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(m_Pipeline), "Triangle pipeline");
-        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(m_VertexBuffer), "Triangle vertex buffer");
+        NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MitosisEngine device");
+        NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(mGfxQueue), "Graphics+present queue");
+        NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(mSwapchain), "Swapchain");
+        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mPipeline), "Triangle pipeline");
+        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mVertexBuffer), "Triangle vertex buffer");
 
-        for (size_t i = 0; i < m_SwapchainImages.size(); ++i)
+        for (size_t i = 0; i < mSwapchainImages.size(); ++i)
         {
-            NameObject(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<uint64_t>(m_SwapchainImages[i]),
+            NameObject(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<uint64_t>(mSwapchainImages[i]),
                        std::format("Swapchain image {}", i).c_str());
         }
 
@@ -369,80 +369,80 @@ namespace mts
     }
     void VulkanRenderer::Shutdown()
     {
-        if (m_Device != VK_NULL_HANDLE)
+        if (mDevice != VK_NULL_HANDLE)
         {
-            vkDeviceWaitIdle(m_Device);
+            vkDeviceWaitIdle(mDevice);
 
-            if (m_Timeline != VK_NULL_HANDLE)
+            if (mTimeline != VK_NULL_HANDLE)
             {
-                vkDestroySemaphore(m_Device, m_Timeline, nullptr);
-                m_Timeline = VK_NULL_HANDLE;
+                vkDestroySemaphore(mDevice, mTimeline, nullptr);
+                mTimeline = VK_NULL_HANDLE;
             }
 
             for (uint32_t i = 0; i < kFramesInFlight; ++i)
             {
-                if (m_ImageAcquired[i] != VK_NULL_HANDLE)
-                    vkDestroySemaphore(m_Device, m_ImageAcquired[i], nullptr);
+                if (mImageAcquired[i] != VK_NULL_HANDLE)
+                    vkDestroySemaphore(mDevice, mImageAcquired[i], nullptr);
                 // Destroying the pool frees its command buffers too.
-                if (m_CmdPools[i] != VK_NULL_HANDLE)
-                    vkDestroyCommandPool(m_Device, m_CmdPools[i], nullptr);
+                if (mCmdPools[i] != VK_NULL_HANDLE)
+                    vkDestroyCommandPool(mDevice, mCmdPools[i], nullptr);
             }
 
-            // before m_Allocator
+            // before mAllocator
             DestroyVertexBuffer();
 
-            if (m_Pipeline != VK_NULL_HANDLE)
+            if (mPipeline != VK_NULL_HANDLE)
             {
-                vkDestroyPipeline(m_Device, m_Pipeline, nullptr);
-                m_Pipeline = VK_NULL_HANDLE;
+                vkDestroyPipeline(mDevice, mPipeline, nullptr);
+                mPipeline = VK_NULL_HANDLE;
             }
 
-            if (m_PipelineLayout != VK_NULL_HANDLE)
+            if (mPipelineLayout != VK_NULL_HANDLE)
             {
-                vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
-                m_PipelineLayout = VK_NULL_HANDLE;
+                vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
+                mPipelineLayout = VK_NULL_HANDLE;
             }
 
             DestroyRenderCompleteSemaphores();
             DestroySwapchain();
         }
 
-        if (m_Allocator != VK_NULL_HANDLE)
+        if (mAllocator != VK_NULL_HANDLE)
         {
             // The permanent leak detector. Every later milestone that allocates
             // must still land here at 0 bytes.
             VmaTotalStatistics stats{};
-            vmaCalculateStatistics(m_Allocator, &stats);
+            vmaCalculateStatistics(mAllocator, &stats);
             MTS_LOG_INFO("[vma] live bytes at shutdown: {} in {} allocation(s)",
                          stats.total.statistics.allocationBytes,
                          stats.total.statistics.allocationCount);
 
-            vmaDestroyAllocator(m_Allocator);
-            m_Allocator = VK_NULL_HANDLE;
+            vmaDestroyAllocator(mAllocator);
+            mAllocator = VK_NULL_HANDLE;
         }
 
-        if (m_Device != VK_NULL_HANDLE)
+        if (mDevice != VK_NULL_HANDLE)
         {
-            vkDestroyDevice(m_Device, nullptr);
-            m_Device = VK_NULL_HANDLE;
+            vkDestroyDevice(mDevice, nullptr);
+            mDevice = VK_NULL_HANDLE;
         }
 
-        if (m_DebugMessenger != VK_NULL_HANDLE)
+        if (mDebugMessenger != VK_NULL_HANDLE)
         {
-            vkDestroyDebugUtilsMessengerEXT(m_VulkanInstance, m_DebugMessenger, nullptr);
-            m_DebugMessenger = VK_NULL_HANDLE;
+            vkDestroyDebugUtilsMessengerEXT(mVulkanInstance, mDebugMessenger, nullptr);
+            mDebugMessenger = VK_NULL_HANDLE;
         }
 
-        if (m_Surface != VK_NULL_HANDLE)
+        if (mSurface != VK_NULL_HANDLE)
         {
-            vkDestroySurfaceKHR(m_VulkanInstance, m_Surface, nullptr);
-            m_Surface = VK_NULL_HANDLE;
+            vkDestroySurfaceKHR(mVulkanInstance, mSurface, nullptr);
+            mSurface = VK_NULL_HANDLE;
         }
 
-        if (m_VulkanInstance != VK_NULL_HANDLE)
+        if (mVulkanInstance != VK_NULL_HANDLE)
         {
-            vkDestroyInstance(m_VulkanInstance, nullptr);
-            m_VulkanInstance = VK_NULL_HANDLE;
+            vkDestroyInstance(mVulkanInstance, nullptr);
+            mVulkanInstance = VK_NULL_HANDLE;
         }
 
         volkFinalize();
@@ -463,7 +463,7 @@ namespace mts
         std::vector<const char *> layers;
         std::vector<const char *> extensions;
 
-        const WindowBackend backend = m_Window->NativeWindow().backend;
+        const WindowBackend backend = mWindow->NativeWindow().backend;
 
         const char *platformExt = vk::PlatformSurfaceExtension(backend);
         if (platformExt == nullptr)
@@ -495,7 +495,7 @@ namespace mts
             {
                 layers.push_back("VK_LAYER_KHRONOS_validation");
                 extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-                m_ValidationEnabled = true;
+                mValidationEnabled = true;
             }
             else
             {
@@ -525,14 +525,14 @@ namespace mts
 
         VkInstanceCreateInfo createInfo{
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            .pNext = m_ValidationEnabled ? static_cast<const void *>(&validationFeatures) : nullptr,
+            .pNext = mValidationEnabled ? static_cast<const void *>(&validationFeatures) : nullptr,
             .pApplicationInfo = &appInfo,
             .enabledLayerCount = static_cast<uint32_t>(layers.size()),
             .ppEnabledLayerNames = layers.data(),
             .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
             .ppEnabledExtensionNames = extensions.data()};
 
-        if (vkCreateInstance(&createInfo, nullptr, &m_VulkanInstance) != VK_SUCCESS)
+        if (vkCreateInstance(&createInfo, nullptr, &mVulkanInstance) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreateInstance failed");
             return false;
@@ -544,7 +544,7 @@ namespace mts
     {
         const VkDebugUtilsMessengerCreateInfoEXT info = MakeMessengerCreateInfo();
 
-        if (vkCreateDebugUtilsMessengerEXT(m_VulkanInstance, &info, nullptr, &m_DebugMessenger) != VK_SUCCESS)
+        if (vkCreateDebugUtilsMessengerEXT(mVulkanInstance, &info, nullptr, &mDebugMessenger) != VK_SUCCESS)
         {
             MTS_LOG_ERROR("vkCreateDebugUtilsMessengerEXT failed");
             return false;
@@ -553,9 +553,9 @@ namespace mts
     }
     bool VulkanRenderer::CreateSurface()
     {
-        m_Surface = vk::CreateSurface(m_VulkanInstance, m_Window->NativeWindow());
+        mSurface = vk::CreateSurface(mVulkanInstance, mWindow->NativeWindow());
 
-        if (m_Surface == VK_NULL_HANDLE)
+        if (mSurface == VK_NULL_HANDLE)
         {
             MTS_LOG_CRITICAL("Vulkan surface creation failed");
             return false;
@@ -566,7 +566,7 @@ namespace mts
     bool VulkanRenderer::FindPhysicalDevice()
     {
         uint32_t count = 0;
-        vkEnumeratePhysicalDevices(m_VulkanInstance, &count, nullptr);
+        vkEnumeratePhysicalDevices(mVulkanInstance, &count, nullptr);
         if (count == 0)
         {
             MTS_LOG_CRITICAL("No Vulkan-capable GPU found");
@@ -574,7 +574,7 @@ namespace mts
         }
 
         std::vector<VkPhysicalDevice> devices(count);
-        vkEnumeratePhysicalDevices(m_VulkanInstance, &count, devices.data());
+        vkEnumeratePhysicalDevices(mVulkanInstance, &count, devices.data());
 
         uint32_t bestScore = 0;
 
@@ -601,13 +601,13 @@ namespace mts
                 MTS_LOG_INFO("Rejected {}: missing dynamicRendering / sync2 / timeline / shaderDrawParameters", props.deviceName);
                 continue;
             }
-            if (!HasSurfaceSupport(device, m_Surface))
+            if (!HasSurfaceSupport(device, mSurface))
             {
                 MTS_LOG_INFO("Rejected {}: no surface formats or present modes", props.deviceName);
                 continue;
             }
 
-            const uint32_t family = FindGraphicsPresentFamily(device, m_Surface);
+            const uint32_t family = FindGraphicsPresentFamily(device, mSurface);
             if (family == UINT32_MAX)
             {
                 MTS_LOG_INFO("Rejected {}: no graphics+present queue family", props.deviceName);
@@ -620,26 +620,26 @@ namespace mts
             if (score > bestScore)
             {
                 bestScore = score;
-                m_PhysicalDevice = device;
-                m_GfxQueueFamIdx = family;
+                mPhysicalDevice = device;
+                mGfxQueueFamIdx = family;
             }
         }
 
-        if (m_PhysicalDevice == VK_NULL_HANDLE)
+        if (mPhysicalDevice == VK_NULL_HANDLE)
         {
             MTS_LOG_CRITICAL("No suitable GPU among {} candidate(s)", count);
             return false;
         }
 
         VkPhysicalDeviceProperties props{};
-        vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
+        vkGetPhysicalDeviceProperties(mPhysicalDevice, &props);
         MTS_LOG_INFO("GPU: {} | {} | Vulkan {}.{}.{} | graphics+present family {}",
                      props.deviceName,
                      props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "discrete" : "integrated",
                      VK_API_VERSION_MAJOR(props.apiVersion),
                      VK_API_VERSION_MINOR(props.apiVersion),
                      VK_API_VERSION_PATCH(props.apiVersion),
-                     m_GfxQueueFamIdx);
+                     mGfxQueueFamIdx);
         return true;
     }
 
@@ -650,7 +650,7 @@ namespace mts
 
         const VkDeviceQueueCreateInfo queueInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = m_GfxQueueFamIdx,
+            .queueFamilyIndex = mGfxQueueFamIdx,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority};
 
@@ -690,14 +690,14 @@ namespace mts
             .pEnabledFeatures = nullptr // must be nullptr, everything goes through .pNext
         };
 
-        if (vkCreateDevice(m_PhysicalDevice, &deviceInfo, nullptr, &m_Device) != VK_SUCCESS)
+        if (vkCreateDevice(mPhysicalDevice, &deviceInfo, nullptr, &mDevice) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreateDevice Failed");
             return false;
         }
 
-        volkLoadDevice(m_Device);
-        vkGetDeviceQueue(m_Device, m_GfxQueueFamIdx, 0, &m_GfxQueue);
+        volkLoadDevice(mDevice);
+        vkGetDeviceQueue(mDevice, mGfxQueueFamIdx, 0, &mGfxQueue);
 
         return true;
     }
@@ -709,13 +709,13 @@ namespace mts
 
         const VmaAllocatorCreateInfo allocatorInfo{
             .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
-            .physicalDevice = m_PhysicalDevice,
-            .device = m_Device,
+            .physicalDevice = mPhysicalDevice,
+            .device = mDevice,
             .pVulkanFunctions = &functions,
-            .instance = m_VulkanInstance,
+            .instance = mVulkanInstance,
             .vulkanApiVersion = VulkanVersion};
 
-        if (vmaCreateAllocator(&allocatorInfo, &m_Allocator) != VK_SUCCESS)
+        if (vmaCreateAllocator(&allocatorInfo, &mAllocator) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vmaCreateAllocator failed");
             return false;
@@ -725,21 +725,21 @@ namespace mts
     bool VulkanRenderer::CreateSwapchain()
     {
         VkSurfaceCapabilitiesKHR caps{};
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &caps);
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDevice, mSurface, &caps);
 
-        const VkSurfaceFormatKHR surfaceFormat = ChooseSurfaceFormat(m_PhysicalDevice, m_Surface);
-        const VkPresentModeKHR presentMode = ChoosePresentMode(m_PhysicalDevice, m_Surface);
-        const VkExtent2D extent = ChooseExtent(caps, *m_Window);
+        const VkSurfaceFormatKHR surfaceFormat = ChooseSurfaceFormat(mPhysicalDevice, mSurface);
+        const VkPresentModeKHR presentMode = ChoosePresentMode(mPhysicalDevice, mSurface);
+        const VkExtent2D extent = ChooseExtent(caps, *mWindow);
 
         uint32_t imageCount = caps.minImageCount + 1;
         if (caps.maxImageCount > 0 && imageCount > caps.maxImageCount)
             imageCount = caps.maxImageCount;
 
-        VkSwapchainKHR oldSwapchain = m_Swapchain;
+        VkSwapchainKHR oldSwapchain = mSwapchain;
 
         const VkSwapchainCreateInfoKHR info{
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            .surface = m_Surface,
+            .surface = mSurface,
             .minImageCount = imageCount,
             .imageFormat = surfaceFormat.format,
             .imageColorSpace = surfaceFormat.colorSpace,
@@ -756,25 +756,25 @@ namespace mts
             // reuse old resources
             .oldSwapchain = oldSwapchain};
 
-        if (vkCreateSwapchainKHR(m_Device, &info, nullptr, &m_Swapchain) != VK_SUCCESS)
+        if (vkCreateSwapchainKHR(mDevice, &info, nullptr, &mSwapchain) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreateSwapchainKHR failed");
-            m_Swapchain = VK_NULL_HANDLE;
+            mSwapchain = VK_NULL_HANDLE;
             return false;
         }
 
         // Retired, not owned by the new swapchain: destroy it ourselves.
         if (oldSwapchain != VK_NULL_HANDLE)
-            vkDestroySwapchainKHR(m_Device, oldSwapchain, nullptr);
+            vkDestroySwapchainKHR(mDevice, oldSwapchain, nullptr);
 
-        m_SwapchainFormat = surfaceFormat.format;
-        m_SwapchainExtent = extent;
+        mSwapchainFormat = surfaceFormat.format;
+        mSwapchainExtent = extent;
 
         // The swapchain creates and owns these. We never allocate or free them.
         uint32_t actualCount = 0;
-        vkGetSwapchainImagesKHR(m_Device, m_Swapchain, &actualCount, nullptr);
-        m_SwapchainImages.resize(actualCount);
-        vkGetSwapchainImagesKHR(m_Device, m_Swapchain, &actualCount, m_SwapchainImages.data());
+        vkGetSwapchainImagesKHR(mDevice, mSwapchain, &actualCount, nullptr);
+        mSwapchainImages.resize(actualCount);
+        vkGetSwapchainImagesKHR(mDevice, mSwapchain, &actualCount, mSwapchainImages.data());
 
         MTS_LOG_INFO("Swapchain: {}x{} | {} image(s), requested {} | present mode {}",
                      extent.width, extent.height, actualCount, imageCount,
@@ -784,15 +784,15 @@ namespace mts
     }
     bool VulkanRenderer::CreateImageViews()
     {
-        m_SwapchainViews.resize(m_SwapchainImages.size(), VK_NULL_HANDLE);
+        mSwapchainViews.resize(mSwapchainImages.size(), VK_NULL_HANDLE);
 
-        for (size_t i = 0; i < m_SwapchainImages.size(); ++i)
+        for (size_t i = 0; i < mSwapchainImages.size(); ++i)
         {
             const VkImageViewCreateInfo info{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .image = m_SwapchainImages[i],
+                .image = mSwapchainImages[i],
                 .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = m_SwapchainFormat,
+                .format = mSwapchainFormat,
                 .subresourceRange{
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
@@ -800,7 +800,7 @@ namespace mts
                     .baseArrayLayer = 0,
                     .layerCount = 1}};
 
-            if (vkCreateImageView(m_Device, &info, nullptr, &m_SwapchainViews[i]) != VK_SUCCESS)
+            if (vkCreateImageView(mDevice, &info, nullptr, &mSwapchainViews[i]) != VK_SUCCESS)
             {
                 MTS_LOG_CRITICAL("vkCreateImageView failed for swapchain image {}", i);
                 return false;
@@ -812,24 +812,24 @@ namespace mts
     void VulkanRenderer::DestroySwapchain()
     {
         // The views are ours. The images are not -- never destroy those.
-        for (VkImageView view : m_SwapchainViews)
+        for (VkImageView view : mSwapchainViews)
         {
             if (view != VK_NULL_HANDLE)
-                vkDestroyImageView(m_Device, view, nullptr);
+                vkDestroyImageView(mDevice, view, nullptr);
         }
-        m_SwapchainViews.clear();
-        m_SwapchainImages.clear();
+        mSwapchainViews.clear();
+        mSwapchainImages.clear();
 
-        if (m_Swapchain != VK_NULL_HANDLE)
+        if (mSwapchain != VK_NULL_HANDLE)
         {
-            vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
-            m_Swapchain = VK_NULL_HANDLE;
+            vkDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
+            mSwapchain = VK_NULL_HANDLE;
         }
     }
 
     bool VulkanRenderer::RecreateSwapchain()
     {
-        vkDeviceWaitIdle(m_Device);
+        vkDeviceWaitIdle(mDevice);
         DestroyRenderCompleteSemaphores();
         DestroySwapchain();
 
@@ -838,21 +838,21 @@ namespace mts
         if (!CreateRenderCompleteSemaphores())
             return false;
 
-        m_NeedRecreate = false;
+        mNeedRecreate = false;
         return true;
     }
 
     bool VulkanRenderer::CreateGraphicsPipeline()
     {
-        VkShaderModule vertModule = CreateShaderModule(m_Device, ShaderPath("triangle.vertexMain.spv"));
-        VkShaderModule fragModule = CreateShaderModule(m_Device, ShaderPath("triangle.fragmentMain.spv"));
+        VkShaderModule vertModule = CreateShaderModule(mDevice, ShaderPath("triangle.vertexMain.spv"));
+        VkShaderModule fragModule = CreateShaderModule(mDevice, ShaderPath("triangle.fragmentMain.spv"));
 
         if (vertModule == VK_NULL_HANDLE || fragModule == VK_NULL_HANDLE)
         {
             if (vertModule != VK_NULL_HANDLE)
-                vkDestroyShaderModule(m_Device, vertModule, nullptr);
+                vkDestroyShaderModule(mDevice, vertModule, nullptr);
             if (fragModule != VK_NULL_HANDLE)
-                vkDestroyShaderModule(m_Device, fragModule, nullptr);
+                vkDestroyShaderModule(mDevice, fragModule, nullptr);
             return false;
         }
 
@@ -939,18 +939,18 @@ namespace mts
             .pushConstantRangeCount = 1,
             .pPushConstantRanges = &pushConstantRange};
 
-        if (vkCreatePipelineLayout(m_Device, &layoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
+        if (vkCreatePipelineLayout(mDevice, &layoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreatePipelineLayout failed");
-            vkDestroyShaderModule(m_Device, vertModule, nullptr);
-            vkDestroyShaderModule(m_Device, fragModule, nullptr);
+            vkDestroyShaderModule(mDevice, vertModule, nullptr);
+            vkDestroyShaderModule(mDevice, fragModule, nullptr);
             return false;
         }
 
         const VkPipelineRenderingCreateInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &m_SwapchainFormat};
+            .pColorAttachmentFormats = &mSwapchainFormat};
 
         const VkGraphicsPipelineCreateInfo pipelineInfo{
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -965,20 +965,20 @@ namespace mts
             .pDepthStencilState = nullptr,
             .pColorBlendState = &colorBlend,
             .pDynamicState = &dynamicState,
-            .layout = m_PipelineLayout,
+            .layout = mPipelineLayout,
             .renderPass = VK_NULL_HANDLE,
             .subpass = 0};
 
         const VkResult result = vkCreateGraphicsPipelines(
-            m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline);
+            mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mPipeline);
 
-        vkDestroyShaderModule(m_Device, vertModule, nullptr);
-        vkDestroyShaderModule(m_Device, fragModule, nullptr);
+        vkDestroyShaderModule(mDevice, vertModule, nullptr);
+        vkDestroyShaderModule(mDevice, fragModule, nullptr);
 
         if (result != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreateGraphicsPipelines failed: {}", static_cast<int>(result));
-            m_Pipeline = VK_NULL_HANDLE;
+            mPipeline = VK_NULL_HANDLE;
             return false;
         }
 
@@ -1005,7 +1005,7 @@ namespace mts
             .usage = VMA_MEMORY_USAGE_AUTO};
 
         VmaAllocationInfo stagingInfoOut{};
-        if (vmaCreateBuffer(m_Allocator, &stagingInfo, &stagingAllocInfo,
+        if (vmaCreateBuffer(mAllocator, &stagingInfo, &stagingAllocInfo,
                             &stagingBuffer, &stagingAllocation, &stagingInfoOut) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vmaCreateBuffer failed for staging buffer");
@@ -1025,11 +1025,11 @@ namespace mts
         const VmaAllocationCreateInfo deviceAllocInfo{
             .usage = VMA_MEMORY_USAGE_AUTO};
 
-        if (vmaCreateBuffer(m_Allocator, &deviceInfo, &deviceAllocInfo,
-                            &m_VertexBuffer, &m_VertexBufferAllocation, nullptr) != VK_SUCCESS)
+        if (vmaCreateBuffer(mAllocator, &deviceInfo, &deviceAllocInfo,
+                            &mVertexBuffer, &mVertexBufferAllocation, nullptr) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vmaCreateBuffer failed for device vertex buffer");
-            vmaDestroyBuffer(m_Allocator, stagingBuffer, stagingAllocation);
+            vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
             return false;
         }
 
@@ -1038,12 +1038,12 @@ namespace mts
         VkCommandPool uploadPool = VK_NULL_HANDLE;
         const VkCommandPoolCreateInfo poolInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .queueFamilyIndex = m_GfxQueueFamIdx};
+            .queueFamilyIndex = mGfxQueueFamIdx};
 
-        if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &uploadPool) != VK_SUCCESS)
+        if (vkCreateCommandPool(mDevice, &poolInfo, nullptr, &uploadPool) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreateCommandPool failed for vertex upload");
-            vmaDestroyBuffer(m_Allocator, stagingBuffer, stagingAllocation);
+            vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
             return false;
         }
 
@@ -1053,7 +1053,7 @@ namespace mts
             .commandPool = uploadPool,
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = 1};
-        vkAllocateCommandBuffers(m_Device, &cmdAllocInfo, &uploadCmd);
+        vkAllocateCommandBuffers(mDevice, &cmdAllocInfo, &uploadCmd);
 
         const VkCommandBufferBeginInfo beginInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1061,7 +1061,7 @@ namespace mts
         vkBeginCommandBuffer(uploadCmd, &beginInfo);
 
         const VkBufferCopy copyRegion{.size = bufferSize};
-        vkCmdCopyBuffer(uploadCmd, stagingBuffer, m_VertexBuffer, 1, &copyRegion);
+        vkCmdCopyBuffer(uploadCmd, stagingBuffer, mVertexBuffer, 1, &copyRegion);
 
         vkEndCommandBuffer(uploadCmd);
 
@@ -1070,13 +1070,13 @@ namespace mts
             .commandBufferCount = 1,
             .pCommandBuffers = &uploadCmd};
 
-        vkQueueSubmit(m_GfxQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueSubmit(mGfxQueue, 1, &submitInfo, VK_NULL_HANDLE);
         // Blocking stall: fine once at init, never inside the frame loop.
         // A staging ring is the eventual fix if repeated uploads are needed.
-        vkQueueWaitIdle(m_GfxQueue);
+        vkQueueWaitIdle(mGfxQueue);
 
-        vkDestroyCommandPool(m_Device, uploadPool, nullptr);
-        vmaDestroyBuffer(m_Allocator, stagingBuffer, stagingAllocation);
+        vkDestroyCommandPool(mDevice, uploadPool, nullptr);
+        vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
 
         MTS_LOG_INFO("Vertex buffer uploaded: {} bytes", bufferSize);
         return true;
@@ -1084,18 +1084,18 @@ namespace mts
 
     void VulkanRenderer::DestroyVertexBuffer()
     {
-        if (m_VertexBuffer != VK_NULL_HANDLE)
+        if (mVertexBuffer != VK_NULL_HANDLE)
         {
-            vmaDestroyBuffer(m_Allocator, m_VertexBuffer, m_VertexBufferAllocation);
-            m_VertexBuffer = VK_NULL_HANDLE;
-            m_VertexBufferAllocation = VK_NULL_HANDLE;
+            vmaDestroyBuffer(mAllocator, mVertexBuffer, mVertexBufferAllocation);
+            mVertexBuffer = VK_NULL_HANDLE;
+            mVertexBufferAllocation = VK_NULL_HANDLE;
         }
     }
 
     void VulkanRenderer::NameObject(VkObjectType type, uint64_t handle, const char *name)
     {
         // only when debugging
-        if (!m_ValidationEnabled || handle == 0)
+        if (!mValidationEnabled || handle == 0)
             return;
 
         const VkDebugUtilsObjectNameInfoEXT info{
@@ -1104,7 +1104,7 @@ namespace mts
             .objectHandle = handle,
             .pObjectName = name};
 
-        vkSetDebugUtilsObjectNameEXT(m_Device, &info);
+        vkSetDebugUtilsObjectNameEXT(mDevice, &info);
     }
 
     bool VulkanRenderer::CreateFrameResources()
@@ -1112,14 +1112,14 @@ namespace mts
         const VkCommandPoolCreateInfo poolInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = 0,
-            .queueFamilyIndex = m_GfxQueueFamIdx};
+            .queueFamilyIndex = mGfxQueueFamIdx};
 
         const VkSemaphoreCreateInfo semInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 
         for (uint32_t i = 0; i < kFramesInFlight; ++i)
         {
-            if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CmdPools[i]) != VK_SUCCESS)
+            if (vkCreateCommandPool(mDevice, &poolInfo, nullptr, &mCmdPools[i]) != VK_SUCCESS)
             {
                 MTS_LOG_CRITICAL("vkCreateCommandPool failed for frame {}", i);
                 return false;
@@ -1127,24 +1127,24 @@ namespace mts
 
             const VkCommandBufferAllocateInfo allocInfo{
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool = m_CmdPools[i],
+                .commandPool = mCmdPools[i],
                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 .commandBufferCount = 1};
 
-            if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_CmdBuffers[i]) != VK_SUCCESS)
+            if (vkAllocateCommandBuffers(mDevice, &allocInfo, &mCmdBuffers[i]) != VK_SUCCESS)
             {
                 MTS_LOG_CRITICAL("vkAllocateCommandBuffers failed for frame {}", i);
                 return false;
             }
 
-            if (vkCreateSemaphore(m_Device, &semInfo, nullptr, &m_ImageAcquired[i]) != VK_SUCCESS)
+            if (vkCreateSemaphore(mDevice, &semInfo, nullptr, &mImageAcquired[i]) != VK_SUCCESS)
             {
                 MTS_LOG_CRITICAL("image-acquired semaphore failed for frame {}", i);
                 return false;
             }
         }
 
-        // Paired with m_NextSignalValue = kFramesInFlight + 1
+        // Paired with mNextSignalValue = kFramesInFlight + 1
         const VkSemaphoreTypeCreateInfo typeInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
             .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
@@ -1154,7 +1154,7 @@ namespace mts
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
             .pNext = &typeInfo};
 
-        if (vkCreateSemaphore(m_Device, &timelineInfo, nullptr, &m_Timeline) != VK_SUCCESS)
+        if (vkCreateSemaphore(mDevice, &timelineInfo, nullptr, &mTimeline) != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("timeline semaphore creation failed");
             return false;
@@ -1168,11 +1168,11 @@ namespace mts
         const VkSemaphoreCreateInfo info{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 
-        m_RenderComplete.resize(m_SwapchainImages.size(), VK_NULL_HANDLE);
+        mRenderComplete.resize(mSwapchainImages.size(), VK_NULL_HANDLE);
 
-        for (VkSemaphore &sem : m_RenderComplete)
+        for (VkSemaphore &sem : mRenderComplete)
         {
-            if (vkCreateSemaphore(m_Device, &info, nullptr, &sem) != VK_SUCCESS)
+            if (vkCreateSemaphore(mDevice, &info, nullptr, &sem) != VK_SUCCESS)
             {
                 MTS_LOG_CRITICAL("render-complete semaphore creation failed");
                 return false;
@@ -1183,17 +1183,17 @@ namespace mts
 
     void VulkanRenderer::DestroyRenderCompleteSemaphores()
     {
-        for (VkSemaphore sem : m_RenderComplete)
+        for (VkSemaphore sem : mRenderComplete)
         {
             if (sem != VK_NULL_HANDLE)
-                vkDestroySemaphore(m_Device, sem, nullptr);
+                vkDestroySemaphore(mDevice, sem, nullptr);
         }
-        m_RenderComplete.clear();
+        mRenderComplete.clear();
     }
     void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex)
     {
         // get image ready
-        ImageBarrier(cmd, m_SwapchainImages[imageIndex],
+        ImageBarrier(cmd, mSwapchainImages[imageIndex],
                      VK_IMAGE_LAYOUT_UNDEFINED,
                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
@@ -1207,7 +1207,7 @@ namespace mts
 
         const VkRenderingAttachmentInfo colorAttachment{
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = m_SwapchainViews[imageIndex],
+            .imageView = mSwapchainViews[imageIndex],
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -1216,14 +1216,14 @@ namespace mts
         const VkRenderingInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
             // The stored extent, never the window: re-deriving it invites drift.
-            .renderArea{.offset{0, 0}, .extent = m_SwapchainExtent},
+            .renderArea{.offset{0, 0}, .extent = mSwapchainExtent},
             .layerCount = 1,
             .colorAttachmentCount = 1,
             .pColorAttachments = &colorAttachment};
 
         vkCmdBeginRendering(cmd, &renderingInfo);
 
-        if (m_ValidationEnabled)
+        if (mValidationEnabled)
         {
             const VkDebugUtilsLabelEXT label{
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
@@ -1232,24 +1232,24 @@ namespace mts
             vkCmdBeginDebugUtilsLabelEXT(cmd, &label);
         }
 
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
         const VkViewport viewport{
             .x = 0.0f,
             .y = 0.0f,
-            .width = static_cast<float>(m_SwapchainExtent.width),
-            .height = static_cast<float>(m_SwapchainExtent.height),
+            .width = static_cast<float>(mSwapchainExtent.width),
+            .height = static_cast<float>(mSwapchainExtent.height),
             .minDepth = 0.0f,
             .maxDepth = 1.0f};
         vkCmdSetViewport(cmd, 0, 1, &viewport);
 
         const VkRect2D scissor{
             .offset{0, 0},
-            .extent = m_SwapchainExtent};
+            .extent = mSwapchainExtent};
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
         const VkDeviceSize vertexOffset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &m_VertexBuffer, &vertexOffset);
+        vkCmdBindVertexBuffers(cmd, 0, 1, &mVertexBuffer, &vertexOffset);
 
         static const auto startTime = std::chrono::steady_clock::now();
         const float elapsed = std::chrono::duration<float>(
@@ -1259,18 +1259,18 @@ namespace mts
         PushData pushData{
             .transform = glm::rotate(glm::mat4(1.0f), elapsed, glm::vec3(0.0f, 0.0f, 1.0f))};
 
-        vkCmdPushConstants(cmd, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+        vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                            0, sizeof(PushData), &pushData);
 
         vkCmdDraw(cmd, 3, 1, 0, 0);
 
-        if (m_ValidationEnabled)
+        if (mValidationEnabled)
             vkCmdEndDebugUtilsLabelEXT(cmd);
 
         vkCmdEndRendering(cmd);
 
         // give it back
-        ImageBarrier(cmd, m_SwapchainImages[imageIndex],
+        ImageBarrier(cmd, mSwapchainImages[imageIndex],
                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -1280,58 +1280,58 @@ namespace mts
 
     void VulkanRenderer::DrawFrame()
     {
-        if (m_Window->Width() == 0 || m_Window->Height() == 0)
+        if (mWindow->Width() == 0 || mWindow->Height() == 0)
             return;
 
         // check swapchain creation
-        if (m_NeedRecreate || m_Window->Height() != m_SwapchainExtent.height || m_Window->Width() != m_SwapchainExtent.width)
+        if (mNeedRecreate || mWindow->Height() != mSwapchainExtent.height || mWindow->Width() != mSwapchainExtent.width)
         {
             if (!RecreateSwapchain())
                 return;
         }
 
-        const uint64_t signalValue = m_NextSignalValue++;
+        const uint64_t signalValue = mNextSignalValue++;
         const uint64_t waitValue = signalValue - kFramesInFlight;
 
         const VkSemaphoreWaitInfo waitInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
             .semaphoreCount = 1,
-            .pSemaphores = &m_Timeline,
+            .pSemaphores = &mTimeline,
             .pValues = &waitValue};
 
         // wait for next image to comeback from framesin flight
-        vkWaitSemaphores(m_Device, &waitInfo, UINT64_MAX);
+        vkWaitSemaphores(mDevice, &waitInfo, UINT64_MAX);
 
         // Whole-pool reset, not per-buffer.
-        vkResetCommandPool(m_Device, m_CmdPools[m_FrameIndex], 0);
+        vkResetCommandPool(mDevice, mCmdPools[mFrameIndex], 0);
 
         uint32_t imageIndex = 0;
         const VkResult acquireResult = vkAcquireNextImageKHR(
-            m_Device, m_Swapchain, UINT64_MAX,
-            m_ImageAcquired[m_FrameIndex], VK_NULL_HANDLE, &imageIndex);
+            mDevice, mSwapchain, UINT64_MAX,
+            mImageAcquired[mFrameIndex], VK_NULL_HANDLE, &imageIndex);
 
         // The semaphore was not signalled, so this frame cannot proceed.
         if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
         {
             // Roll the signal value back: nothing will signal it.
-            m_NeedRecreate = true;
-            --m_NextSignalValue;
+            mNeedRecreate = true;
+            --mNextSignalValue;
             return;
         }
 
         // Signalled and usable. Finish the frame, recreate next one.
         if (acquireResult == VK_SUBOPTIMAL_KHR)
         {
-            m_NeedRecreate = true;
+            mNeedRecreate = true;
         }
         else if (acquireResult != VK_SUCCESS)
         {
             MTS_LOG_ERROR("vkAcquireNextImageKHR failed: {}", static_cast<int>(acquireResult));
-            --m_NextSignalValue;
+            --mNextSignalValue;
             return;
         }
 
-        VkCommandBuffer cmd = m_CmdBuffers[m_FrameIndex];
+        VkCommandBuffer cmd = mCmdBuffers[mFrameIndex];
 
         const VkCommandBufferBeginInfo beginInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1343,15 +1343,15 @@ namespace mts
 
         const VkSemaphoreSubmitInfo waitSem{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-            .semaphore = m_ImageAcquired[m_FrameIndex],
+            .semaphore = mImageAcquired[mFrameIndex],
             .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
 
         const VkSemaphoreSubmitInfo signalSems[]{
             {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-             .semaphore = m_RenderComplete[imageIndex],
+             .semaphore = mRenderComplete[imageIndex],
              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT},
             {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-             .semaphore = m_Timeline,
+             .semaphore = mTimeline,
              .value = signalValue,
              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT}};
 
@@ -1368,7 +1368,7 @@ namespace mts
             .signalSemaphoreInfoCount = 2,
             .pSignalSemaphoreInfos = signalSems};
 
-        if (vkQueueSubmit2(m_GfxQueue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS)
+        if (vkQueueSubmit2(mGfxQueue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS)
         {
             MTS_LOG_ERROR("vkQueueSubmit2 failed");
             return;
@@ -1376,17 +1376,17 @@ namespace mts
         const VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &m_RenderComplete[imageIndex],
+            .pWaitSemaphores = &mRenderComplete[imageIndex],
             .swapchainCount = 1,
-            .pSwapchains = &m_Swapchain,
+            .pSwapchains = &mSwapchain,
             .pImageIndices = &imageIndex};
 
-        const VkResult presentResult = vkQueuePresentKHR(m_GfxQueue, &presentInfo);
+        const VkResult presentResult = vkQueuePresentKHR(mGfxQueue, &presentInfo);
         if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR)
-            m_NeedRecreate = true;
+            mNeedRecreate = true;
         else if (presentResult != VK_SUCCESS)
             MTS_LOG_ERROR("vkQueuePresentKHR failed: {}", static_cast<int>(presentResult));
 
-        m_FrameIndex = (m_FrameIndex + 1) % kFramesInFlight;
+        mFrameIndex = (mFrameIndex + 1) % kFramesInFlight;
     }
 }

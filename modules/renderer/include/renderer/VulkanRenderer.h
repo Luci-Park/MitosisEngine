@@ -59,44 +59,44 @@ namespace mts
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
         constexpr static uint32_t kFramesInFlight = 2;
 
-        const ISurfaceProvider *m_Window;
-        VkInstance m_VulkanInstance = VK_NULL_HANDLE;
-        VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
-        VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
+        const ISurfaceProvider *mWindow;
+        VkInstance mVulkanInstance = VK_NULL_HANDLE;
+        VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
+        VkSurfaceKHR mSurface = VK_NULL_HANDLE;
 
-        VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
-        VkDevice m_Device = VK_NULL_HANDLE;
-        VkQueue m_GfxQueue = VK_NULL_HANDLE;
-        VmaAllocator m_Allocator = VK_NULL_HANDLE;
+        VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
+        VkDevice mDevice = VK_NULL_HANDLE;
+        VkQueue mGfxQueue = VK_NULL_HANDLE;
+        VmaAllocator mAllocator = VK_NULL_HANDLE;
 
-        VkSwapchainKHR m_Swapchain = VK_NULL_HANDLE;
-        VkFormat m_SwapchainFormat = VK_FORMAT_UNDEFINED;
-        VkExtent2D m_SwapchainExtent{};
-        std::vector<VkImage> m_SwapchainImages;
-        std::vector<VkImageView> m_SwapchainViews;
+        VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
+        VkFormat mSwapchainFormat = VK_FORMAT_UNDEFINED;
+        VkExtent2D mSwapchainExtent{};
+        std::vector<VkImage> mSwapchainImages;
+        std::vector<VkImageView> mSwapchainViews;
 
         // queue for render + present
-        uint32_t m_GfxQueueFamIdx = UINT32_MAX;
+        uint32_t mGfxQueueFamIdx = UINT32_MAX;
 
-        VkCommandPool m_CmdPools[kFramesInFlight]{};
-        VkCommandBuffer m_CmdBuffers[kFramesInFlight]{};
-        VkSemaphore m_ImageAcquired[kFramesInFlight]{};
+        VkCommandPool mCmdPools[kFramesInFlight]{};
+        VkCommandBuffer mCmdBuffers[kFramesInFlight]{};
+        VkSemaphore mImageAcquired[kFramesInFlight]{};
 
-        std::vector<VkSemaphore> m_RenderComplete;
-        VkSemaphore m_Timeline = VK_NULL_HANDLE;
+        std::vector<VkSemaphore> mRenderComplete;
+        VkSemaphore mTimeline = VK_NULL_HANDLE;
 
         // waitvalue = signalValue - kFramesInFlight
         // dont start at 0 or 1 or else underflows
-        uint64_t m_NextSignalValue = kFramesInFlight + 1;
+        uint64_t mNextSignalValue = kFramesInFlight + 1;
 
-        VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
-        VkPipeline m_Pipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
+        VkPipeline mPipeline = VK_NULL_HANDLE;
 
-        VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
-        VmaAllocation m_VertexBufferAllocation = VK_NULL_HANDLE;
+        VkBuffer mVertexBuffer = VK_NULL_HANDLE;
+        VmaAllocation mVertexBufferAllocation = VK_NULL_HANDLE;
 
-        uint32_t m_FrameIndex = 0;
-        bool m_NeedRecreate = false;
-        bool m_ValidationEnabled = false;
+        uint32_t mFrameIndex = 0;
+        bool mNeedRecreate = false;
+        bool mValidationEnabled = false;
     };
 }

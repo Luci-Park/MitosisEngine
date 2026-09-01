@@ -17,10 +17,10 @@ namespace mts
 {
     struct WindowDesc
     {
-        uint32_t m_width = 1280;
-        uint32_t m_height = 720;
-        const char *m_title = "MitosisEngine";
-        bool m_resizable = true;
+        uint32_t mWidth = 1280;
+        uint32_t mHeight = 720;
+        const char *mTitle = "MitosisEngine";
+        bool mResizable = true;
     };
 
     class Window : public ISurfaceProvider
