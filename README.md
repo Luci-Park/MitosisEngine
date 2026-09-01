@@ -47,3 +47,18 @@ This engine is aiming for modularity, therefore each part of the engine is its o
 
 A new module has no sources yet, and CMake cannot build an empty library. Add at
 least one file to it before building.
+
+# Assets
+
+Source assets live under `assets/`. Building `HelloWorld` cooks them automatically:
+`AssetCooker` builds first, runs over every configured source root, and its output
+is copied to `cooked/` next to the executable, alongside `shaders/`. Editing an
+asset triggers a recook on the next build; a file whose cooked output is already
+newer than the source is skipped.
+
+To run the cook step by hand:
+```
+AssetCooker --source <dir> [--source <dir> ...] --out <dir>
+```
+`--source` paths should be given relative to the repo root (matching how CMake
+invokes it), not absolute, since each asset's id is hashed from that path.
