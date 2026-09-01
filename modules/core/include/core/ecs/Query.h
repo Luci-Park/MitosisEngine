@@ -58,15 +58,13 @@ namespace mts
     public:
         // calls fn(Entity, Ts&...) for every live entity in this query.
         // no order guaranteed.
-        //
-        // const: refreshing the match cache is memoization, not a logical change
         template <typename Fn>
-        void ForEach(Fn &&fn) const
+        void ForEach(Fn &&fn)
         {
             ForEachImpl(fn, std::index_sequence_for<Ts...>{});
         }
 
-        std::size_t MatchedArchetypeCount() const
+        std::size_t MatchedArchetypeCount()
         {
             EnsureFresh();
             return mMatches.size();
@@ -76,8 +74,8 @@ namespace mts
         friend class World;
 
         template <typename... Filters>
-        explicit Query(const World &world, Filters... filters)
-            : mWorld(&const_cast<World &>(world)), mDataMask(detail::TableSignatureOf<Ts...>())
+        explicit Query(World &world, Filters... filters)
+            : mWorld(&world), mDataMask(detail::TableSignatureOf<Ts...>())
         {
             // filters are fixed for the life of a Query instance, so fold them
             // into the masks here rather than on every ForEach call
@@ -181,7 +179,7 @@ namespace mts
 
         // -- cache --------------------------------------------------------------
 
-        void EnsureFresh() const
+        void EnsureFresh()
         {
             if (mWorld->Generation() == mSeenGeneration)
                 return;
@@ -227,7 +225,7 @@ namespace mts
         // table walk, split from the row walk so a ForEachChunk can be added as a
         // sibling later without touching ForEach. Internal only.
         template <typename Fn>
-        void ForEachMatchedTable(Fn &&fn) const
+        void ForEachMatchedTable(Fn &&fn)
         {
             EnsureFresh();
 
@@ -244,7 +242,7 @@ namespace mts
         }
 
         template <typename Fn, std::size_t... Is>
-        void ForEachImpl(Fn &fn, std::index_sequence<Is...>) const
+        void ForEachImpl(Fn &fn, std::index_sequence<Is...>)
         {
             ForEachMatchedTable([&](Archetype &table, Columns &columns)
                                 {
@@ -282,15 +280,9 @@ namespace mts
         }
 
         World *mWorld;
-
-        // rebuilt on demand from the world, so a const walk may refresh it;
-        // not part of the query's logical value
-        mutable std::vector<Match> mMatches;
-        mutable std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
-        mutable bool mIterating = false;
-
-        // resolved once in the ctor, so it needs no mutable: in a const method
-        // std::get still yields a pointer to non-const storage
+        std::vector<Match> mMatches;
+        std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
+        bool mIterating = false;
         std::tuple<SparseSetStorage<detail::Bare<Ts>> *...> mSparseStorages{};
 
         Signature mDataMask;
@@ -300,10 +292,8 @@ namespace mts
         std::vector<detail::SparseFilterCheck> mSparseFilterChecks;
     };
 
-    // shared body for both GetOrCreateQuery overloads. const-qualified because
-    // the only member it writes, mQueries, is mutable.
     template <typename... Ts, typename... Filters>
-    Query<Ts...> &World::FindOrMakeQuery(Filters... filters) const
+    Query<Ts...> &World::GetOrCreateQuery(Filters... filters)
     {
         const uint32_t key = detail::QueryKeyOf<detail::TypeList<Ts...>, Filters...>();
 
@@ -315,34 +305,11 @@ namespace mts
         return *static_cast<Query<Ts...> *>(it->second.get());
     }
 
-    template <typename... Ts, typename... Filters>
-    Query<Ts...> &World::GetOrCreateQuery(Filters... filters)
-    {
-        return FindOrMakeQuery<Ts...>(filters...);
-    }
-
-    template <typename... Ts, typename... Filters>
-    const Query<Ts...> &World::GetOrCreateQuery(Filters... filters) const
-    {
-        static_assert((std::is_const_v<Ts> && ...),
-                      "World::GetOrCreateQuery: a const World yields read-only terms only - "
-                      "spell each term as const T");
-        return FindOrMakeQuery<Ts...>(filters...);
-    }
-
     // Fn : function of fn(Entity, Ts&...)
     template <typename... Ts, typename Fn>
     void World::ForEach(Fn &&cb)
     {
         static_assert(sizeof...(Ts) > 0, "World::ForEach: needs at least one component");
-        GetOrCreateQuery<Ts...>().ForEach(cb);
-    }
-
-    template <typename... Ts, typename Fn>
-    void World::ForEach(Fn &&cb) const
-    {
-        static_assert(sizeof...(Ts) > 0, "World::ForEach: needs at least one component");
-        // resolves to the const overload, which carries the all-const-terms assert
         GetOrCreateQuery<Ts...>().ForEach(cb);
     }
 }
