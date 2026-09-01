@@ -106,7 +106,7 @@ int main(int argc, char **argv)
                 continue;
 
             const std::filesystem::path relative = std::filesystem::relative(entry.path(), rootPath);
-            const std::string idSource = root + "/" + relative.generic_string();
+            const std::string idSource = (std::filesystem::path(root) / relative).generic_string();
             const mts::AssetId id = mts::MakeAssetId(idSource);
 
             const std::optional<std::vector<std::byte>> bytes = ReadFileBytes(entry.path());

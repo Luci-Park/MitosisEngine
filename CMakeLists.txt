@@ -22,6 +22,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 include(cmake/EnginePlatform.cmake)
 include(cmake/EngineModule.cmake)
 include(cmake/Shaders.cmake)
+include(cmake/Assets.cmake)
 
 option(BUILD_TESTING "Build unit tests (per module, run via ctest)" ON)
 if(BUILD_TESTING)
@@ -46,7 +47,9 @@ engine_add_shaders(HelloWorld
     SOURCE assets/shaders/triangle.slang
     ENTRIES vertexMain:vertex fragmentMain:fragment)
 
-    
+engine_cook_assets(HelloWorld
+    SOURCE_ROOTS assets/
+    OUT_DIR ${CMAKE_BINARY_DIR}/cooked_assets)
 
 target_link_libraries(HelloWorld PRIVATE
     mts::app
