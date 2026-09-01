@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace mts
@@ -16,6 +18,7 @@ namespace mts
     inline constexpr AssetId kNullAssetId{};
 
     uint64_t Fnv1a64(std::string_view s);
+    uint64_t Fnv1a64(std::span<const std::byte> bytes);
 
     AssetId MakeAssetId(std::string_view path);
 }

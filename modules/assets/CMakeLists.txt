@@ -1,6 +1,7 @@
 ﻿engine_add_module(assets)
 
 target_sources(engine_assets PRIVATE
+    src/assets/AssetBlob.cpp
     src/assets/AssetId.cpp
 )
 
