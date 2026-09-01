@@ -22,6 +22,7 @@
 #include <cstring>
 #include <memory>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -218,13 +219,24 @@ namespace mts
         template <typename... Ts, typename... Filters>
         Query<Ts...> &GetOrCreateQuery(Filters... filters);
 
+        // const world: every term must be const, so the query can never hand
+        // back a mutable component reference
+        template <typename... Ts, typename... Filters>
+        const Query<Ts...> &GetOrCreateQuery(Filters... filters) const;
+
         // Use with GetOrCreateQuery<Ts...>().ForEach(cb); defined in Query.h.
         template <typename... Ts, typename Fn>
         void ForEach(Fn &&cb);
 
+        template <typename... Ts, typename Fn>
+        void ForEach(Fn &&cb) const;
+
     protected:
         template <typename...>
         friend class Query;
+
+        template <typename... Ts, typename... Filters>
+        Query<Ts...> &FindOrMakeQuery(Filters... filters) const;
 
         const std::unordered_map<Signature, std::unique_ptr<Archetype>> &Archetypes() const { return mArchetypes; }
 
@@ -271,9 +283,11 @@ namespace mts
             mRecords[entity.mIndex] = EntityRecord{&target, row};
         }
 
-        // lazy creation
+        // lazy creation.
+        // const: an absent storage and an empty one are indistinguishable to
+        // every observer, so materialising one is not a logical change.
         template <typename T>
-        SparseSetStorage<T> &SparseStorageFor()
+        SparseSetStorage<T> &SparseStorageFor() const
         {
             const uint32_t seq = TypeIdOf<T>().seq;
             auto it = mSparseStorages.find(seq);
@@ -397,8 +411,10 @@ namespace mts
         std::vector<EntityRecord> mRecords; // indexed by Entity::mIndex
         std::unordered_map<Signature, std::unique_ptr<Archetype>> mArchetypes;
         Archetype *mEmptyArchetype = nullptr;
-        std::unordered_map<uint32_t, std::unique_ptr<detail::ISparseStorage>> mSparseStorages; // by TypeId::seq
-        std::unordered_map<uint32_t, std::unique_ptr<detail::IQuery>> mQueries;                // by detail::QueryKeyOf
+        // caches, not state: both are filled on demand by queries, so a const
+        // World may still populate them
+        mutable std::unordered_map<uint32_t, std::unique_ptr<detail::ISparseStorage>> mSparseStorages; // by TypeId::seq
+        mutable std::unordered_map<uint32_t, std::unique_ptr<detail::IQuery>> mQueries;                // by detail::QueryKeyOf
         std::size_t mArchetypeGeneration = 0;
     };
 }

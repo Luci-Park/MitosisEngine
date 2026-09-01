@@ -520,3 +520,55 @@ TEST_CASE("Query allows a nested walk when no rebuild is needed", "[ecs][query]"
 
     REQUIRE(pairs == 6); // 3 entities, ordered pairs
 }
+
+TEST_CASE("Query walks a const World through const terms", "[ecs][query]")
+{
+    World world;
+
+    const Entity a = world.CreateEntity();
+    world.AddComponent(a, QPosition{3.0f, 4.0f});
+
+    const Entity b = world.CreateEntity();
+    world.AddComponent(b, QPosition{1.0f, 0.0f});
+    world.AddComponent(b, QVelocity{});
+
+    const World &readOnly = world;
+
+    SECTION("ForEach on a const World")
+    {
+        float sum = 0.0f;
+        readOnly.ForEach<const QPosition>([&](Entity, const QPosition &p)
+                                          {
+                                              static_assert(std::is_const_v<std::remove_reference_t<decltype(p)>>);
+                                              sum += p.x;
+                                          });
+
+        REQUIRE(sum == 4.0f);
+    }
+
+    SECTION("MatchedArchetypeCount is callable on a const query")
+    {
+        const Query<const QPosition> &query = readOnly.GetOrCreateQuery<const QPosition>();
+        REQUIRE(query.MatchedArchetypeCount() == 2);
+    }
+
+    SECTION("filters still apply on the const path")
+    {
+        int calls = 0;
+        readOnly.GetOrCreateQuery<const QPosition>(Without<QVelocity>{})
+            .ForEach([&](Entity, const QPosition &) { ++calls; });
+
+        REQUIRE(calls == 1);
+    }
+
+    SECTION("a const query object is still walkable")
+    {
+        // ForEach is const-qualified, so binding a non-const world's query to a
+        // const reference does not lock it out
+        const Query<QPosition> &query = world.GetOrCreateQuery<QPosition>();
+
+        int calls = 0;
+        query.ForEach([&](Entity, QPosition &) { ++calls; });
+        REQUIRE(calls == 2);
+    }
+}
