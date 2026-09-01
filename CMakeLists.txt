@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.25)
+﻿cmake_minimum_required(VERSION 3.26)
 
 # Must come before project(): CMAKE_TOOLCHAIN_FILE is only honoured there.
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/VcpkgToolchain.cmake)

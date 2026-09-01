@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace mts
@@ -30,5 +31,6 @@ namespace mts
         const AssetManifest *mManifest;
         std::filesystem::path mCookedRoot;
         std::unordered_map<uint64_t, AssetCacheEntry> mLoaded;
+        std::unordered_set<uint64_t> mFailedLoads;
     };
 }

@@ -32,9 +32,7 @@ namespace mts
 
     struct AssetManifestSourceEntry
     {
-        AssetId id;
-        uint32_t typeTag;
-        uint32_t contentVersion;
+        AssetManifestEntry entry;
         std::string_view path;
     };
 

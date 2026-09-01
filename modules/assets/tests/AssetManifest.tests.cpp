@@ -10,8 +10,8 @@ TEST_CASE("AssetManifest build and parse round trip", "[assets][manifest]")
     const mts::AssetId second = mts::MakeAssetId("a/two.raw");
 
     const mts::AssetManifestSourceEntry entries[]{
-        {first, 1, 1, "cooked/one.blob"},
-        {second, 2, 1, "cooked/two.blob"},
+        {{first, 1, 1}, "cooked/one.blob"},
+        {{second, 2, 1}, "cooked/two.blob"},
     };
 
     const std::vector<std::byte> blob = mts::BuildAssetManifestBlob(entries);

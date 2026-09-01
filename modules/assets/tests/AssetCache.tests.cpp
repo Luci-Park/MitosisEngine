@@ -55,7 +55,7 @@ TEST_CASE("AssetCache loads a cooked blob through the manifest", "[assets][cache
     const std::vector<std::byte> content = MakeContent("hello asset cache");
     WriteFile(dir.path / "greeting.blob", mts::BuildAssetBlob(1, 1, content));
 
-    const mts::AssetManifestSourceEntry sourceEntry{id, 1, 1, "greeting.blob"};
+    const mts::AssetManifestSourceEntry sourceEntry{{id, 1, 1}, "greeting.blob"};
     const std::optional<mts::AssetManifest> manifest =
         mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({&sourceEntry, 1}));
     REQUIRE(manifest.has_value());
@@ -86,12 +86,13 @@ TEST_CASE("AssetCache Load returns nullptr when the file is missing", "[assets][
 {
     ScratchDir dir;
     const mts::AssetId id = mts::MakeAssetId("ghost.raw");
-    const mts::AssetManifestSourceEntry sourceEntry{id, 1, 1, "ghost.blob"};
+    const mts::AssetManifestSourceEntry sourceEntry{{id, 1, 1}, "ghost.blob"};
     const std::optional<mts::AssetManifest> manifest =
         mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({&sourceEntry, 1}));
     REQUIRE(manifest.has_value());
 
     mts::AssetCache cache(&*manifest, dir.path);
+    CHECK(cache.Load(id) == nullptr);
     CHECK(cache.Load(id) == nullptr);
 }
 
@@ -101,7 +102,7 @@ TEST_CASE("AssetCache Load rejects a blob that does not match its manifest entry
     const mts::AssetId id = mts::MakeAssetId("mismatch.raw");
     WriteFile(dir.path / "mismatch.blob", mts::BuildAssetBlob(1, 1, MakeContent("payload")));
 
-    const mts::AssetManifestSourceEntry sourceEntry{id, 2, 1, "mismatch.blob"};
+    const mts::AssetManifestSourceEntry sourceEntry{{id, 2, 1}, "mismatch.blob"};
     const std::optional<mts::AssetManifest> manifest =
         mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({&sourceEntry, 1}));
     REQUIRE(manifest.has_value());

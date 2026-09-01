@@ -1,10 +1,10 @@
 #include "assets/AssetManifest.h"
 
 #include "assets/AssetBlob.h"
+#include "assets/AssetFileIo.h"
 #include "core/log/Log.h"
 
 #include <cstring>
-#include <fstream>
 
 namespace mts
 {
@@ -16,10 +16,7 @@ namespace mts
 
         for (const AssetManifestSourceEntry &src : entries)
         {
-            AssetManifestEntry entry{};
-            entry.id = src.id;
-            entry.typeTag = src.typeTag;
-            entry.contentVersion = src.contentVersion;
+            AssetManifestEntry entry = src.entry;
             entry.pathOffset = static_cast<uint32_t>(pathTable.size());
             entry.pathLength = static_cast<uint32_t>(src.path.size());
             pathTable.append(src.path);
@@ -70,12 +67,15 @@ namespace mts
         uint64_t entryCount = 0;
         std::memcpy(&entryCount, content.data(), sizeof(entryCount));
 
-        const std::size_t entriesBytes = static_cast<std::size_t>(entryCount) * sizeof(AssetManifestEntry);
-        if (content.size() < sizeof(entryCount) + entriesBytes)
+        const std::size_t availableForEntries = content.size() - sizeof(entryCount);
+        const std::size_t maxEntries = availableForEntries / sizeof(AssetManifestEntry);
+        if (entryCount > maxEntries)
         {
             MTS_LOG_ERROR("AssetManifest::Parse: content too small for {} entries", entryCount);
             return std::nullopt;
         }
+
+        const std::size_t entriesBytes = static_cast<std::size_t>(entryCount) * sizeof(AssetManifestEntry);
 
         AssetManifest manifest;
         manifest.mEntries.resize(entryCount);
@@ -102,29 +102,11 @@ namespace mts
 
     std::optional<AssetManifest> AssetManifest::LoadFile(const std::filesystem::path &path)
     {
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
-        if (!file)
-        {
-            MTS_LOG_ERROR("AssetManifest::LoadFile: cannot open {}", path.string());
+        const std::optional<std::vector<std::byte>> bytes = ReadFileBytes(path);
+        if (!bytes.has_value())
             return std::nullopt;
-        }
 
-        const std::streamsize size = file.tellg();
-        if (size < 0)
-        {
-            MTS_LOG_ERROR("AssetManifest::LoadFile: cannot determine size of {}", path.string());
-            return std::nullopt;
-        }
-        file.seekg(0);
-
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
-        if (!bytes.empty() && !file.read(reinterpret_cast<char *>(bytes.data()), size))
-        {
-            MTS_LOG_ERROR("AssetManifest::LoadFile: short read on {}", path.string());
-            return std::nullopt;
-        }
-
-        return Parse(bytes);
+        return Parse(*bytes);
     }
 
     const AssetManifestEntry *AssetManifest::Find(AssetId id) const

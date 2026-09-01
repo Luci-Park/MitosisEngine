@@ -2,7 +2,7 @@
 This is a CMake project built with VSCode. Everything is driven through presets and VSCode tasks.
 
 # Requirement
-- CMake >= 3.25
+- CMake >= 3.26
 - Ninja
 - MSVC (Visual Studio 2026 or Build Tools)
 - Vulkan SDK >= 1.4.309 (supplies `slangc` for shader builds)
