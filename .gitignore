@@ -1,5 +1,9 @@
 # build files
 /[Bb]uild
 /[Bb]uilds
+/cmake-build-*
 
 /logs
+
+# IDE
+/.idea
