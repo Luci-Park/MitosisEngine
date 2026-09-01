@@ -8,11 +8,14 @@
  */
 #pragma once
 
+#include <assets/AssetCache.h>
+#include <assets/AssetManifest.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 namespace mts
 {
@@ -45,6 +48,8 @@ namespace mts
     private:
         std::unique_ptr<Window> m_window;
         VulkanRenderer m_renderer;
+        std::optional<AssetManifest> m_assetManifest;
+        std::optional<AssetCache> m_assetCache;
         bool m_initialized = false;
     };
 }

@@ -16,4 +16,6 @@ namespace mts
     const std::filesystem::path &ExecutableDir();
 
     std::filesystem::path ShaderPath(std::string_view name);
+
+    std::filesystem::path CookedAssetsDir();
 }

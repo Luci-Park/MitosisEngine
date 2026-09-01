@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <string>
@@ -43,6 +44,7 @@ namespace mts
     {
     public:
         static std::optional<AssetManifest> Parse(std::span<const std::byte> raw);
+        static std::optional<AssetManifest> LoadFile(const std::filesystem::path &path);
 
         const AssetManifestEntry *Find(AssetId id) const;
         std::string_view PathOf(const AssetManifestEntry &entry) const;

@@ -48,4 +48,9 @@ namespace mts
     {
         return ExecutableDir() / "shaders" / name;
     }
+
+    std::filesystem::path CookedAssetsDir()
+    {
+        return ExecutableDir() / "cooked";
+    }
 }

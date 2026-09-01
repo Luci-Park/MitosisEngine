@@ -1,5 +1,6 @@
 #include <app/App.h>
 
+#include <core/fs/Paths.h>
 #include <core/log/Log.h>
 
 namespace mts
@@ -31,6 +32,17 @@ namespace mts
             m_window.reset();
             return false;
         }
+
+        const std::filesystem::path manifestPath = CookedAssetsDir() / "manifest.blob";
+        m_assetManifest = AssetManifest::LoadFile(manifestPath);
+        if (!m_assetManifest.has_value())
+        {
+            MTS_LOG_ERROR("Asset manifest load failed: {}", manifestPath.string());
+            m_renderer.Shutdown();
+            m_window.reset();
+            return false;
+        }
+        m_assetCache.emplace(&*m_assetManifest, CookedAssetsDir());
 
         m_initialized = true;
         return true;

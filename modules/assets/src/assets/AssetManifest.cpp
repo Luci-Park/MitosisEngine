@@ -4,6 +4,7 @@
 #include "core/log/Log.h"
 
 #include <cstring>
+#include <fstream>
 
 namespace mts
 {
@@ -97,6 +98,33 @@ namespace mts
         }
 
         return manifest;
+    }
+
+    std::optional<AssetManifest> AssetManifest::LoadFile(const std::filesystem::path &path)
+    {
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file)
+        {
+            MTS_LOG_ERROR("AssetManifest::LoadFile: cannot open {}", path.string());
+            return std::nullopt;
+        }
+
+        const std::streamsize size = file.tellg();
+        if (size < 0)
+        {
+            MTS_LOG_ERROR("AssetManifest::LoadFile: cannot determine size of {}", path.string());
+            return std::nullopt;
+        }
+        file.seekg(0);
+
+        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        if (!bytes.empty() && !file.read(reinterpret_cast<char *>(bytes.data()), size))
+        {
+            MTS_LOG_ERROR("AssetManifest::LoadFile: short read on {}", path.string());
+            return std::nullopt;
+        }
+
+        return Parse(bytes);
     }
 
     const AssetManifestEntry *AssetManifest::Find(AssetId id) const
