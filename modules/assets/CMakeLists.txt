@@ -8,3 +8,7 @@ target_sources(engine_assets PRIVATE
 )
 
 target_link_libraries(engine_assets PUBLIC mts::core)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
