@@ -1,7 +1,8 @@
 engine_add_module(app)
 
 target_link_libraries(engine_app
-    PUBLIC mts::core
+    PUBLIC mts::assets
+           mts::core
            mts::window
            mts::renderer
 )

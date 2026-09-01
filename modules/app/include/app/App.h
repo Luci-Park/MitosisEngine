@@ -11,11 +11,14 @@
 #include <core/ecs/CommandBuffer.h>
 #include <core/ecs/SystemScheduler.h>
 #include <core/ecs/World.h>
+#include <assets/AssetCache.h>
+#include <assets/AssetManifest.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 namespace mts
 {
@@ -66,6 +69,8 @@ namespace mts
         AppDesc m_desc;
         double m_elapsed = 0.0;
         uint64_t m_frame = 0;
+        std::optional<AssetManifest> m_assetManifest;
+        std::optional<AssetCache> m_assetCache;
         bool m_initialized = false;
     };
 }
