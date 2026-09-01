@@ -14,6 +14,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -130,10 +131,16 @@ int main(int argc, char **argv)
     for (const std::string &root : sourceRoots)
     {
         const std::filesystem::path rootPath = root;
+        // Skipping would leave a valid, empty manifest and a green build whose
+        // only symptom is "no manifest entry for asset ..." at runtime. An
+        // explicitly requested root that is not there is a build error.
+        // (An empty root is fine - only a missing one fails. A game with no
+        // assets yet needs a .gitkeep, since git does not track empty dirs.)
         if (!std::filesystem::exists(rootPath))
         {
-            MTS_LOG_WARN("AssetCooker: source root does not exist, skipping: {}", root);
-            continue;
+            MTS_LOG_ERROR("AssetCooker: source root does not exist: {}", root);
+            mts::FlushLog();
+            return 1;
         }
 
         for (const std::filesystem::directory_entry &entry : std::filesystem::recursive_directory_iterator(rootPath))
@@ -193,6 +200,37 @@ int main(int argc, char **argv)
         mts::FlushLog();
         return 1;
     }
+
+    // Nothing else removes these: the cooker only ever wrote, so a deleted asset
+    // left its blob behind forever, and a re-added file with an older mtime would
+    // read as up to date against that leftover and cook the *old* bytes.
+    std::unordered_set<std::string> keep;
+    keep.reserve(cooked.size() + 1);
+    for (const CookedFile &file : cooked)
+        keep.insert(file.fileName);
+    keep.insert("manifest.blob");
+
+    std::error_code pruneEc;
+    for (const std::filesystem::directory_entry &entry : std::filesystem::directory_iterator(outPath, pruneEc))
+    {
+        // flat and .blob only: the cooker writes hashed names straight into
+        // outPath, so anything else in there is not ours to delete
+        if (!entry.is_regular_file() || entry.path().extension() != ".blob")
+            continue;
+
+        const std::string fileName = entry.path().filename().string();
+        if (keep.contains(fileName))
+            continue;
+
+        std::error_code removeEc;
+        if (std::filesystem::remove(entry.path(), removeEc))
+            MTS_LOG_INFO("pruned stale {}", fileName);
+        else
+            MTS_LOG_WARN("AssetCooker: could not prune stale {}: {}", fileName, removeEc.message());
+    }
+
+    if (pruneEc)
+        MTS_LOG_WARN("AssetCooker: could not scan {} for stale blobs: {}", outDir, pruneEc.message());
 
     MTS_LOG_INFO("AssetCooker: cooked {} assets into {}", cooked.size(), outDir);
     mts::FlushLog();
