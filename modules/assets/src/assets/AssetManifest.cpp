@@ -57,6 +57,17 @@ namespace mts
             return std::nullopt;
         }
 
+        // AssetCache::Load checks this for every ordinary asset; the manifest is
+        // the one blob that must be trustworthy, so it cannot be the one that
+        // skips the check. Without it an old manifest memcpys its stale entry
+        // layout into the current struct and yields garbage ids and offsets.
+        if (blob->header.contentVersion != kAssetManifestContentVersion)
+        {
+            MTS_LOG_ERROR("AssetManifest::Parse: unsupported content version {}, expected {}",
+                          blob->header.contentVersion, kAssetManifestContentVersion);
+            return std::nullopt;
+        }
+
         const std::span<const std::byte> content = blob->content;
         if (content.size() < sizeof(uint64_t))
         {
@@ -94,7 +105,14 @@ namespace mts
                 MTS_LOG_ERROR("AssetManifest::Parse: entry {} path range out of bounds", i);
                 return std::nullopt;
             }
-            manifest.mIndex.emplace(entry.id.value, i);
+            // emplace does not overwrite, so a duplicate would leave the second
+            // entry permanently unreachable with no diagnostic - which is exactly
+            // what an id collision looks like. Reject instead.
+            if (!manifest.mIndex.emplace(entry.id.value, i).second)
+            {
+                MTS_LOG_ERROR("AssetManifest::Parse: duplicate asset id {:#x} at entry {}", entry.id.value, i);
+                return std::nullopt;
+            }
         }
 
         return manifest;

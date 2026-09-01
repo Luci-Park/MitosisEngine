@@ -62,3 +62,31 @@ TEST_CASE("WriteFileBytes returns false when the directory does not exist", "[as
     const std::filesystem::path path = MakeScratchFile() / "no_such_dir" / "file.blob";
     CHECK_FALSE(mts::WriteFileBytes(path, MakeContent("data")));
 }
+
+TEST_CASE("ReadFilePrefix returns exactly the requested bytes", "[assets][fileio]")
+{
+    const std::filesystem::path path = MakeScratchFile();
+    REQUIRE(mts::WriteFileBytes(path, MakeContent("HEADERbody body body")));
+
+    const std::optional<std::vector<std::byte>> prefix = mts::ReadFilePrefix(path, 6);
+    REQUIRE(prefix.has_value());
+    REQUIRE(prefix->size() == 6);
+    CHECK(std::memcmp(prefix->data(), "HEADER", 6) == 0);
+
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("ReadFilePrefix fails when the file is shorter than requested", "[assets][fileio]")
+{
+    const std::filesystem::path path = MakeScratchFile();
+    REQUIRE(mts::WriteFileBytes(path, MakeContent("tiny")));
+
+    CHECK_FALSE(mts::ReadFilePrefix(path, 64).has_value());
+
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("ReadFilePrefix returns nullopt for a missing file", "[assets][fileio]")
+{
+    CHECK_FALSE(mts::ReadFilePrefix(MakeScratchFile(), 4).has_value());
+}

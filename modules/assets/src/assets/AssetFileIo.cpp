@@ -49,6 +49,30 @@ namespace mts
             return false;
         }
 
+        // write() only fills the stream buffer. Without this the flush happens in
+        // the destructor, after we have already returned true and thrown its
+        // failure away - so a full disk or a dropped share would report success
+        // and leave a truncated blob to be discovered at load time.
+        file.flush();
+        if (!file.good())
+        {
+            MTS_LOG_ERROR("WriteFileBytes: flush failed on {}", path.string());
+            return false;
+        }
+
         return true;
+    }
+
+    std::optional<std::vector<std::byte>> ReadFilePrefix(const std::filesystem::path &path, std::size_t count)
+    {
+        std::ifstream file(path, std::ios::binary);
+        if (!file)
+            return std::nullopt; // quiet: callers probe files that may legitimately not exist
+
+        std::vector<std::byte> bytes(count);
+        if (count != 0 && !file.read(reinterpret_cast<char *>(bytes.data()), static_cast<std::streamsize>(count)))
+            return std::nullopt; // shorter than requested
+
+        return bytes;
     }
 }

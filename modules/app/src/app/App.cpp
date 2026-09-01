@@ -38,19 +38,31 @@ namespace mts
             return false;
         }
 
+        m_initialized = true;
+        return true;
+    }
+
+    AssetCache *App::Assets()
+    {
+        if (m_assetCache.has_value())
+            return &*m_assetCache;
+
+        if (m_assetLoadFailed)
+            return nullptr; // already tried and logged; do not re-stat the disk every call
+
         const std::filesystem::path manifestPath = CookedAssetsDir() / "manifest.blob";
         m_assetManifest = AssetManifest::LoadFile(manifestPath);
         if (!m_assetManifest.has_value())
         {
-            MTS_LOG_ERROR("Asset manifest load failed: {}", manifestPath.string());
-            m_renderer.Shutdown();
-            m_window.reset();
-            return false;
+            MTS_LOG_ERROR("Asset manifest load failed, assets unavailable: {}", manifestPath.string());
+            m_assetLoadFailed = true;
+            return nullptr;
         }
-        m_assetCache.emplace(&*m_assetManifest, CookedAssetsDir());
 
-        m_initialized = true;
-        return true;
+        // after the manifest is engaged, never before: the cache stores a raw
+        // pointer to it
+        m_assetCache.emplace(&*m_assetManifest, CookedAssetsDir());
+        return &*m_assetCache;
     }
 
     SystemContext App::MakeContext(float dt)
@@ -101,6 +113,13 @@ namespace mts
         // let all the systems stop first
         SystemContext stopContext = MakeContext(0.0f);
         m_scheduler.Stop(stopContext);
+
+        // Cache before manifest: the cache points at the manifest, and Initialize
+        // may be called again afterwards. Leaving the cache engaged over a
+        // destroyed manifest would leave a dangling pointer behind.
+        m_assetCache.reset();
+        m_assetManifest.reset();
+        m_assetLoadFailed = false;
 
         m_renderer.Shutdown();
         // Renderer holds the surface built from the window: window dies last.

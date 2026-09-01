@@ -43,3 +43,36 @@ TEST_CASE("AssetManifest Parse rejects a blob with the wrong type tag", "[assets
     const std::vector<std::byte> blob = mts::BuildAssetBlob(999, 1, {});
     CHECK_FALSE(mts::AssetManifest::Parse(blob).has_value());
 }
+
+TEST_CASE("AssetManifest rejects an unsupported content version", "[assets][manifest]")
+{
+    const mts::AssetManifestSourceEntry entries[]{
+        {{mts::MakeAssetId("a/one.raw"), 1, 1}, "cooked/one.blob"},
+    };
+
+    // a well-formed manifest body, re-wrapped with a content version this build
+    // does not know: the entry layout it describes may not be the current one
+    const std::vector<std::byte> current = mts::BuildAssetManifestBlob(entries);
+    const std::optional<mts::AssetBlobView> view = mts::ParseAssetBlob(current);
+    REQUIRE(view.has_value());
+
+    const std::vector<std::byte> future = mts::BuildAssetBlob(
+        mts::kAssetManifestTypeTag, mts::kAssetManifestContentVersion + 1, view->content);
+
+    CHECK_FALSE(mts::AssetManifest::Parse(future).has_value());
+}
+
+TEST_CASE("AssetManifest rejects duplicate asset ids", "[assets][manifest]")
+{
+    const mts::AssetId id = mts::MakeAssetId("a/one.raw");
+
+    // what an id collision looks like on disk: silently keeping the first would
+    // make the second asset permanently unreachable
+    const mts::AssetManifestSourceEntry entries[]{
+        {{id, 1, 1}, "cooked/one.blob"},
+        {{id, 1, 1}, "cooked/two.blob"},
+    };
+
+    const std::vector<std::byte> blob = mts::BuildAssetManifestBlob(entries);
+    CHECK_FALSE(mts::AssetManifest::Parse(blob).has_value());
+}

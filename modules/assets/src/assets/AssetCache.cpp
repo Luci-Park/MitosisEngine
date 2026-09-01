@@ -1,6 +1,7 @@
 #include "assets/AssetCache.h"
 
 #include "assets/AssetFileIo.h"
+#include "core/log/Assert.h"
 #include "core/log/Log.h"
 
 #include <optional>
@@ -10,6 +11,9 @@ namespace mts
     AssetCache::AssetCache(const AssetManifest *manifest, std::filesystem::path cookedRoot)
         : mManifest(manifest), mCookedRoot(std::move(cookedRoot))
     {
+        // Load dereferences this unconditionally; catching it here names the
+        // real mistake instead of crashing on the first asset request.
+        MTS_ASSERT(mManifest != nullptr, "AssetCache: manifest must not be null");
     }
 
     const AssetBlobView *AssetCache::Load(AssetId id)

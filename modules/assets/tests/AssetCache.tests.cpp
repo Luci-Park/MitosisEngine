@@ -9,6 +9,7 @@
 #include <cstring>
 #include <fstream>
 #include <string>
+#include <type_traits>
 
 namespace
 {
@@ -109,4 +110,17 @@ TEST_CASE("AssetCache Load rejects a blob that does not match its manifest entry
 
     mts::AssetCache cache(&*manifest, dir.path);
     CHECK(cache.Load(id) == nullptr);
+}
+
+TEST_CASE("AssetCache and its entries are move-only", "[assets][cache]")
+{
+    // AssetCacheEntry::view.content spans that entry's own raw buffer, so a copy
+    // would allocate a fresh buffer and leave the view aliasing the original
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible_v<mts::AssetCacheEntry>);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<mts::AssetCacheEntry>);
+    STATIC_REQUIRE(std::is_move_constructible_v<mts::AssetCacheEntry>);
+
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible_v<mts::AssetCache>);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<mts::AssetCache>);
+    STATIC_REQUIRE(std::is_move_constructible_v<mts::AssetCache>);
 }

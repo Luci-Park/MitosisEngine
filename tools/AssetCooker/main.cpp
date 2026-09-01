@@ -6,6 +6,7 @@
 #include <core/log/Log.h>
 
 #include <cstddef>
+#include <cstring>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -40,10 +41,34 @@ namespace
         return path.extension() == ".slang";
     }
 
+    // A cooked blob is only current if it was written by *this* cooker: an mtime
+    // test alone means bumping kRawAssetContentVersion (or the blob format) skips
+    // every file as up to date while the manifest is rewritten with the new
+    // version, so every blob on disk disagrees with it and every runtime load
+    // fails. Reading the 32-byte header is cheap next to recooking the asset.
+    bool BlobMatchesCurrentFormat(const std::filesystem::path &cooked)
+    {
+        const std::optional<std::vector<std::byte>> prefix =
+            mts::ReadFilePrefix(cooked, sizeof(mts::AssetBlobHeader));
+        if (!prefix.has_value())
+            return false;
+
+        mts::AssetBlobHeader header{};
+        std::memcpy(&header, prefix->data(), sizeof(header));
+
+        return header.magic == mts::kAssetBlobMagic &&
+               header.formatVersion == mts::kAssetBlobFormatVersion &&
+               header.typeTag == mts::kRawAssetTypeTag &&
+               header.contentVersion == mts::kRawAssetContentVersion;
+    }
+
     bool IsUpToDate(const std::filesystem::path &source, const std::filesystem::path &cooked)
     {
         std::error_code ec;
         if (!std::filesystem::exists(cooked, ec))
+            return false;
+
+        if (!BlobMatchesCurrentFormat(cooked))
             return false;
 
         const auto sourceTime = std::filesystem::last_write_time(source, ec);
@@ -54,7 +79,9 @@ namespace
         if (ec)
             return false;
 
-        return cookedTime >= sourceTime;
+        // strictly newer: an edit landing in the same filesystem timestamp tick as
+        // the previous cook would otherwise read as current and never be recooked
+        return cookedTime > sourceTime;
     }
 
     struct CookedFile

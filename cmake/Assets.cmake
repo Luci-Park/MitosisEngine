@@ -2,6 +2,11 @@
 #     SOURCE_ROOTS <dir> [<dir> ...]
 #     OUT_DIR <dir>)
 #
+# SOURCE_ROOTS are relative to the repository root, not to the calling
+# CMakeLists. A subdirectory therefore passes "games/foo/assets", not "assets":
+# the root string is hashed into every asset id, so it has to mean the same
+# thing no matter which CMakeLists asks for it.
+#
 # Runs AssetCooker over every SOURCE_ROOTS directory into OUT_DIR, then copies
 # OUT_DIR next to the executable as cooked/ so the run directory is
 # self-contained and the exe works when moved.
@@ -26,7 +31,19 @@ function(engine_cook_assets target)
     set(cooker_args "")
 
     foreach(root IN LISTS ARG_SOURCE_ROOTS)
-        get_filename_component(root_abs "${root}" ABSOLUTE)
+        if(IS_ABSOLUTE "${root}")
+            message(FATAL_ERROR
+                "engine_cook_assets: SOURCE_ROOTS must be relative to the repository "
+                "root, but got the absolute path \"${root}\". The root is hashed into "
+                "every asset id, so an absolute path would bake this machine's "
+                "checkout location into ids that must match on every machine.")
+        endif()
+
+        # BASE_DIR is the repository root, not CMAKE_CURRENT_SOURCE_DIR: the
+        # cooker below resolves the same string against CMAKE_SOURCE_DIR (its
+        # WORKING_DIRECTORY), and the two must agree or the glob watches one
+        # directory while the cooker reads another.
+        get_filename_component(root_abs "${root}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
 
         # CONFIGURE_DEPENDS: a newly added asset file needs a reconfigure to
         # join this list, same reasoning as vcpkg.json in the root CMakeLists.

@@ -55,6 +55,13 @@ namespace mts
         World &GetWorld() { return m_world; }
         SystemScheduler &Systems() { return m_scheduler; }
 
+        /// The asset cache, loading the manifest on first use.
+        /// Returns nullptr when no manifest is available - a build with no cooked
+        /// assets, or an exe moved away from its cooked/ folder - so a missing
+        /// manifest costs the caller an asset, not the whole application.
+        /// The failure is sticky: the manifest is not retried every frame.
+        AssetCache *Assets();
+
     private:
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
@@ -69,8 +76,12 @@ namespace mts
         AppDesc m_desc;
         double m_elapsed = 0.0;
         uint64_t m_frame = 0;
+        // m_assetCache holds a raw pointer into m_assetManifest, so the two are
+        // created and torn down together, cache first. Declared in this order so
+        // destruction (reverse of declaration) also destroys the cache first.
         std::optional<AssetManifest> m_assetManifest;
         std::optional<AssetCache> m_assetCache;
+        bool m_assetLoadFailed = false;
         bool m_initialized = false;
     };
 }
