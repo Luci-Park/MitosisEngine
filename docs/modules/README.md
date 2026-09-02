@@ -10,9 +10,9 @@ together; these say how one of them works.
 |---|---|---|
 | core | [core.md](core.md) | Sumin Park |
 | assets | - | - |
-| window | - | - |
+| window | [window.md](window.md) | Sumin Park |
 | renderer | - | - |
-| app | - | - |
+| app | [app.md](app.md) | Sumin Park |
 
 Add your row when you start a document.
 
