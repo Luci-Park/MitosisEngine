@@ -1,5 +1,25 @@
+# Mitosis Engine
 
-This is a CMake project built with VSCode. Everything is driven through presets and VSCode tasks.
+A modular 3D engine: an archetype ECS, a Vulkan 1.3 renderer, and an offline
+asset pipeline. This is a CMake project built with VSCode. Everything is driven
+through presets and VSCode tasks.
+
+Each game is its own directory under `games/`, defined by configs, assets and Lua
+scripts rather than by C++ - one shared runtime loads them, so making a game needs
+no rebuild ([decision 0018](docs/decisions/0018-game-definition.md)).
+
+# Document Structure
+
+| Document | What it answers |
+|---|---|
+| [docs/SETUP.md](docs/SETUP.md) | Getting it building on your machine |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | What the engine is today, and how it fits together |
+| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | How to write code that fits in |
+| [docs/EXTENDING.md](docs/EXTENDING.md) | Adding a module, component, system, shader or asset |
+| [docs/decisions/](docs/decisions/README.md) | Why it is the way it is |
+| [docs/README.md](docs/README.md) | The full documentation index, and where your own docs go |
+
+The rest of this file is the short version.
 
 # Requirement
 - CMake >= 3.26
@@ -7,6 +27,48 @@ This is a CMake project built with VSCode. Everything is driven through presets 
 - MSVC (Visual Studio 2026 or Build Tools)
 - Vulkan SDK >= 1.4.309 (supplies `slangc` for shader builds)
 - VSCode extensions: `ms-vscode.cmake-tools`, `ms-vscode.cpptools`
+
+# File Structure
+
+```
+CMakeLists.txt        root build: module list, HelloWorld target
+CMakePresets.json     Debug / Release presets, the only supported configure path
+vcpkg.json            dependency manifest
+main.cpp              HelloWorld entry point
+
+cmake/                build helpers
+  EngineModule.cmake    engine_add_module, engine_add_module_tests
+  EnginePlatform.cmake  ENGINE_PLATFORM and family flags
+  Shaders.cmake         slangc compilation
+  Assets.cmake          asset cooking
+  VcpkgToolchain.cmake  resolves vcpkg from VCPKG_ROOT
+
+modules/              one static library each, mts::<name>
+  core/                 ECS, logging, paths, surface contract
+  window/               GLFW window behind an interface
+  renderer/             Vulkan 1.3 renderer
+  assets/               cooked asset blobs, manifest, cache
+  app/                  composition root and main loop
+    include/<name>/       public API - the whole surface of the module
+    src/<name>/           implementation and private headers
+    tests/                Catch2 tests, one CTest case per TEST_CASE
+
+games/                one directory per game - planned, none exist yet
+  <name>/
+    game.config           boot parameters: title, resolution, entry script
+    assets/               its own source assets, cooked separately
+    scripts/              Lua: components, systems, scenes, gameplay
+
+tools/                AssetCooker, new_module.ps1, new_file.ps1
+templates/            what the scaffolding scripts stamp out
+assets/               source assets, cooked into the build tree
+docs/                 setup, architecture, conventions, decisions
+builds/               build trees, gitignored
+logs/                 engine.log, gitignored
+```
+
+Module details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), game rules in
+[decision 0018](docs/decisions/0018-game-definition.md).
 
 # Getting the Source
 
@@ -56,9 +118,19 @@ is copied to `cooked/` next to the executable, alongside `shaders/`. Editing an
 asset triggers a recook on the next build; a file whose cooked output is already
 newer than the source is skipped.
 
+Any target can cook roots of its own - a game cooks its own `assets/` this way:
+
+```cmake
+engine_cook_assets(MyGame
+    SOURCE_ROOTS games/mygame/assets/
+    OUT_DIR ${CMAKE_BINARY_DIR}/mygame_cooked)
+```
+
 To run the cook step by hand:
 ```
 AssetCooker --source <dir> [--source <dir> ...] --out <dir>
 ```
-`--source` paths should be given relative to the repo root (matching how CMake
-invokes it), not absolute, since each asset's id is hashed from that path.
+
+`SOURCE_ROOTS` and `--source` must both be relative to the repo root, never
+absolute: the root string is hashed into every asset id, so an absolute path
+bakes one machine's checkout location into ids that have to match everywhere.

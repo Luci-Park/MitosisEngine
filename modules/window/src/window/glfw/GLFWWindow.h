@@ -23,16 +23,16 @@ namespace mts
         void PollEvents() override;
         bool ShouldClose() const override;
 
-        uint32_t Width() const override { return m_width; }
-        uint32_t Height() const override { return m_height; }
+        uint32_t Width() const override { return mWidth; }
+        uint32_t Height() const override { return mHeight; }
 
         NativeWindowHandle NativeWindow() const override;
 
     private:
         static void OnFramebufferSize(GLFWwindow *handle, int width, int height);
 
-        GLFWwindow *m_handle = nullptr;
-        uint32_t m_width = 0;
-        uint32_t m_height = 0;
+        GLFWwindow *mHandle = nullptr;
+        uint32_t mWidth = 0;
+        uint32_t mHeight = 0;
     };
 }

@@ -9,7 +9,7 @@ int main()
     mts::App app;
 
     mts::AppDesc desc{};
-    desc.m_title = "MitosisEngine - Window Test";
+    desc.mTitle = "MitosisEngine - Window Test";
 
     if (!app.Initialize(desc))
     {
