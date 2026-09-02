@@ -5,4 +5,6 @@ engine_add_module_tests(core
     Query.tests.cpp
     CommandBuffer.tests.cpp
     System.tests.cpp
+    Transform.tests.cpp
+    TransformHierarchy.tests.cpp
 )

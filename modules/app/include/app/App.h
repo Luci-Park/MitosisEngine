@@ -11,14 +11,19 @@
 #include <core/ecs/CommandBuffer.h>
 #include <core/ecs/SystemScheduler.h>
 #include <core/ecs/World.h>
+#include <core/ecs/components/TriangleRenderer.h>
+#include <core/ecs/components/WorldTransform.h>
 #include <assets/AssetCache.h>
 #include <assets/AssetManifest.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
+#include <glm/mat4x4.hpp>
+
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace mts
 {
@@ -30,13 +35,9 @@ namespace mts
         const char *mAppName = "MitosisEngine";
         bool mEnableValidation = true;
 
-        /// A stalled frame (breakpoint, window drag) would otherwise hand systems
-        /// a multi-second dt and teleport everything.
         float mMaxDeltaSeconds = 0.25f;
     };
 
-    /// Fixed-member composition root: no generic system registry until one is
-    /// actually needed (see architecture decisions).
     class App
     {
     public:
@@ -66,12 +67,25 @@ namespace mts
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
 
+        /// Refills mDrawInstances from the world. This is the whole ECS ->
+        /// renderer bridge, and it lives here rather than in either module:
+        /// engine_core must not link engine_renderer, and the renderer takes
+        /// plain matrices so it never learns what a World is. App links both,
+        /// so App is the only place the two may meet.
+        /// Refills mDrawInstances from the world :
+        void CollectDrawInstances();
+
         std::unique_ptr<Window> mWindow;
         VulkanRenderer mRenderer;
 
         World mWorld;
         CommandBuffer mCommands;
         SystemScheduler mScheduler;
+
+        /// Rebuilt every frame but keeps its capacity to steady allocation.
+        std::vector<glm::mat4> mDrawInstances;
+
+        Query<const WorldTransform> *mDrawQuery = nullptr;
 
         AppDesc mDesc;
         double mElapsed = 0.0;

@@ -68,6 +68,7 @@ namespace mts
             }
         }
 
+        // will call all systems in all phases in order
         void Update(SystemContext &context)
         {
             MTS_ASSERT(mStarted, "SystemScheduler::Update: Start was never called");
@@ -96,6 +97,17 @@ namespace mts
             }
 
             mStarted = false;
+        }
+
+        /// Drops every registered system so Add and Start may be used again.
+        /// Stop has to have run first: the systems are about to be destroyed,
+        /// and OnStop is their only chance to release anything.
+        void Reset()
+        {
+            MTS_ASSERT(!mStarted, "SystemScheduler::Reset: Stop must run before Reset");
+
+            for (std::size_t phase = 0; phase < kPhaseCount; ++phase)
+                mPhases[phase].clear();
         }
 
         bool Started() const { return mStarted; }

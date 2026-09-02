@@ -28,6 +28,24 @@
 
 namespace mts
 {
+    class World;
+
+    /**
+     * Called just before an entity is torn down, while all of its components
+     * are still readable. Registered with World::AddDestroyHook.
+     *
+     * A hook may destroy further entities - that is the point of it, and how
+     * the scene hierarchy cascades - so it must tolerate being re-entered.
+     * It must not add or remove hooks.
+     */
+    struct EntityDestroyHook
+    {
+        void (*fn)(World &world, Entity entity, void *user);
+        void *user = nullptr;
+
+        bool operator==(const EntityDestroyHook &) const = default;
+    };
+
     // where an entity's components live: which table, and which row of it
     struct EntityRecord
     {
@@ -98,10 +116,55 @@ namespace mts
             return entity;
         }
 
+        /**
+         * Registers a hook to run before each entity is torn down. Adding the
+         * same fn+user twice is a no-op, so an installer can be called from
+         * every entry point without tracking whether it already ran.
+         *
+         * World stays ignorant of what any hook means: this is how the scene
+         * hierarchy makes destruction cascade without World learning what a
+         * parent is.
+         */
+        void AddDestroyHook(void (*fn)(World &, Entity, void *), void *user = nullptr)
+        {
+            const EntityDestroyHook hook{fn, user};
+            for (const EntityDestroyHook &existing : mDestroyHooks)
+            {
+                if (existing == hook)
+                    return;
+            }
+
+            mDestroyHooks.push_back(hook);
+        }
+
         // reset record, remove from both storages, remove from pool
         void DestroyEntity(Entity entity)
         {
             MTS_ASSERT(mPool.IsAlive(entity), "World::DestroyEntity: entity is not alive");
+
+            // Hooks run first, while this entity's components are still
+            // readable, and the record is read only afterwards. A hook may
+            // destroy other entities, and a swap-remove in this archetype can
+            // move this entity's row - a record captured before the hooks ran
+            // would then name someone else's row.
+            //
+            // Indexed rather than ranged so the vector may not be reallocated
+            // underneath the loop; hooks are documented not to add hooks.
+            for (std::size_t i = 0; i < mDestroyHooks.size(); ++i)
+            {
+                // Re-checked every iteration, not just after the loop: an
+                // earlier hook's cascade can reach this entity, and hooks are
+                // promised an entity whose components are still readable.
+                if (!mPool.IsAlive(entity))
+                    return;
+
+                mDestroyHooks[i].fn(*this, entity, mDestroyHooks[i].user);
+            }
+
+            // A cascade can reach this entity from another direction and
+            // destroy it before we get here. Already gone is success.
+            if (!mPool.IsAlive(entity))
+                return;
 
             const EntityRecord record = mRecords[entity.mIndex];
             RemoveRow(*record.archetype, record.row);
@@ -399,6 +462,7 @@ namespace mts
         Archetype *mEmptyArchetype = nullptr;
         std::unordered_map<uint32_t, std::unique_ptr<detail::ISparseStorage>> mSparseStorages; // by TypeId::seq
         std::unordered_map<uint32_t, std::unique_ptr<detail::IQuery>> mQueries;                // by detail::QueryKeyOf
+        std::vector<EntityDestroyHook> mDestroyHooks;
         std::size_t mArchetypeGeneration = 0;
     };
 }

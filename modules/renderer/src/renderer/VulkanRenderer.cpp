@@ -1190,7 +1190,7 @@ namespace mts
         }
         mRenderComplete.clear();
     }
-    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex)
+    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances)
     {
         // get image ready
         ImageBarrier(cmd, mSwapchainImages[imageIndex],
@@ -1251,18 +1251,18 @@ namespace mts
         const VkDeviceSize vertexOffset = 0;
         vkCmdBindVertexBuffers(cmd, 0, 1, &mVertexBuffer, &vertexOffset);
 
-        static const auto startTime = std::chrono::steady_clock::now();
-        const float elapsed = std::chrono::duration<float>(
-                                  std::chrono::steady_clock::now() - startTime)
-                                  .count();
+        // One draw per instance rather than instanced rendering: the transform
+        // arrives as a push constant, and there is no per-instance buffer yet.
+        // should be replaced soon
+        for (const glm::mat4 &transform : instances)
+        {
+            const PushData pushData{.transform = transform};
 
-        PushData pushData{
-            .transform = glm::rotate(glm::mat4(1.0f), elapsed, glm::vec3(0.0f, 0.0f, 1.0f))};
+            vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                               0, sizeof(PushData), &pushData);
 
-        vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                           0, sizeof(PushData), &pushData);
-
-        vkCmdDraw(cmd, 3, 1, 0, 0);
+            vkCmdDraw(cmd, 3, 1, 0, 0);
+        }
 
         if (mValidationEnabled)
             vkCmdEndDebugUtilsLabelEXT(cmd);
@@ -1278,7 +1278,7 @@ namespace mts
                      VK_PIPELINE_STAGE_2_NONE, 0);
     }
 
-    void VulkanRenderer::DrawFrame()
+    void VulkanRenderer::DrawFrame(std::span<const glm::mat4> instances)
     {
         if (mWindow->Width() == 0 || mWindow->Height() == 0)
             return;
@@ -1338,7 +1338,7 @@ namespace mts
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
         vkBeginCommandBuffer(cmd, &beginInfo);
-        RecordCommands(cmd, imageIndex);
+        RecordCommands(cmd, imageIndex, instances);
         vkEndCommandBuffer(cmd);
 
         const VkSemaphoreSubmitInfo waitSem{

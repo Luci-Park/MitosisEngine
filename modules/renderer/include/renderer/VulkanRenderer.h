@@ -12,7 +12,10 @@
 
 #include <volk.h>
 
+#include <glm/mat4x4.hpp>
+
 #include <cstdint>
+#include <span>
 #include <vector>
 
 VK_DEFINE_HANDLE(VmaAllocator)
@@ -32,7 +35,9 @@ namespace mts
     public:
         VulkanRenderer() = default;
         bool Initialize(const RendererDesc &desc);
-        void DrawFrame();
+
+        void DrawFrame(std::span<const glm::mat4> instances);
+
         void Shutdown();
 
     private:
@@ -53,7 +58,7 @@ namespace mts
         bool CreateVertexBuffer();
         void DestroyVertexBuffer();
         void NameObject(VkObjectType type, uint64_t handle, const char *name);
-        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex);
+        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances);
 
     private:
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};

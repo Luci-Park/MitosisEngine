@@ -1,5 +1,6 @@
 #include <app/App.h>
 
+#include <core/ecs/TransformHierarchy.h>
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
 
@@ -30,13 +31,22 @@ namespace mts
         }
 
         if (!mRenderer.Initialize({.window = mWindow.get(),
-                                    .appName = desc.mAppName,
-                                    .enableValidation = desc.mEnableValidation}))
+                                   .appName = desc.mAppName,
+                                   .enableValidation = desc.mEnableValidation}))
         {
             MTS_LOG_ERROR("Renderer initialization failed");
             mWindow.reset();
             return false;
         }
+
+        // Destruction needs no system: InstallHierarchyHooks makes
+        // World::DestroyEntity cascade, so nothing is ever left orphaned for a
+        // pass to reap. Armed here so a World that is destroyed into before its
+        // first AddTransform still cascades.
+        InstallHierarchyHooks(mWorld);
+
+        // should be before any other system in PostUpdate
+        mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);
 
         mInitialized = true;
         return true;
@@ -70,6 +80,17 @@ namespace mts
         return SystemContext{mWorld, mCommands, dt, mElapsed, mFrame};
     }
 
+    void App::CollectDrawInstances()
+    {
+        if (mDrawQuery == nullptr)
+            mDrawQuery = &mWorld.GetOrCreateQuery<const WorldTransform>(With<TriangleRenderer>{});
+
+        mDrawInstances.clear();
+
+        mDrawQuery->ForEach([this](Entity, const WorldTransform &world)
+                            { mDrawInstances.push_back(world.Matrix()); });
+    }
+
     void App::Run()
     {
         if (!mInitialized)
@@ -95,9 +116,8 @@ namespace mts
             SystemContext context = MakeContext(dt);
             mScheduler.Update(context);
 
-            // The Render phase is reserved but empty: a render system would need
-            // to reach the renderer, and engine_core must not link engine_renderer.
-            mRenderer.DrawFrame();
+            CollectDrawInstances();
+            mRenderer.DrawFrame(mDrawInstances);
 
             ++mFrame;
         }
@@ -113,6 +133,14 @@ namespace mts
         // let all the systems stop first
         SystemContext stopContext = MakeContext(0.0f);
         mScheduler.Stop(stopContext);
+
+        // Dropped, not kept: Initialize may run again (see below), and it
+        // registers TransformPropagateSystem unconditionally. Keeping the old
+        // list would run a second copy of it, and of every game system, on
+        // every frame of the next session.
+        mScheduler.Reset();
+        mDrawQuery = nullptr;
+        mDrawInstances.clear();
 
         // Cache before manifest: the cache points at the manifest, and Initialize
         // may be called again afterwards. Leaving the cache engaged over a
