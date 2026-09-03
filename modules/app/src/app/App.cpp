@@ -11,6 +11,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <chrono>
@@ -51,6 +52,9 @@ namespace mts
 
         ImGuiIO &io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        mImGuiIniPath = (ExecutableDir() / "imgui.ini").string();
+        io.IniFilename = mImGuiIniPath.c_str();
 
         ImFontConfig fontConfig;
         fontConfig.OversampleH = 3;
@@ -186,6 +190,35 @@ namespace mts
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
+
+            const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(
+                0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+
+            ImGuiDockNode *dockspaceNode = ImGui::DockBuilderGetNode(dockspaceId);
+            if (dockspaceNode != nullptr && dockspaceNode->IsEmpty())
+            {
+                ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
+
+                ImGuiID center = dockspaceId;
+                const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.2f, nullptr, &center);
+                const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
+                const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.25f, nullptr, &center);
+
+                ImGui::DockBuilderDockWindow("Scene", left);
+                ImGui::DockBuilderDockWindow("Inspector", right);
+                ImGui::DockBuilderDockWindow("Output", bottom);
+
+                ImGui::DockBuilderFinish(dockspaceId);
+            }
+
+            ImGui::Begin("Scene");
+            ImGui::End();
+
+            ImGui::Begin("Inspector");
+            ImGui::End();
+
+            ImGui::Begin("Output");
+            ImGui::End();
 
             if (mDesc.mShowImGuiDemo)
                 ImGui::ShowDemoWindow();

@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace mts
@@ -107,5 +108,6 @@ namespace mts
         bool mInitialized = false;
         bool mImGuiInitialized = false;
         bool mShowStyleEditor = false;
+        std::string mImGuiIniPath;
     };
 }
