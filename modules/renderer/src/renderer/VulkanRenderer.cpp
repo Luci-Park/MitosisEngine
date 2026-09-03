@@ -51,9 +51,9 @@ namespace mts
             return vmaCreateBuffer(allocator, &bufferInfo, &allocInfo,
                                    &outBuffer, &outAllocation, outInfo) == VK_SUCCESS;
         }
-        // vulkan's guaranteed minimum constant size = 128
-        // vulkan pads every column to 16 anyways so pad it ourselves for no surprise
         // normalCols = Normal matrix
+        // vulkan's guaranteed minimum constant size = 128
+        // vulkan pads every column to 16 anyways
         struct PushData
         {
             glm::mat4 transform;  // 64
@@ -1429,18 +1429,9 @@ namespace mts
             .extent = mSwapchainExtent};
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-        // One draw per item, each keyed by its own mesh handle: an item whose
-        // mesh does not resolve (not yet loaded, or a stale handle) costs
-        // that one item, not the frame - see FindMesh. No dedup across items
-        // that share a mesh; sorting the list to skip redundant binds is a
-        // later optimisation, invisible at the object counts here.
-        //
-        // Pipeline binds are tracked and skipped when unchanged from the
-        // previous item - items are not sorted by material, so this only
-        // helps when a caller happens to group them, but it costs nothing
-        // when they are not.
         VkPipeline boundPipeline = VK_NULL_HANDLE;
 
+        // no mesh/material batching yet, just draw per item
         for (const DrawItem &item : items)
         {
             const GpuMesh *const mesh = FindMesh(item.mesh);
@@ -1462,9 +1453,6 @@ namespace mts
             const VkDeviceSize vertexOffset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->mVertexBuffer, &vertexOffset);
 
-            // UINT32 to match std::vector<uint32_t>. UINT16 halves the index
-            // buffer and is worth it once meshes are cooked; picking it now
-            // would mean two index paths for no measurable gain.
             vkCmdBindIndexBuffer(cmd, mesh->mIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             const PushData pushData{
