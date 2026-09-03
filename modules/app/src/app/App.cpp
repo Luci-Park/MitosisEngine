@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 
 namespace mts
 {
@@ -109,20 +110,11 @@ namespace mts
         }
 
         mImGuiInitialized = true;
-        // Nothing past this point can fail, so this is where Initialize is
-        // committed - Shutdown's cleanup, including ImGui teardown, is gated
-        // on this flag alone.
         mInitialized = true;
 
-        // Destruction needs no system: InstallHierarchy puts the scene graph
-        // in place and arms the destroy hook, so World::DestroyEntity cascades
-        // and nothing is ever left orphaned for a pass to reap. Called here so
-        // a world destroyed into before its first AddTransform still cascades.
+        // scene graph + install destroy hook
         InstallHierarchy(mWorld);
 
-        // Before anything may load a script: the registry gives a name to
-        // whoever claims it first, and a script-declared component that stole
-        // "Transform" would be refused here rather than at its own callsite.
         RegisterCoreComponents();
         RegisterRendererComponents();
 
@@ -186,17 +178,27 @@ namespace mts
             const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
             const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.25f, nullptr, &center);
 
-            ImGui::DockBuilderDockWindow("Scene", left);
+            ImGui::DockBuilderDockWindow("Hierarchy", left);
             ImGui::DockBuilderDockWindow("Inspector", right);
             ImGui::DockBuilderDockWindow("Output", bottom);
 
             ImGui::DockBuilderFinish(dockspaceId);
         }
 
-        for (const char *name : {"Scene", "Inspector", "Output"})
+        for (const char *name : {"Hierarchy", "Inspector", "Output"})
         {
             ImGui::Begin(name);
             ImGui::End();
+        }
+
+        // ImGuiDockNodeFlags_PassthruCentralNode leaves the dockspace's center undocked
+        if (const ImGuiDockNode *centralNode = ImGui::DockBuilderGetCentralNode(dockspaceId);
+            centralNode != nullptr)
+        {
+            mSceneViewportRect = VkRect2D{
+                .offset{static_cast<int32_t>(centralNode->Pos.x), static_cast<int32_t>(centralNode->Pos.y)},
+                .extent{static_cast<uint32_t>(std::max(centralNode->Size.x, 0.0f)),
+                        static_cast<uint32_t>(std::max(centralNode->Size.y, 0.0f))}};
         }
 
         if (ImGui::BeginMainMenuBar())
@@ -261,6 +263,7 @@ namespace mts
             // Update (SystemPhase::Render), so this frame's draw data has to
             // be handed to the renderer before Update runs, not after.
             mRenderer.SetImGuiDrawData(ImGui::GetDrawData());
+            mRenderer.SetSceneViewport(mSceneViewportRect);
 
             SystemContext context = MakeContext(dt);
             mScheduler.Update(context);

@@ -68,6 +68,9 @@ namespace mts
         /// separately, before the scheduler update that reaches DrawFrame.
         void SetImGuiDrawData(ImDrawData *drawData) { mImguiDrawData = drawData; }
 
+        /// Viewport/scissor rect (window pixels) the scene pass is clipped to
+        void SetSceneViewport(VkRect2D rect) { mSceneViewportRect = rect; }
+
         // Uploads geometry and returns a handle to it.
         // Use on load time
         MeshHandle CreateMesh(std::span<const Vertex> vertices,
@@ -77,12 +80,16 @@ namespace mts
         /// kNullMaterial means default material
         MaterialHandle CreateMaterial(const MaterialDesc &desc);
 
-        /// Width/height of the current swapchain
+        /// Width/height of whatever the scene actually renders into: the
+        /// editor viewport once one is set, else the full swapchain.
         float AspectRatio() const
         {
-            return mSwapchainExtent.height == 0
+            const VkExtent2D extent = HasSceneViewport()
+                                          ? mSceneViewportRect.extent
+                                          : mSwapchainExtent;
+            return extent.height == 0
                        ? 1.0f
-                       : static_cast<float>(mSwapchainExtent.width) / static_cast<float>(mSwapchainExtent.height);
+                       : static_cast<float>(extent.width) / static_cast<float>(extent.height);
         }
 
         void DrawFrame(std::span<const DrawItem> items);
@@ -94,6 +101,11 @@ namespace mts
     private:
         struct GpuMesh;
         struct GpuMaterial;
+
+        bool HasSceneViewport() const
+        {
+            return mSceneViewportRect.extent.width > 0 && mSceneViewportRect.extent.height > 0;
+        }
 
         bool CreateVulkanInstance(const RendererDesc &desc);
         bool CreateDebugMessenger();
@@ -143,6 +155,8 @@ namespace mts
         VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
         VkFormat mSwapchainFormat = VK_FORMAT_UNDEFINED;
         VkExtent2D mSwapchainExtent{};
+
+        VkRect2D mSceneViewportRect{};
         std::vector<VkImage> mSwapchainImages;
         std::vector<VkImageView> mSwapchainViews;
 

@@ -107,5 +107,8 @@ namespace mts
         bool mImGuiInitialized = false;
         bool mShowStyleEditor = false;
         std::string mImGuiIniPath;
+
+        /// Scene rendering screen info
+        VkRect2D mSceneViewportRect{};
     };
 }

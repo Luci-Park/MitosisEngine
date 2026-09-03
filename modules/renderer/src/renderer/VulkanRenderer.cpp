@@ -1470,19 +1470,27 @@ namespace mts
             vkCmdBeginDebugUtilsLabelEXT(cmd, &label);
         }
 
+        // clip the scene pass if there is a specified viewport
+        const VkRect2D requestedRect = HasSceneViewport()
+                                           ? mSceneViewportRect
+                                           : VkRect2D{.offset{0, 0}, .extent = mSwapchainExtent};
+        VkRect2D sceneRect = requestedRect;
+        sceneRect.offset.x = std::clamp(sceneRect.offset.x, 0, static_cast<int32_t>(mSwapchainExtent.width));
+        sceneRect.offset.y = std::clamp(sceneRect.offset.y, 0, static_cast<int32_t>(mSwapchainExtent.height));
+        sceneRect.extent.width = std::min(sceneRect.extent.width,
+                                          mSwapchainExtent.width - static_cast<uint32_t>(sceneRect.offset.x));
+        sceneRect.extent.height = std::min(sceneRect.extent.height,
+                                           mSwapchainExtent.height - static_cast<uint32_t>(sceneRect.offset.y));
+
         const VkViewport viewport{
-            .x = 0.0f,
-            .y = 0.0f,
-            .width = static_cast<float>(mSwapchainExtent.width),
-            .height = static_cast<float>(mSwapchainExtent.height),
+            .x = static_cast<float>(sceneRect.offset.x),
+            .y = static_cast<float>(sceneRect.offset.y),
+            .width = static_cast<float>(sceneRect.extent.width),
+            .height = static_cast<float>(sceneRect.extent.height),
             .minDepth = 0.0f,
             .maxDepth = 1.0f};
         vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-        const VkRect2D scissor{
-            .offset{0, 0},
-            .extent = mSwapchainExtent};
-        vkCmdSetScissor(cmd, 0, 1, &scissor);
+        vkCmdSetScissor(cmd, 0, 1, &sceneRect);
 
         VkPipeline boundPipeline = VK_NULL_HANDLE;
 
