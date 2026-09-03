@@ -23,7 +23,6 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
-#include <cmath>
 #include <fstream>
 #include <optional>
 #include <array>
@@ -34,23 +33,35 @@ namespace mts
 {
     namespace
     {
-        struct Vertex
+        bool CreateBuffer(VmaAllocator allocator,
+                          VkDeviceSize size,
+                          VkBufferUsageFlags usage,
+                          VmaAllocationCreateFlags allocFlags,
+                          VkBuffer &outBuffer,
+                          VmaAllocation &outAllocation,
+                          VmaAllocationInfo *outInfo)
         {
-            glm::vec2 pos;
-            glm::vec3 color;
-        };
+            const VkBufferCreateInfo bufferInfo{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .size = size,
+                .usage = usage,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
 
-        // frontface = counter-clockwise
-        const Vertex kTriangleVertices[3]{
-            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        };
+            const VmaAllocationCreateInfo allocInfo{
+                .flags = allocFlags,
+                .usage = VMA_MEMORY_USAGE_AUTO};
 
-        // 64 bytes: inside the 128-byte guaranteed minimum for push constants.
+            return vmaCreateBuffer(allocator, &bufferInfo, &allocInfo,
+                                   &outBuffer, &outAllocation, outInfo) == VK_SUCCESS;
+        }
+
+        // 64 + 16 = 80 bytes: inside the 128-byte guaranteed minimum for push
+        // constants. A second mat4 (view-projection, rung 4) will not fit
+        // beside this - that is why rung 4 premultiplies on the CPU instead.
         struct PushData
         {
             glm::mat4 transform;
+            glm::vec4 tint;
         };
         VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -231,7 +242,7 @@ namespace mts
                                        caps.maxImageExtent.height);
             return extent;
         }
-        void ImageBarrier(VkCommandBuffer cmd, VkImage image,
+        void ImageBarrier(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags aspectMask,
                           VkImageLayout oldLayout, VkImageLayout newLayout,
                           VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
                           VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
@@ -248,7 +259,7 @@ namespace mts
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = image,
                 .subresourceRange{
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .aspectMask = aspectMask,
                     .levelCount = 1,
                     .layerCount = 1}};
 
@@ -353,14 +364,10 @@ namespace mts
         if (!CreateGraphicsPipeline())
             return false;
 
-        if (!CreateVertexBuffer())
-            return false;
-
         NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MitosisEngine device");
         NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(mGfxQueue), "Graphics+present queue");
         NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(mSwapchain), "Swapchain");
-        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mPipeline), "Triangle pipeline");
-        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mVertexBuffer), "Triangle vertex buffer");
+        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mPipeline), "Mesh pipeline");
 
         for (size_t i = 0; i < mSwapchainImages.size(); ++i)
         {
@@ -385,7 +392,8 @@ namespace mts
         VkPipelineRenderingCreateInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &mSwapchainFormat};
+            .pColorAttachmentFormats = &mSwapchainFormat,
+            .depthAttachmentFormat = kDepthFormat};
 
         ImGui_ImplVulkan_InitInfo initInfo{};
         initInfo.ApiVersion = VulkanVersion;
@@ -443,7 +451,7 @@ namespace mts
             }
 
             // before mAllocator
-            DestroyVertexBuffer();
+            DestroyMeshes();
 
             if (mPipeline != VK_NULL_HANDLE)
             {
@@ -834,7 +842,7 @@ namespace mts
                      extent.width, extent.height, actualCount, imageCount,
                      presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? "MAILBOX" : "FIFO");
 
-        return CreateImageViews();
+        return CreateImageViews() && CreateDepthResources();
     }
     bool VulkanRenderer::CreateImageViews()
     {
@@ -863,9 +871,88 @@ namespace mts
 
         return true;
     }
+    bool VulkanRenderer::CreateDepthResources()
+    {
+        VkFormatProperties formatProps{};
+        vkGetPhysicalDeviceFormatProperties(mPhysicalDevice, kDepthFormat, &formatProps);
+        if ((formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0)
+        {
+            MTS_LOG_CRITICAL("VK_FORMAT_D32_SFLOAT unsupported as an optimal-tiling depth attachment");
+            return false;
+        }
+
+        for (uint32_t i = 0; i < kFramesInFlight; ++i)
+        {
+            const VkImageCreateInfo imageInfo{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format = kDepthFormat,
+                .extent{mSwapchainExtent.width, mSwapchainExtent.height, 1},
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .tiling = VK_IMAGE_TILING_OPTIMAL,
+                .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
+
+            const VmaAllocationCreateInfo allocInfo{.usage = VMA_MEMORY_USAGE_AUTO};
+
+            if (vmaCreateImage(mAllocator, &imageInfo, &allocInfo,
+                               &mDepthImages[i], &mDepthAllocations[i], nullptr) != VK_SUCCESS)
+            {
+                MTS_LOG_CRITICAL("vmaCreateImage failed for depth buffer {}", i);
+                return false;
+            }
+
+            const VkImageViewCreateInfo viewInfo{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = mDepthImages[i],
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = kDepthFormat,
+                .subresourceRange{
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1}};
+
+            if (vkCreateImageView(mDevice, &viewInfo, nullptr, &mDepthViews[i]) != VK_SUCCESS)
+            {
+                MTS_LOG_CRITICAL("vkCreateImageView failed for depth buffer {}", i);
+                return false;
+            }
+
+            NameObject(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<uint64_t>(mDepthImages[i]),
+                       std::format("Depth buffer {}", i).c_str());
+        }
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyDepthResources()
+    {
+        for (uint32_t i = 0; i < kFramesInFlight; ++i)
+        {
+            if (mDepthViews[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(mDevice, mDepthViews[i], nullptr);
+                mDepthViews[i] = VK_NULL_HANDLE;
+            }
+            if (mDepthImages[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyImage(mAllocator, mDepthImages[i], mDepthAllocations[i]);
+                mDepthImages[i] = VK_NULL_HANDLE;
+                mDepthAllocations[i] = VK_NULL_HANDLE;
+            }
+        }
+    }
+
     void VulkanRenderer::DestroySwapchain()
     {
-        // The views are ours. The images are not -- never destroy those.
+        // swapchain and depth go hand in hand
+        DestroyDepthResources();
+
         for (VkImageView view : mSwapchainViews)
         {
             if (view != VK_NULL_HANDLE)
@@ -925,7 +1012,7 @@ namespace mts
             .stride = sizeof(Vertex),
             .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
 
-        const std::array<VkVertexInputAttributeDescription, 2> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, pos)},
+        const std::array<VkVertexInputAttributeDescription, 2> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos)},
                                                                                  {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, color)}}};
 
         const VkPipelineVertexInputStateCreateInfo vertexInput{
@@ -967,6 +1054,14 @@ namespace mts
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                               VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
 
+        const VkPipelineDepthStencilStateCreateInfo depthStencil{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = VK_TRUE,
+            .depthWriteEnable = VK_TRUE,
+            .depthCompareOp = VK_COMPARE_OP_LESS,
+            .depthBoundsTestEnable = VK_FALSE,
+            .stencilTestEnable = VK_FALSE};
+
         const VkPipelineColorBlendStateCreateInfo colorBlend{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
             .logicOpEnable = VK_FALSE,
@@ -1004,7 +1099,8 @@ namespace mts
         const VkPipelineRenderingCreateInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &mSwapchainFormat};
+            .pColorAttachmentFormats = &mSwapchainFormat,
+            .depthAttachmentFormat = kDepthFormat};
 
         const VkGraphicsPipelineCreateInfo pipelineInfo{
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -1016,7 +1112,7 @@ namespace mts
             .pViewportState = &viewportState,
             .pRasterizationState = &rasterizer,
             .pMultisampleState = &multisample,
-            .pDepthStencilState = nullptr,
+            .pDepthStencilState = &depthStencil,
             .pColorBlendState = &colorBlend,
             .pDynamicState = &dynamicState,
             .layout = mPipelineLayout,
@@ -1040,55 +1136,68 @@ namespace mts
         return true;
     }
 
-    bool VulkanRenderer::CreateVertexBuffer()
+    MeshHandle VulkanRenderer::CreateMesh(std::span<const Vertex> vertices,
+                                          std::span<const uint32_t> indices)
     {
-        const VkDeviceSize bufferSize = sizeof(kTriangleVertices);
+        if (vertices.empty() || indices.empty())
+        {
+            MTS_LOG_ERROR("CreateMesh: vertices and indices must both be non-empty");
+            return kNullMesh;
+        }
 
-        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        const VkDeviceSize vertexBytes = vertices.size_bytes();
+        const VkDeviceSize indexBytes = indices.size_bytes();
+
+        // temporarily pack multiple data to one buffer for faster creation
+        VkBuffer staging = VK_NULL_HANDLE;
         VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+        VmaAllocationInfo stagingInfo{};
 
-        const VkBufferCreateInfo stagingInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = bufferSize,
-            .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
-
-        VmaAllocationCreateInfo stagingAllocInfo{
-            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO};
-
-        VmaAllocationInfo stagingInfoOut{};
-        if (vmaCreateBuffer(mAllocator, &stagingInfo, &stagingAllocInfo,
-                            &stagingBuffer, &stagingAllocation, &stagingInfoOut) != VK_SUCCESS)
+        if (!CreateBuffer(mAllocator, vertexBytes + indexBytes,
+                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                              VMA_ALLOCATION_CREATE_MAPPED_BIT,
+                          staging, stagingAllocation, &stagingInfo))
         {
-            MTS_LOG_CRITICAL("vmaCreateBuffer failed for staging buffer");
-            return false;
+            MTS_LOG_CRITICAL("CreateMesh: staging buffer allocation failed");
+            return kNullMesh;
         }
 
-        std::memcpy(stagingInfoOut.pMappedData, kTriangleVertices, bufferSize);
+        // MAPPED_BIT means pMappedData is already valid - no vmaMapMemory or
+        // matching unmap. SEQUENTIAL_WRITE says these writes are forward-only,
+        // which lets VMA pick write-combined memory; never read this pointer.
+        std::byte *const mapped = static_cast<std::byte *>(stagingInfo.pMappedData);
+        std::memcpy(mapped, vertices.data(), vertexBytes);
+        std::memcpy(mapped + vertexBytes, indices.data(), indexBytes);
 
-        const VkBufferCreateInfo deviceInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = bufferSize,
-            .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+        GpuMesh mesh{};
+        mesh.mIndexCount = static_cast<uint32_t>(indices.size());
+        mesh.mGeneration = 1;
 
-        // No host-access flags: that absence is what tells VMA this buffer
-        // should live in device-local memory.
-        const VmaAllocationCreateInfo deviceAllocInfo{
-            .usage = VMA_MEMORY_USAGE_AUTO};
+        // No host-access flags on either: that is what puts them in VRAM.
+        const bool buffersCreated =
+            CreateBuffer(mAllocator, vertexBytes,
+                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                         0, mesh.mVertexBuffer, mesh.mVertexAllocation, nullptr) &&
+            CreateBuffer(mAllocator, indexBytes,
+                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                         0, mesh.mIndexBuffer, mesh.mIndexAllocation, nullptr);
 
-        if (vmaCreateBuffer(mAllocator, &deviceInfo, &deviceAllocInfo,
-                            &mVertexBuffer, &mVertexBufferAllocation, nullptr) != VK_SUCCESS)
+        if (!buffersCreated)
         {
-            MTS_LOG_CRITICAL("vmaCreateBuffer failed for device vertex buffer");
-            vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
-            return false;
+            MTS_LOG_CRITICAL("CreateMesh: device buffer allocation failed");
+            // The && above short-circuits, so one of the two may be null here.
+            // Both destroys are guarded, so this handles either case.
+            if (mesh.mVertexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
+            if (mesh.mIndexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
+            vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
+            return kNullMesh;
         }
 
-        // One-shot upload: its own throwaway pool, not a frame pool, since
-        // those get reset by the frame loop and this runs before it starts.
+        // Throwaway pool, not a frame pool: the frame loop resets those, and
+        // this may run before the loop has started.
         VkCommandPool uploadPool = VK_NULL_HANDLE;
         const VkCommandPoolCreateInfo poolInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -1096,9 +1205,11 @@ namespace mts
 
         if (vkCreateCommandPool(mDevice, &poolInfo, nullptr, &uploadPool) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreateCommandPool failed for vertex upload");
-            vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
-            return false;
+            MTS_LOG_CRITICAL("CreateMesh: upload command pool creation failed");
+            vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
+            vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
+            vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
+            return kNullMesh;
         }
 
         VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
@@ -1114,8 +1225,12 @@ namespace mts
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
         vkBeginCommandBuffer(uploadCmd, &beginInfo);
 
-        const VkBufferCopy copyRegion{.size = bufferSize};
-        vkCmdCopyBuffer(uploadCmd, stagingBuffer, mVertexBuffer, 1, &copyRegion);
+        const VkBufferCopy vertexCopy{.srcOffset = 0, .dstOffset = 0, .size = vertexBytes};
+        vkCmdCopyBuffer(uploadCmd, staging, mesh.mVertexBuffer, 1, &vertexCopy);
+
+        // srcOffset picks the second half of the same staging allocation.
+        const VkBufferCopy indexCopy{.srcOffset = vertexBytes, .dstOffset = 0, .size = indexBytes};
+        vkCmdCopyBuffer(uploadCmd, staging, mesh.mIndexBuffer, 1, &indexCopy);
 
         vkEndCommandBuffer(uploadCmd);
 
@@ -1125,25 +1240,52 @@ namespace mts
             .pCommandBuffers = &uploadCmd};
 
         vkQueueSubmit(mGfxQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        // Blocking stall: fine once at init, never inside the frame loop.
-        // A staging ring is the eventual fix if repeated uploads are needed.
+        // wait till buffer is created
         vkQueueWaitIdle(mGfxQueue);
 
         vkDestroyCommandPool(mDevice, uploadPool, nullptr);
-        vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
+        vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
 
-        MTS_LOG_INFO("Vertex buffer uploaded: {} bytes", bufferSize);
-        return true;
+        const uint32_t index = static_cast<uint32_t>(mMeshes.size());
+        mMeshes.push_back(mesh);
+
+        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mesh.mVertexBuffer),
+                   std::format("Mesh {} vertices", index).c_str());
+        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mesh.mIndexBuffer),
+                   std::format("Mesh {} indices", index).c_str());
+
+        MTS_LOG_INFO("Mesh {} uploaded: {} vertices, {} indices, {} bytes",
+                     index, vertices.size(), indices.size(), vertexBytes + indexBytes);
+
+        return MeshHandle{index, mesh.mGeneration};
     }
 
-    void VulkanRenderer::DestroyVertexBuffer()
+    const VulkanRenderer::GpuMesh *VulkanRenderer::FindMesh(MeshHandle handle) const
     {
-        if (mVertexBuffer != VK_NULL_HANDLE)
+        if (handle.IsNull() || handle.mIndex >= mMeshes.size())
+            return nullptr;
+
+        const GpuMesh &mesh = mMeshes[handle.mIndex];
+
+        // Nothing bumps a generation yet, so this can only fail on a
+        // hand-built handle today. It is the check that makes freeing a mesh a
+        // local change later instead of an audit of every call site.
+        if (mesh.mGeneration != handle.mGeneration)
+            return nullptr;
+
+        return &mesh;
+    }
+
+    void VulkanRenderer::DestroyMeshes()
+    {
+        for (GpuMesh &mesh : mMeshes)
         {
-            vmaDestroyBuffer(mAllocator, mVertexBuffer, mVertexBufferAllocation);
-            mVertexBuffer = VK_NULL_HANDLE;
-            mVertexBufferAllocation = VK_NULL_HANDLE;
+            if (mesh.mVertexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
+            if (mesh.mIndexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
         }
+        mMeshes.clear();
     }
 
     void VulkanRenderer::NameObject(VkObjectType type, uint64_t handle, const char *name)
@@ -1244,20 +1386,22 @@ namespace mts
         }
         mRenderComplete.clear();
     }
-    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances, ImDrawData *imguiDrawData)
+    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const DrawItem> items)
     {
         // get image ready
-        ImageBarrier(cmd, mSwapchainImages[imageIndex],
+        ImageBarrier(cmd, mSwapchainImages[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_UNDEFINED,
                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
 
-        // just a little test
-        static uint64_t frameCounter = 0;
-        const float t = static_cast<float>(frameCounter++) * 0.01f;
-        const float pulse = 0.5f + 0.5f * std::sin(t);
+        ImageBarrier(cmd, mDepthImages[mFrameIndex], VK_IMAGE_ASPECT_DEPTH_BIT,
+                     VK_IMAGE_LAYOUT_UNDEFINED,
+                     VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                     VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0,
+                     VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         const VkRenderingAttachmentInfo colorAttachment{
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -1265,7 +1409,15 @@ namespace mts
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .clearValue{.color{{0.0f, pulse, pulse * 0.5f, 1.0f}}}};
+            .clearValue{.color{{mClearColor.r, mClearColor.g, mClearColor.b, mClearColor.a}}}};
+
+        const VkRenderingAttachmentInfo depthAttachment{
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = mDepthViews[mFrameIndex],
+            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .clearValue{.depthStencil{.depth = 1.0f}}};
 
         const VkRenderingInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -1273,7 +1425,8 @@ namespace mts
             .renderArea{.offset{0, 0}, .extent = mSwapchainExtent},
             .layerCount = 1,
             .colorAttachmentCount = 1,
-            .pColorAttachments = &colorAttachment};
+            .pColorAttachments = &colorAttachment,
+            .pDepthAttachment = &depthAttachment};
 
         vkCmdBeginRendering(cmd, &renderingInfo);
 
@@ -1302,21 +1455,35 @@ namespace mts
             .extent = mSwapchainExtent};
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-        const VkDeviceSize vertexOffset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &mVertexBuffer, &vertexOffset);
-
-        for (const glm::mat4 &transform : instances)
+        // One draw per item, each keyed by its own mesh handle: an item whose
+        // mesh does not resolve (not yet loaded, or a stale handle) costs
+        // that one item, not the frame - see FindMesh. No dedup across items
+        // that share a mesh; sorting the list to skip redundant binds is a
+        // later optimisation, invisible at the object counts here.
+        for (const DrawItem &item : items)
         {
-            const PushData pushData{.transform = transform};
+            const GpuMesh *const mesh = FindMesh(item.mesh);
+            if (mesh == nullptr)
+                continue;
+
+            const VkDeviceSize vertexOffset = 0;
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->mVertexBuffer, &vertexOffset);
+
+            // UINT32 to match std::vector<uint32_t>. UINT16 halves the index
+            // buffer and is worth it once meshes are cooked; picking it now
+            // would mean two index paths for no measurable gain.
+            vkCmdBindIndexBuffer(cmd, mesh->mIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+            const PushData pushData{.transform = item.model, .tint = item.tint};
 
             vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(PushData), &pushData);
 
-            vkCmdDraw(cmd, 3, 1, 0, 0);
+            vkCmdDrawIndexed(cmd, mesh->mIndexCount, 1, 0, 0, 0);
         }
 
-        if (imguiDrawData != nullptr)
-            ImGui_ImplVulkan_RenderDrawData(imguiDrawData, cmd);
+        if (mImguiDrawData != nullptr)
+            ImGui_ImplVulkan_RenderDrawData(mImguiDrawData, cmd);
 
         if (mValidationEnabled)
             vkCmdEndDebugUtilsLabelEXT(cmd);
@@ -1324,7 +1491,7 @@ namespace mts
         vkCmdEndRendering(cmd);
 
         // give it back
-        ImageBarrier(cmd, mSwapchainImages[imageIndex],
+        ImageBarrier(cmd, mSwapchainImages[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -1332,7 +1499,7 @@ namespace mts
                      VK_PIPELINE_STAGE_2_NONE, 0);
     }
 
-    void VulkanRenderer::DrawFrame(std::span<const glm::mat4> instances, ImDrawData *imguiDrawData)
+    void VulkanRenderer::DrawFrame(std::span<const DrawItem> items)
     {
         if (mWindow->Width() == 0 || mWindow->Height() == 0)
             return;
@@ -1392,7 +1559,7 @@ namespace mts
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
         vkBeginCommandBuffer(cmd, &beginInfo);
-        RecordCommands(cmd, imageIndex, instances, imguiDrawData);
+        RecordCommands(cmd, imageIndex, items);
         vkEndCommandBuffer(cmd);
 
         const VkSemaphoreSubmitInfo waitSem{

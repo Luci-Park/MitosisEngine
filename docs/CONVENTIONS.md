@@ -1,7 +1,4 @@
 # Conventions
-
-What review checks against. Reasoning lives in the linked decision records.
-
 ## Layout
 
 - One static library per module, `modules/<name>/`, lowercase `[a-z][a-z0-9_]*`.
@@ -39,13 +36,12 @@ Headers use `#pragma once`.
 | CMake target | `engine_<module>`, alias `mts::<module>` | `engine_core` |
 | File | `PascalCase.h`/`.cpp`, matching its main type | `VulkanRenderer.cpp` |
 
-Members are `mPascalCase` engine-wide
-([0017](decisions/0017-member-naming.md)), `*Desc` fields included. The exception
-is a plain-data type describing a **layout** - `AssetBlobHeader`,
+Members are `mPascalCase` engine-wide, `*Desc` fields included. The exception is
+a plain-data type describing a **layout** - `AssetBlobHeader`,
 `AssetManifestEntry`, component fields - which carries no prefix, because the
 names are the format.
 
-The rename is applied but not committed; see 0017 for how to split it.
+The rename is applied but not committed.
 
 
 ## ECS
@@ -63,7 +59,7 @@ The rename is applied but not committed; see 0017 for how to split it.
   scripts should reach its values. Unregistered means unreachable by name, with
   no error to say so.
 - A field table uses accessor thunks, never offsets, for any component with an
-  invariant to keep ([0022](decisions/0022-component-registry.md)).
+  invariant to keep.
 - Register the C++ components before loading any script: a name belongs to
   whoever claims it first.
 
@@ -88,9 +84,7 @@ The rename is applied but not committed; see 0017 for how to split it.
 ## Dependencies
 
 Everything through `vcpkg.json`; nothing vendored or fetched at build time. Link
-`PRIVATE` unless a type appears in a public header, and say why in a comment. A
-dependency in a public header, or affecting every platform, gets a decision
-record.
+`PRIVATE` unless a type appears in a public header, and say why in a comment.
 
 The one exception is `third_party/imgui`, a git submodule.
 

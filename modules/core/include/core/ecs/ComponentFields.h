@@ -13,6 +13,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -31,9 +32,22 @@ namespace mts
         Int,
         Float,
         Vec3,
+        Vec4,
         Quat,
         Mat4,
         EntityRef,
+
+        /// A resource handle shaped {index, generation} - the same layout as
+        /// Entity, deliberately kept separate from EntityRef. EntityRef names
+        /// a live entity in this World; Handle names something outside the
+        /// World entirely (today: a renderer MeshHandle). Conflating the two
+        /// would mislead a future binding that special-cases EntityRef with
+        /// World-specific behaviour - an "is this entity alive" check, an
+        /// entity picker - none of which makes sense for a mesh handle. Sized
+        /// directly as two uint32_t rather than naming any owning type, so
+        /// core never has to know what a Handle points at; a future asset or
+        /// texture handle reuses this kind as long as it keeps the same shape.
+        Handle,
     };
 
     constexpr uint32_t FieldSize(FieldKind kind)
@@ -48,12 +62,16 @@ namespace mts
             return sizeof(float);
         case FieldKind::Vec3:
             return sizeof(glm::vec3);
+        case FieldKind::Vec4:
+            return sizeof(glm::vec4);
         case FieldKind::Quat:
             return sizeof(glm::quat);
         case FieldKind::Mat4:
             return sizeof(glm::mat4);
         case FieldKind::EntityRef:
             return sizeof(Entity);
+        case FieldKind::Handle:
+            return 2 * sizeof(uint32_t);
         }
         return 0;
     }
@@ -70,12 +88,16 @@ namespace mts
             return alignof(float);
         case FieldKind::Vec3:
             return alignof(glm::vec3);
+        case FieldKind::Vec4:
+            return alignof(glm::vec4);
         case FieldKind::Quat:
             return alignof(glm::quat);
         case FieldKind::Mat4:
             return alignof(glm::mat4);
         case FieldKind::EntityRef:
             return alignof(Entity);
+        case FieldKind::Handle:
+            return alignof(uint32_t);
         }
         return 1;
     }
@@ -92,12 +114,16 @@ namespace mts
             return "float";
         case FieldKind::Vec3:
             return "vec3";
+        case FieldKind::Vec4:
+            return "vec4";
         case FieldKind::Quat:
             return "quat";
         case FieldKind::Mat4:
             return "mat4";
         case FieldKind::EntityRef:
             return "entity";
+        case FieldKind::Handle:
+            return "handle";
         }
         return "?";
     }

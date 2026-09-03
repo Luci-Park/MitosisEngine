@@ -9,10 +9,12 @@
 #pragma once
 
 #include <core/platform/Surface.h>
+#include <renderer/Mesh.h>
 
 #include <volk.h>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 #include <cstdint>
 #include <span>
@@ -32,6 +34,18 @@ namespace mts
         bool enableValidation;
     };
 
+    /// One draw call's worth of data, built by RenderSystem from a
+    /// WorldTransform + MeshRenderer pair.
+    struct DrawItem
+    {
+        MeshHandle mesh;
+
+        /// model * view projection
+        glm::mat4 model{1.0f};
+
+        glm::vec4 tint{1.0f, 1.0f, 1.0f, 1.0f};
+    };
+
     class VulkanRenderer
     {
     public:
@@ -41,11 +55,33 @@ namespace mts
         bool InitImGuiVulkanBackend();
         void ShutdownImGuiVulkanBackend();
 
-        void DrawFrame(std::span<const glm::mat4> instances, ImDrawData *imguiDrawData = nullptr);
+        /// RenderSystem drives DrawFrame from SystemPhase::Render and has no
+        /// reason to know ImGui exists, so App feeds this frame's draw data in
+        /// separately, before the scheduler update that reaches DrawFrame.
+        void SetImGuiDrawData(ImDrawData *drawData) { mImguiDrawData = drawData; }
+
+        // Uploads geometry and returns a handle to it.
+        // Use on load time
+        MeshHandle CreateMesh(std::span<const Vertex> vertices,
+                              std::span<const uint32_t> indices);
+
+        /// Width/height of the current swapchain
+        float AspectRatio() const
+        {
+            return mSwapchainExtent.height == 0
+                       ? 1.0f
+                       : static_cast<float>(mSwapchainExtent.width) / static_cast<float>(mSwapchainExtent.height);
+        }
+
+        void DrawFrame(std::span<const DrawItem> items);
+
+        void SetClearColor(const glm::vec4 &color) { mClearColor = color; }
 
         void Shutdown();
 
     private:
+        struct GpuMesh;
+
         bool CreateVulkanInstance(const RendererDesc &desc);
         bool CreateDebugMessenger();
         bool CreateSurface();
@@ -54,20 +90,28 @@ namespace mts
         bool CreateAllocator();
         bool CreateSwapchain();
         bool CreateImageViews();
+        bool CreateDepthResources();
+        void DestroyDepthResources();
         void DestroySwapchain();
         bool RecreateSwapchain();
         bool CreateFrameResources();
         bool CreateRenderCompleteSemaphores();
         void DestroyRenderCompleteSemaphores();
         bool CreateGraphicsPipeline();
-        bool CreateVertexBuffer();
-        void DestroyVertexBuffer();
+        void DestroyMeshes();
+        const GpuMesh *FindMesh(MeshHandle handle) const;
         void NameObject(VkObjectType type, uint64_t handle, const char *name);
-        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances, ImDrawData *imguiDrawData);
+        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const DrawItem> items);
 
     private:
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
         constexpr static uint32_t kFramesInFlight = 2;
+
+        // 32-bit float depth, no stencil.
+        constexpr static VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
+
+        // Default: dark gray. Overridden via SetClearColor.
+        glm::vec4 mClearColor{0.02f, 0.02f, 0.02f, 1.0f};
 
         const ISurfaceProvider *mWindow;
         VkInstance mVulkanInstance = VK_NULL_HANDLE;
@@ -84,6 +128,10 @@ namespace mts
         VkExtent2D mSwapchainExtent{};
         std::vector<VkImage> mSwapchainImages;
         std::vector<VkImageView> mSwapchainViews;
+
+        VkImage mDepthImages[kFramesInFlight]{};
+        VmaAllocation mDepthAllocations[kFramesInFlight]{};
+        VkImageView mDepthViews[kFramesInFlight]{};
 
         // queue for render + present
         uint32_t mGfxQueueFamIdx = UINT32_MAX;
@@ -102,13 +150,26 @@ namespace mts
         VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
         VkPipeline mPipeline = VK_NULL_HANDLE;
 
-        VkBuffer mVertexBuffer = VK_NULL_HANDLE;
-        VmaAllocation mVertexBufferAllocation = VK_NULL_HANDLE;
+        // One buffer pair per mesh
+        struct GpuMesh
+        {
+            VkBuffer mVertexBuffer = VK_NULL_HANDLE;
+            VmaAllocation mVertexAllocation = VK_NULL_HANDLE;
+            VkBuffer mIndexBuffer = VK_NULL_HANDLE;
+            VmaAllocation mIndexAllocation = VK_NULL_HANDLE;
+            uint32_t mIndexCount = 0;
+            uint32_t mGeneration = 0; //< 0 = slot never filled
+        };
+
+        /// Indices are stable: nothing is ever erased from this vector, which
+        /// is what makes MeshHandle::mIndex a plain subscript.
+        std::vector<GpuMesh> mMeshes;
 
         uint32_t mFrameIndex = 0;
         bool mNeedRecreate = false;
         bool mValidationEnabled = false;
 
         bool mImGuiBackendInitialized = false;
+        ImDrawData *mImguiDrawData = nullptr;
     };
 }

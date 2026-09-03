@@ -68,7 +68,7 @@ tools/                AssetCooker, new_module.ps1, new_file.ps1
 templates/            what the scaffolding scripts stamp out
 assets/               source assets, cooked into the build tree
 fonts/                editor UI fonts, copied to fonts/ next to the exe
-docs/                 setup, architecture, conventions
+docs/                 setup, architecture, conventions, module docs
 builds/               build trees, gitignored
 logs/                 engine.log, gitignored
 ```

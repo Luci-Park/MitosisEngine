@@ -1,7 +1,9 @@
 #include <app/App.h>
 #include <core/ecs/TransformHierarchy.h>
-#include <core/ecs/components/TriangleRenderer.h>
 #include <core/log/Log.h>
+#include <renderer/Shapes.h>
+#include <renderer/components/Camera.h>
+#include <renderer/components/MeshRenderer.h>
 
 #include <glm/gtc/quaternion.hpp>
 
@@ -21,7 +23,7 @@ namespace
             if (transform == nullptr)
                 return;
 
-            transform->Rotate(glm::angleAxis(mSpeed * context.dt, glm::vec3(0.0f, 0.0f, 1.0f)));
+            transform->Rotate(glm::angleAxis(mSpeed * context.dt, glm::vec3(0.0f, 1.0f, 0.0f)));
         }
 
     private:
@@ -33,18 +35,18 @@ namespace
     {
         mts::World &world = app.GetWorld();
 
-        const mts::Entity parent = world.CreateEntity();
-        mts::AddTransform(world, parent, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.6f)});
-        world.AddComponent<mts::TriangleRenderer>(parent, mts::TriangleRenderer{});
+        const mts::MeshData cube = mts::MakeCube();
+        const mts::MeshHandle cubeMesh = app.Renderer().CreateMesh(cube.vertices, cube.indices);
 
-        const mts::Entity child = world.CreateEntity();
-        mts::AddTransform(world,
-                          child,
-                          mts::Transform{glm::vec3(1.2f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.5f)},
-                          parent);
-        world.AddComponent<mts::TriangleRenderer>(child, mts::TriangleRenderer{});
+        const mts::Entity cubeEntity = world.CreateEntity();
+        mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
+        world.AddComponent<mts::MeshRenderer>(cubeEntity, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f)});
 
-        app.Systems().Add<SpinSystem>(mts::SystemPhase::Update, parent, 1.0f);
+        const mts::Entity camera = world.CreateEntity();
+        mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
+        world.AddComponent<mts::Camera>(camera, mts::Camera{});
+
+        app.Systems().Add<SpinSystem>(mts::SystemPhase::Update, cubeEntity, 1.0f);
     }
 }
 

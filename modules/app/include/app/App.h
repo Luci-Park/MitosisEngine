@@ -11,20 +11,15 @@
 #include <core/ecs/CommandBuffer.h>
 #include <core/ecs/SystemScheduler.h>
 #include <core/ecs/World.h>
-#include <core/ecs/components/TriangleRenderer.h>
-#include <core/ecs/components/WorldTransform.h>
 #include <assets/AssetCache.h>
 #include <assets/AssetManifest.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
-#include <glm/mat4x4.hpp>
-
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace mts
 {
@@ -64,6 +59,12 @@ namespace mts
         World &GetWorld() { return mWorld; }
         SystemScheduler &Systems() { return mScheduler; }
 
+        /// Temporary seam: CreateMesh has nowhere else to be called from until
+        /// an asset-facing mesh service exists. A caller building a scene
+        /// reaches the renderer through here, uploads geometry once at load
+        /// time, and stores the returned MeshHandle in a MeshRenderer.
+        VulkanRenderer &Renderer() { return mRenderer; }
+
         /// The asset cache, loading the manifest on first use.
         /// Returns nullptr when no manifest is available - a build with no cooked
         /// assets, or an exe moved away from its cooked/ folder - so a missing
@@ -74,14 +75,6 @@ namespace mts
     private:
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
-
-        /// Refills mDrawInstances from the world. This is the whole ECS ->
-        /// renderer bridge, and it lives here rather than in either module:
-        /// engine_core must not link engine_renderer, and the renderer takes
-        /// plain matrices so it never learns what a World is. App links both,
-        /// so App is the only place the two may meet.
-        /// Refills mDrawInstances from the world :
-        void CollectDrawInstances();
 
         /// Dockspace, the default Scene/Inspector/Output split, and the
         /// Debug menu - the Slate editor shell, not a generic App concern.
@@ -100,11 +93,6 @@ namespace mts
 
         World mWorld;
         SystemScheduler mScheduler;
-
-        /// Rebuilt every frame but keeps its capacity to steady allocation.
-        std::vector<glm::mat4> mDrawInstances;
-
-        Query<const WorldTransform> *mDrawQuery = nullptr;
 
         AppDesc mDesc;
         double mElapsed = 0.0;

@@ -1,6 +1,6 @@
 struct VSInput
 {
-    float2 pos   : POSITION;
+    float3 pos   : POSITION;
     float3 color : COLOR;
 };
 
@@ -14,6 +14,7 @@ struct VSOutput
 struct PushData
 {
     float4x4 transform;
+    float4 tint;
 };
 
 [[vk::push_constant]]
@@ -23,8 +24,11 @@ PushData pushData;
 VSOutput vertexMain(VSInput input)
 {
     VSOutput output;
-    output.position = mul(pushData.transform, float4(input.pos, 0.0, 1.0));
-    output.color = input.color;
+    output.position = mul(pushData.transform, float4(input.pos, 1.0));
+    // Tint multiplies here, not in the fragment stage: the push constant
+    // range is VERTEX_BIT only (see CreateGraphicsPipeline), so the fragment
+    // stage never sees pushData at all.
+    output.color = input.color * pushData.tint.rgb;
     return output;
 }
 

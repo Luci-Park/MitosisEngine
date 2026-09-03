@@ -6,6 +6,8 @@
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
 #include <editortheme/EditorTheme.h>
+#include <renderer/ComponentRegistration.h>
+#include <renderer/RenderSystem.h>
 
 #include <IconsFontAwesome6.h>
 #include <imgui.h>
@@ -122,6 +124,7 @@ namespace mts
         // whoever claims it first, and a script-declared component that stole
         // "Transform" would be refused here rather than at its own callsite.
         RegisterCoreComponents();
+        RegisterRendererComponents();
 
         // Publishes the frame's buffer so a caller with only a World - a script
         // binding, an editor command - can defer a structural change it is not
@@ -132,6 +135,10 @@ namespace mts
 
         // should be before any other system in PostUpdate
         mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);
+
+        // Render runs after PostUpdate, so every WorldTransform it reads is
+        // already current for this frame - see RenderSystem's own comment.
+        mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
 
         return true;
     }
@@ -162,17 +169,6 @@ namespace mts
     SystemContext App::MakeContext(float dt)
     {
         return SystemContext{mWorld, mCommands, dt, mElapsed, mFrame};
-    }
-
-    void App::CollectDrawInstances()
-    {
-        if (mDrawQuery == nullptr)
-            mDrawQuery = &mWorld.GetOrCreateQuery<const WorldTransform>(With<TriangleRenderer>{});
-
-        mDrawInstances.clear();
-
-        mDrawQuery->ForEach([this](Entity, const WorldTransform &world)
-                            { mDrawInstances.push_back(world.Matrix()); });
     }
 
     void App::DrawEditorUI()
@@ -243,9 +239,6 @@ namespace mts
             previous = now;
             mElapsed += dt;
 
-            SystemContext context = MakeContext(dt);
-            mScheduler.Update(context);
-
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
@@ -264,8 +257,13 @@ namespace mts
 
             ImGui::Render();
 
-            CollectDrawInstances();
-            mRenderer.DrawFrame(mDrawInstances, ImGui::GetDrawData());
+            // RenderSystem calls VulkanRenderer::DrawFrame from inside
+            // Update (SystemPhase::Render), so this frame's draw data has to
+            // be handed to the renderer before Update runs, not after.
+            mRenderer.SetImGuiDrawData(ImGui::GetDrawData());
+
+            SystemContext context = MakeContext(dt);
+            mScheduler.Update(context);
 
             ++mFrame;
         }
@@ -287,8 +285,6 @@ namespace mts
         // list would run a second copy of it, and of every game system, on
         // every frame of the next session.
         mScheduler.Reset();
-        mDrawQuery = nullptr;
-        mDrawInstances.clear();
 
         // Cache before manifest: the cache points at the manifest, and Initialize
         // may be called again afterwards. Leaving the cache engaged over a
