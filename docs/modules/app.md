@@ -18,7 +18,7 @@ subclass. `main` constructs an `App`, registers systems on it, and runs it.
 
 ## Mental model
 
-Fixed members, three calls ([0009](../decisions/0009-app-composition-root.md)).
+Fixed members, three calls.
 
 ```
 Initialize(desc) -> Run() -> Shutdown()
@@ -166,9 +166,8 @@ None. `modules/app/` has no `tests/` directory.
 and a loop running, all of which need a display and a GPU. The parts worth
 asserting - phase ordering, command buffer flushing, asset cache lookup - are
 tested where they live, in `core` and `assets`. A headless renderer would be the
-prerequisite for testing anything here, and that is the trigger listed in
-[0009](../decisions/0009-app-composition-root.md) for revisiting the whole shape
-of this class.
+prerequisite for testing anything here, and that is also the trigger for
+revisiting the whole shape of this class.
 
 ## Open questions
 

@@ -1,6 +1,6 @@
 struct VSInput
 {
-    float2 pos   : POSITION;
+    float3 pos   : POSITION;
     float3 color : COLOR;
 };
 
@@ -23,7 +23,7 @@ PushData pushData;
 VSOutput vertexMain(VSInput input)
 {
     VSOutput output;
-    output.position = mul(pushData.transform, float4(input.pos, 0.0, 1.0));
+    output.position = mul(pushData.transform, float4(input.pos, 1.0));
     output.color = input.color;
     return output;
 }

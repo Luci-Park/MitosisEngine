@@ -9,6 +9,7 @@
 #pragma once
 
 #include <core/platform/Surface.h>
+#include <renderer/Mesh.h>
 
 #include <volk.h>
 
@@ -36,11 +37,18 @@ namespace mts
         VulkanRenderer() = default;
         bool Initialize(const RendererDesc &desc);
 
+        // Uploads geometry and returns a handle to it.
+        // Use on load time
+        MeshHandle CreateMesh(std::span<const Vertex> vertices,
+                              std::span<const uint32_t> indices);
+
         void DrawFrame(std::span<const glm::mat4> instances);
 
         void Shutdown();
 
     private:
+        struct GpuMesh;
+
         bool CreateVulkanInstance(const RendererDesc &desc);
         bool CreateDebugMessenger();
         bool CreateSurface();
@@ -55,8 +63,8 @@ namespace mts
         bool CreateRenderCompleteSemaphores();
         void DestroyRenderCompleteSemaphores();
         bool CreateGraphicsPipeline();
-        bool CreateVertexBuffer();
-        void DestroyVertexBuffer();
+        void DestroyMeshes();
+        const GpuMesh *FindMesh(MeshHandle handle) const;
         void NameObject(VkObjectType type, uint64_t handle, const char *name);
         void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances);
 
@@ -97,8 +105,24 @@ namespace mts
         VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
         VkPipeline mPipeline = VK_NULL_HANDLE;
 
-        VkBuffer mVertexBuffer = VK_NULL_HANDLE;
-        VmaAllocation mVertexBufferAllocation = VK_NULL_HANDLE;
+        // One buffer pair per mesh
+        struct GpuMesh
+        {
+            VkBuffer mVertexBuffer = VK_NULL_HANDLE;
+            VmaAllocation mVertexAllocation = VK_NULL_HANDLE;
+            VkBuffer mIndexBuffer = VK_NULL_HANDLE;
+            VmaAllocation mIndexAllocation = VK_NULL_HANDLE;
+            uint32_t mIndexCount = 0;
+            uint32_t mGeneration = 0; //< 0 = slot never filled
+        };
+
+        /// Indices are stable: nothing is ever erased from this vector, which
+        /// is what makes MeshHandle::mIndex a plain subscript.
+        std::vector<GpuMesh> mMeshes;
+
+        /// Rung 1 only. Every entity draws this until MeshRenderer carries its
+        /// own handle, at which point this member disappears.
+        MeshHandle mDefaultMesh;
 
         uint32_t mFrameIndex = 0;
         bool mNeedRecreate = false;

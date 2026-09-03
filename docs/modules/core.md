@@ -85,8 +85,7 @@ HierarchyIndex *index = world.TryResource<HierarchyIndex>();
 
 Resources are not components and carry none of the POD constraints: nothing
 relocates one, so they may own heap memory and have destructors. They are
-invisible to queries and have no per-entity form. See
-[0019](../decisions/0019-world-resources.md).
+invisible to queries and have no per-entity form.
 
 ## Queries
 
@@ -101,7 +100,7 @@ shares `detail::ArchetypeMatcher` with `Query`, so the match test and the cache
 rule have one implementation, and it hands the callback
 `(Entity, std::span<void *const>)` - one pointer per term, valid for that call
 only. Every term must be a registered table component. Unlike `Query`, the caller
-owns it. See [0024](../decisions/0024-runtime-queries-stay-behind-friendship.md).
+owns it.
 
 ## Erased access
 
@@ -178,13 +177,11 @@ private:
 - **Scene structure is not in components.** Parent and child edges live in the
   `HierarchyIndex` resource, so `RemoveComponent` cannot tear them apart.
   `SetParent` refuses cycles and anything past `kMaxHierarchyDepth`, returning
-  `false` rather than asserting. Destroying an entity destroys its subtree. See
-  [0020](../decisions/0020-scene-graph-as-a-resource.md).
+  `false` rather than asserting. Destroying an entity destroys its subtree.
 - **`Transform` is written through its setters.** Each bumps a version that
   `WorldTransform` compares against; a raw write leaves descendants stale
   permanently. `ResolveWorld` is correct at any point in the frame, so no reader
-  needs to reason about phase order. See
-  [0021](../decisions/0021-world-transforms-resolve-on-read.md).
+  needs to reason about phase order.
 - **At most 256 component types**, C++ and script-declared together. The budget
   is charged per distinct name for the life of the process, so a script reload
   costs nothing. Overflow stops the process in every build, at allocation
@@ -197,8 +194,7 @@ private:
   error, just a name scripts cannot find.
 - **Erased operations are total.** `ComponentOps` answers for a dead entity
   instead of asserting - unlike the typed `World` API, because a script holding a
-  stale handle is ordinary. See
-  [0022](../decisions/0022-component-registry.md).
+  stale handle is ordinary.
 - **A stale `Entity` is detected, not honoured.** `Get` returns `nullptr` for a
   dead handle; `AddComponent` and friends assert.
 - **A signature excludes sparse components** - it is not the full component set.
@@ -225,9 +221,7 @@ hook.
 
 Since then: a component registry with erased operations and named field access,
 script-declared component types, and runtime queries - the ECS-side groundwork
-for scripting ([0022](../decisions/0022-component-registry.md),
-[0023](../decisions/0023-runtime-component-types.md),
-[0024](../decisions/0024-runtime-queries-stay-behind-friendship.md)).
+for scripting.
 
 Missing: parallelism, dependency ordering, change detection, component lifecycle
 hooks, serialisation (the stable hash and the field tables exist, nothing uses

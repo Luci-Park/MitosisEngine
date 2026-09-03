@@ -40,6 +40,7 @@ target_compile_definitions(engine_renderer PRIVATE
 
 target_sources(engine_renderer PRIVATE
     src/renderer/Renderer.cpp
+    src/renderer/Shapes.cpp
     src/renderer/VulkanRenderer.cpp
     src/renderer/vulkan/VmaImpl.cpp
 )

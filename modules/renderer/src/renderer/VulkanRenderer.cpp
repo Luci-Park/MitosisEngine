@@ -7,6 +7,7 @@
  *
  */
 #include "renderer/VulkanRenderer.h"
+#include "renderer/Shapes.h"
 #include "vulkan/VulkanSurface.h"
 #include <core/log/Log.h>
 #include <core/log/Assert.h>
@@ -31,18 +32,27 @@ namespace mts
 {
     namespace
     {
-        struct Vertex
+        bool CreateBuffer(VmaAllocator allocator,
+                          VkDeviceSize size,
+                          VkBufferUsageFlags usage,
+                          VmaAllocationCreateFlags allocFlags,
+                          VkBuffer &outBuffer,
+                          VmaAllocation &outAllocation,
+                          VmaAllocationInfo *outInfo)
         {
-            glm::vec2 pos;
-            glm::vec3 color;
-        };
+            const VkBufferCreateInfo bufferInfo{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .size = size,
+                .usage = usage,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
 
-        // frontface = counter-clockwise
-        const Vertex kTriangleVertices[3]{
-            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        };
+            const VmaAllocationCreateInfo allocInfo{
+                .flags = allocFlags,
+                .usage = VMA_MEMORY_USAGE_AUTO};
+
+            return vmaCreateBuffer(allocator, &bufferInfo, &allocInfo,
+                                   &outBuffer, &outAllocation, outInfo) == VK_SUCCESS;
+        }
 
         // 64 bytes: inside the 128-byte guaranteed minimum for push constants.
         struct PushData
@@ -350,14 +360,16 @@ namespace mts
         if (!CreateGraphicsPipeline())
             return false;
 
-        if (!CreateVertexBuffer())
+        // test quad
+        const MeshData quad = MakeQuad();
+        mDefaultMesh = CreateMesh(quad.vertices, quad.indices);
+        if (mDefaultMesh.IsNull())
             return false;
 
         NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MitosisEngine device");
         NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(mGfxQueue), "Graphics+present queue");
         NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(mSwapchain), "Swapchain");
-        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mPipeline), "Triangle pipeline");
-        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mVertexBuffer), "Triangle vertex buffer");
+        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mPipeline), "Mesh pipeline");
 
         for (size_t i = 0; i < mSwapchainImages.size(); ++i)
         {
@@ -389,7 +401,7 @@ namespace mts
             }
 
             // before mAllocator
-            DestroyVertexBuffer();
+            DestroyMeshes();
 
             if (mPipeline != VK_NULL_HANDLE)
             {
@@ -871,7 +883,7 @@ namespace mts
             .stride = sizeof(Vertex),
             .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
 
-        const std::array<VkVertexInputAttributeDescription, 2> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, pos)},
+        const std::array<VkVertexInputAttributeDescription, 2> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos)},
                                                                                  {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, color)}}};
 
         const VkPipelineVertexInputStateCreateInfo vertexInput{
@@ -898,7 +910,7 @@ namespace mts
             .depthClampEnable = VK_FALSE,
             .rasterizerDiscardEnable = VK_FALSE,
             .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
             .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
             .depthBiasEnable = VK_FALSE,
             .lineWidth = 1.0f};
@@ -986,55 +998,68 @@ namespace mts
         return true;
     }
 
-    bool VulkanRenderer::CreateVertexBuffer()
+    MeshHandle VulkanRenderer::CreateMesh(std::span<const Vertex> vertices,
+                                          std::span<const uint32_t> indices)
     {
-        const VkDeviceSize bufferSize = sizeof(kTriangleVertices);
+        if (vertices.empty() || indices.empty())
+        {
+            MTS_LOG_ERROR("CreateMesh: vertices and indices must both be non-empty");
+            return kNullMesh;
+        }
 
-        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        const VkDeviceSize vertexBytes = vertices.size_bytes();
+        const VkDeviceSize indexBytes = indices.size_bytes();
+
+        // temporarily pack multiple data to one buffer for faster creation
+        VkBuffer staging = VK_NULL_HANDLE;
         VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+        VmaAllocationInfo stagingInfo{};
 
-        const VkBufferCreateInfo stagingInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = bufferSize,
-            .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
-
-        VmaAllocationCreateInfo stagingAllocInfo{
-            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO};
-
-        VmaAllocationInfo stagingInfoOut{};
-        if (vmaCreateBuffer(mAllocator, &stagingInfo, &stagingAllocInfo,
-                            &stagingBuffer, &stagingAllocation, &stagingInfoOut) != VK_SUCCESS)
+        if (!CreateBuffer(mAllocator, vertexBytes + indexBytes,
+                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                              VMA_ALLOCATION_CREATE_MAPPED_BIT,
+                          staging, stagingAllocation, &stagingInfo))
         {
-            MTS_LOG_CRITICAL("vmaCreateBuffer failed for staging buffer");
-            return false;
+            MTS_LOG_CRITICAL("CreateMesh: staging buffer allocation failed");
+            return kNullMesh;
         }
 
-        std::memcpy(stagingInfoOut.pMappedData, kTriangleVertices, bufferSize);
+        // MAPPED_BIT means pMappedData is already valid - no vmaMapMemory or
+        // matching unmap. SEQUENTIAL_WRITE says these writes are forward-only,
+        // which lets VMA pick write-combined memory; never read this pointer.
+        std::byte *const mapped = static_cast<std::byte *>(stagingInfo.pMappedData);
+        std::memcpy(mapped, vertices.data(), vertexBytes);
+        std::memcpy(mapped + vertexBytes, indices.data(), indexBytes);
 
-        const VkBufferCreateInfo deviceInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = bufferSize,
-            .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+        GpuMesh mesh{};
+        mesh.mIndexCount = static_cast<uint32_t>(indices.size());
+        mesh.mGeneration = 1;
 
-        // No host-access flags: that absence is what tells VMA this buffer
-        // should live in device-local memory.
-        const VmaAllocationCreateInfo deviceAllocInfo{
-            .usage = VMA_MEMORY_USAGE_AUTO};
+        // No host-access flags on either: that is what puts them in VRAM.
+        const bool buffersCreated =
+            CreateBuffer(mAllocator, vertexBytes,
+                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                         0, mesh.mVertexBuffer, mesh.mVertexAllocation, nullptr) &&
+            CreateBuffer(mAllocator, indexBytes,
+                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                         0, mesh.mIndexBuffer, mesh.mIndexAllocation, nullptr);
 
-        if (vmaCreateBuffer(mAllocator, &deviceInfo, &deviceAllocInfo,
-                            &mVertexBuffer, &mVertexBufferAllocation, nullptr) != VK_SUCCESS)
+        if (!buffersCreated)
         {
-            MTS_LOG_CRITICAL("vmaCreateBuffer failed for device vertex buffer");
-            vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
-            return false;
+            MTS_LOG_CRITICAL("CreateMesh: device buffer allocation failed");
+            // The && above short-circuits, so one of the two may be null here.
+            // Both destroys are guarded, so this handles either case.
+            if (mesh.mVertexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
+            if (mesh.mIndexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
+            vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
+            return kNullMesh;
         }
 
-        // One-shot upload: its own throwaway pool, not a frame pool, since
-        // those get reset by the frame loop and this runs before it starts.
+        // Throwaway pool, not a frame pool: the frame loop resets those, and
+        // this may run before the loop has started.
         VkCommandPool uploadPool = VK_NULL_HANDLE;
         const VkCommandPoolCreateInfo poolInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -1042,9 +1067,11 @@ namespace mts
 
         if (vkCreateCommandPool(mDevice, &poolInfo, nullptr, &uploadPool) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreateCommandPool failed for vertex upload");
-            vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
-            return false;
+            MTS_LOG_CRITICAL("CreateMesh: upload command pool creation failed");
+            vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
+            vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
+            vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
+            return kNullMesh;
         }
 
         VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
@@ -1060,8 +1087,12 @@ namespace mts
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
         vkBeginCommandBuffer(uploadCmd, &beginInfo);
 
-        const VkBufferCopy copyRegion{.size = bufferSize};
-        vkCmdCopyBuffer(uploadCmd, stagingBuffer, mVertexBuffer, 1, &copyRegion);
+        const VkBufferCopy vertexCopy{.srcOffset = 0, .dstOffset = 0, .size = vertexBytes};
+        vkCmdCopyBuffer(uploadCmd, staging, mesh.mVertexBuffer, 1, &vertexCopy);
+
+        // srcOffset picks the second half of the same staging allocation.
+        const VkBufferCopy indexCopy{.srcOffset = vertexBytes, .dstOffset = 0, .size = indexBytes};
+        vkCmdCopyBuffer(uploadCmd, staging, mesh.mIndexBuffer, 1, &indexCopy);
 
         vkEndCommandBuffer(uploadCmd);
 
@@ -1071,25 +1102,52 @@ namespace mts
             .pCommandBuffers = &uploadCmd};
 
         vkQueueSubmit(mGfxQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        // Blocking stall: fine once at init, never inside the frame loop.
-        // A staging ring is the eventual fix if repeated uploads are needed.
+        // wait till buffer is created
         vkQueueWaitIdle(mGfxQueue);
 
         vkDestroyCommandPool(mDevice, uploadPool, nullptr);
-        vmaDestroyBuffer(mAllocator, stagingBuffer, stagingAllocation);
+        vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
 
-        MTS_LOG_INFO("Vertex buffer uploaded: {} bytes", bufferSize);
-        return true;
+        const uint32_t index = static_cast<uint32_t>(mMeshes.size());
+        mMeshes.push_back(mesh);
+
+        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mesh.mVertexBuffer),
+                   std::format("Mesh {} vertices", index).c_str());
+        NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mesh.mIndexBuffer),
+                   std::format("Mesh {} indices", index).c_str());
+
+        MTS_LOG_INFO("Mesh {} uploaded: {} vertices, {} indices, {} bytes",
+                     index, vertices.size(), indices.size(), vertexBytes + indexBytes);
+
+        return MeshHandle{index, mesh.mGeneration};
     }
 
-    void VulkanRenderer::DestroyVertexBuffer()
+    const VulkanRenderer::GpuMesh *VulkanRenderer::FindMesh(MeshHandle handle) const
     {
-        if (mVertexBuffer != VK_NULL_HANDLE)
+        if (handle.IsNull() || handle.mIndex >= mMeshes.size())
+            return nullptr;
+
+        const GpuMesh &mesh = mMeshes[handle.mIndex];
+
+        // Nothing bumps a generation yet, so this can only fail on a
+        // hand-built handle today. It is the check that makes freeing a mesh a
+        // local change later instead of an audit of every call site.
+        if (mesh.mGeneration != handle.mGeneration)
+            return nullptr;
+
+        return &mesh;
+    }
+
+    void VulkanRenderer::DestroyMeshes()
+    {
+        for (GpuMesh &mesh : mMeshes)
         {
-            vmaDestroyBuffer(mAllocator, mVertexBuffer, mVertexBufferAllocation);
-            mVertexBuffer = VK_NULL_HANDLE;
-            mVertexBufferAllocation = VK_NULL_HANDLE;
+            if (mesh.mVertexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
+            if (mesh.mIndexBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
         }
+        mMeshes.clear();
     }
 
     void VulkanRenderer::NameObject(VkObjectType type, uint64_t handle, const char *name)
@@ -1248,20 +1306,31 @@ namespace mts
             .extent = mSwapchainExtent};
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-        const VkDeviceSize vertexOffset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &mVertexBuffer, &vertexOffset);
-
-        // One draw per instance rather than instanced rendering: the transform
-        // arrives as a push constant, and there is no per-instance buffer yet.
-        // should be replaced soon
-        for (const glm::mat4 &transform : instances)
+        const GpuMesh *const mesh = FindMesh(mDefaultMesh);
+        if (mesh != nullptr)
         {
-            const PushData pushData{.transform = transform};
+            const VkDeviceSize vertexOffset = 0;
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->mVertexBuffer, &vertexOffset);
 
-            vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(PushData), &pushData);
+            // UINT32 to match std::vector<uint32_t>. UINT16 halves the index
+            // buffer and is worth it once meshes are cooked; picking it now
+            // would mean two index paths for no measurable gain.
+            vkCmdBindIndexBuffer(cmd, mesh->mIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdDraw(cmd, 3, 1, 0, 0);
+            // One draw per instance rather than instanced rendering: the
+            // transform arrives as a push constant, and there is no
+            // per-instance buffer yet. Still one mesh for every instance -
+            // the bind moves inside this loop once MeshRenderer carries its
+            // own handle.
+            for (const glm::mat4 &transform : instances)
+            {
+                const PushData pushData{.transform = transform};
+
+                vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                                   0, sizeof(PushData), &pushData);
+
+                vkCmdDrawIndexed(cmd, mesh->mIndexCount, 1, 0, 0, 0);
+            }
         }
 
         if (mValidationEnabled)

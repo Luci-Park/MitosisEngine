@@ -9,8 +9,7 @@
 
 Gets an OS window on screen, pumps its events, and reports whether it should
 close. It also hands out the one thing a renderer needs from it - a native handle
-and a size - through `ISurfaceProvider`, which is declared in `core`, not here
-([0013](../decisions/0013-surface-provider.md)).
+and a size - through `ISurfaceProvider`, which is declared in `core`, not here.
 
 It does not do input, and it does not touch a graphics API. GLFW is created with
 `GLFW_NO_API`: the renderer owns the graphics API entirely, and no GLFW type
