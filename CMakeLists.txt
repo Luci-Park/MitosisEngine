@@ -23,6 +23,7 @@ include(cmake/EnginePlatform.cmake)
 include(cmake/EngineModule.cmake)
 include(cmake/Shaders.cmake)
 include(cmake/Assets.cmake)
+include(cmake/Fonts.cmake)
 
 option(BUILD_TESTING "Build unit tests (per module, run via ctest)" ON)
 if(BUILD_TESTING)
@@ -53,6 +54,8 @@ engine_add_shaders(HelloWorld
 engine_cook_assets(HelloWorld
     SOURCE_ROOTS assets/
     OUT_DIR ${CMAKE_BINARY_DIR}/cooked_assets)
+
+engine_copy_fonts(HelloWorld SOURCE_DIR fonts)
 
 target_link_libraries(HelloWorld PRIVATE
     mts::app

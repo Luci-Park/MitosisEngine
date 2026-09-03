@@ -50,6 +50,7 @@ modules/              one static library each, mts::<name>
   core/                 ECS, logging, paths, surface contract
   window/               GLFW window behind an interface
   renderer/             Vulkan 1.3 renderer
+  editortheme/          the Slate ImGui theme
   assets/               cooked asset blobs, manifest, cache
   app/                  composition root and main loop
     include/<name>/       public API - the whole surface of the module
@@ -65,6 +66,7 @@ games/                one directory per game - planned, none exist yet
 tools/                AssetCooker, new_module.ps1, new_file.ps1
 templates/            what the scaffolding scripts stamp out
 assets/               source assets, cooked into the build tree
+fonts/                editor UI fonts, copied to fonts/ next to the exe
 docs/                 setup, architecture, conventions
 builds/               build trees, gitignored
 logs/                 engine.log, gitignored
@@ -91,6 +93,9 @@ One dependency is vendored instead: Dear ImGui, as a `third_party/imgui` git
 submodule, MIT-licensed, `LICENSE.txt` ships inside the submodule. Clone with
 `git clone --recurse-submodules`, or after the fact:
 `git submodule update --init --recursive`.
+
+The editor UI font, `fonts/Inter.ttf`, is Inter by Rasmus Andersson,
+SIL Open Font License, `fonts/Inter-OFL.txt`.
 
 # Adding Modules and Files
 This engine is aiming for modularity, therefore each part of the engine is its own static library. To make things easier VSCode tasks have been added.

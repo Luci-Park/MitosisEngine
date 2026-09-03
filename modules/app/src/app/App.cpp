@@ -47,7 +47,19 @@ namespace mts
         }
 
         ImGui::CreateContext();
-        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        ImGuiIO &io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        ImFontConfig fontConfig;
+        fontConfig.OversampleH = 3;
+        const std::string fontPath = FontPath("Inter.ttf").string();
+        if (io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 16.0f, &fontConfig) == nullptr)
+        {
+            MTS_LOG_ERROR("Failed to load font: {}", fontPath);
+            io.Fonts->AddFontDefault();
+        }
+
         EditorTheme::Apply();
 
         if (!ImGui_ImplGlfw_InitForVulkan(
