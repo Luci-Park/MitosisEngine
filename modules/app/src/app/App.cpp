@@ -39,11 +39,11 @@ namespace mts
             return false;
         }
 
-        // Destruction needs no system: InstallHierarchyHooks makes
-        // World::DestroyEntity cascade, so nothing is ever left orphaned for a
-        // pass to reap. Armed here so a World that is destroyed into before its
-        // first AddTransform still cascades.
-        InstallHierarchyHooks(mWorld);
+        // Destruction needs no system: InstallHierarchy puts the scene graph
+        // in place and arms the destroy hook, so World::DestroyEntity cascades
+        // and nothing is ever left orphaned for a pass to reap. Called here so
+        // a world destroyed into before its first AddTransform still cascades.
+        InstallHierarchy(mWorld);
 
         // should be before any other system in PostUpdate
         mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);

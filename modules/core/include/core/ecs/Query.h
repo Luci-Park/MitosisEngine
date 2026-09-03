@@ -83,17 +83,32 @@ namespace mts
             ResolveSparseStorages(std::index_sequence_for<Ts...>{});
         }
 
-        // set for the duration of a table walk, so EnsureFresh can refuse to
-        // rebuild mMatches while the walk still holds references into it
+        // Held for the duration of a table walk. It stops EnsureFresh
+        // rebuilding mMatches under the walk, and tells the world to refuse
+        // structural changes while references into a table are live.
+        //
+        // A depth rather than a flag: the same query may be re-entered from its
+        // own callback for a pairwise scan, and a flag would let the inner
+        // walk's destructor declare the outer one finished.
         struct IterationGuard
         {
-            explicit IterationGuard(bool &flag) : mFlag(flag) { mFlag = true; }
-            ~IterationGuard() { mFlag = false; }
+            IterationGuard(uint32_t &depth, World &world) : mDepth(depth), mWorld(world)
+            {
+                ++mDepth;
+                mWorld.BeginQueryIteration();
+            }
+
+            ~IterationGuard()
+            {
+                mWorld.EndQueryIteration();
+                --mDepth;
+            }
 
             IterationGuard(const IterationGuard &) = delete;
             IterationGuard &operator=(const IterationGuard &) = delete;
 
-            bool &mFlag;
+            uint32_t &mDepth;
+            World &mWorld;
         };
 
         // -- archetype-level match ----------------------------------------------
@@ -184,7 +199,7 @@ namespace mts
             if (mWorld->Generation() == mSeenGeneration)
                 return;
 
-            MTS_ASSERT(!mIterating,
+            MTS_ASSERT(mIterationDepth == 0,
                        "Query::EnsureFresh: archetypes changed while this query is iterating; a "
                        "ForEach callback must not create archetypes and then re-run the same query");
 
@@ -231,7 +246,7 @@ namespace mts
 
             // index rather than iterator, and the guard makes a rebuild under the
             // walk a loud failure instead of a dangling reference
-            const IterationGuard guard(mIterating);
+            const IterationGuard guard(mIterationDepth, *mWorld);
             for (std::size_t i = 0; i < mMatches.size(); ++i)
             {
                 Match &match = mMatches[i];
@@ -246,8 +261,16 @@ namespace mts
         {
             ForEachMatchedTable([&](Archetype &table, Columns &columns)
                                 {
+                                    // Clamped against both the count at entry
+                                    // and the live one. The first stops a
+                                    // callback that spawns entities from
+                                    // walking rows it just created - CreateEntity
+                                    // stays legal mid-walk. The second stops a
+                                    // release build, where the structural-change
+                                    // assert is compiled out, from running past
+                                    // the end of a table something shortened.
                                     const uint32_t rows = table.RowCount();
-                                    for (uint32_t row = 0; row < rows; ++row)
+                                    for (uint32_t row = 0; row < rows && row < table.RowCount(); ++row)
                                     {
                                         const Entity entity = table.EntityAt(row);
 
@@ -282,7 +305,7 @@ namespace mts
         World *mWorld;
         std::vector<Match> mMatches;
         std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
-        bool mIterating = false;
+        uint32_t mIterationDepth = 0;
         std::tuple<SparseSetStorage<detail::Bare<Ts>> *...> mSparseStorages{};
 
         Signature mDataMask;

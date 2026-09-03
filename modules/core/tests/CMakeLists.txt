@@ -7,4 +7,5 @@ engine_add_module_tests(core
     System.tests.cpp
     Transform.tests.cpp
     TransformHierarchy.tests.cpp
+    Resources.tests.cpp
 )

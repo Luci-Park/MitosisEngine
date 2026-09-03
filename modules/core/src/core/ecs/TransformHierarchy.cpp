@@ -1,7 +1,7 @@
-﻿/**
+/**
  * @file TransformHierarchy.cpp
  * @author Sumin Park
- * @brief Resolving Transform + Hierarchy into WorldTransform.
+ * @brief Resolving Transform through the scene graph into WorldTransform.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -13,6 +13,7 @@
 #include "core/ecs/Query.h"
 #include "core/ecs/World.h"
 #include "core/log/Assert.h"
+#include "core/log/Log.h"
 
 namespace mts
 {
@@ -49,103 +50,41 @@ namespace mts
             static void Invalidate(WorldTransform &target) { target.mDirty = true; }
         };
 
-        /**
-         * The only writer of Hierarchy's links. Every operation keeps the two
-         * encodings of an edge - the child's mParent and the parent's chain -
-         * in agreement, which is why the fields are not public.
-         */
-        struct HierarchyLinker
+        // HierarchyIndex keeps its mutators private so that mts::SetParent is
+        // the only route in - it is what pairs a structural change with the
+        // WorldTransform invalidation. This is that route's key.
+        struct HierarchyMutator
         {
-            static void Detach(World &world, Entity child)
+            static bool SetParent(HierarchyIndex &index, Entity child, Entity parent)
             {
-                Hierarchy *node = world.Get<Hierarchy>(child);
-                if (node == nullptr || node->mParent.IsNull())
-                    return;
-
-                // Splicing needs both neighbours, which is what mPrevSibling is
-                // for: without it this would scan from the parent's head.
-                if (Hierarchy *previous = world.Get<Hierarchy>(node->mPrevSibling))
-                    previous->mNextSibling = node->mNextSibling;
-                else if (Hierarchy *parent = world.Get<Hierarchy>(node->mParent))
-                    parent->mFirstChild = node->mNextSibling; // child was the head
-
-                if (Hierarchy *next = world.Get<Hierarchy>(node->mNextSibling))
-                    next->mPrevSibling = node->mPrevSibling;
-
-                node->mParent = kNullEntity;
-                node->mNextSibling = kNullEntity;
-                node->mPrevSibling = kNullEntity;
+                return index.SetParent(child, parent);
             }
 
-            // Assumes `child` is already detached.
-            static void Attach(World &world, Entity child, Entity parent)
+            static void Remove(HierarchyIndex &index, Entity entity) { index.Remove(entity); }
+
+            static std::vector<Entity> TakeChildren(HierarchyIndex &index, Entity entity)
             {
-                Hierarchy *node = world.Get<Hierarchy>(child);
-                Hierarchy *head = world.Get<Hierarchy>(parent);
-
-                // Callers run EnsureHierarchy on both ends first. Reaching here
-                // without one means the edge would be silently dropped - and
-                // Detach has already run - so say so rather than leave the
-                // child mysteriously rooted.
-                MTS_ASSERT(node != nullptr && head != nullptr,
-                           "HierarchyLinker::Attach: both entities need a Hierarchy component");
-
-                if (node == nullptr || head == nullptr)
-                    return;
-
-                // Pushed onto the front, so linking stays O(1) and no tail
-                // pointer has to be maintained. Child order is therefore
-                // reverse insertion order, which nothing may rely on.
-                node->mParent = parent;
-                node->mPrevSibling = kNullEntity;
-                node->mNextSibling = head->mFirstChild;
-
-                if (Hierarchy *first = world.Get<Hierarchy>(head->mFirstChild))
-                    first->mPrevSibling = child;
-
-                head->mFirstChild = child;
+                return index.TakeChildren(entity);
             }
         };
     }
 
     namespace
     {
-        // The parent of `entity`, or null if it has none, the link is stale, or
-        // the parent has been destroyed. The destroy hook means nothing should
-        // outlive its parent; the aliveness check keeps a World that never
+        // The parent, treating a destroyed one as none. The destroy hook means
+        // nothing normally outlives its parent; this keeps a world that never
         // installed the hook resolving in place instead of dangling.
-        Entity ParentOf(World &world, Entity entity)
+        //
+        // Takes the index rather than looking it up: this runs once per level
+        // of every resolve, and every resolve runs once per entity per frame,
+        // so a hash lookup in here would dwarf the compares it exists to guard.
+        Entity LiveParentOf(World &world, const HierarchyIndex *index, Entity entity)
         {
-            const Hierarchy *node = world.Get<Hierarchy>(entity);
-            if (node == nullptr || node->Parent().IsNull() || !world.IsAlive(node->Parent()))
+            if (index == nullptr)
                 return kNullEntity;
 
-            return node->Parent();
-        }
-
-        // Both ends of an edge need the component before it can be linked.
-        // Also arms the destroy hook, so a World that only ever went through
-        // SetParent still cascades.
-        void EnsureHierarchy(World &world, Entity entity)
-        {
-            InstallHierarchyHooks(world);
-
-            if (!world.Has<Hierarchy>(entity))
-                world.AddComponent<Hierarchy>(entity, Hierarchy{});
-        }
-
-        // Levels above `entity`, stopping at the cap so a malformed graph
-        // cannot spin here.
-        uint32_t DepthOf(World &world, Entity entity)
-        {
-            uint32_t depth = 0;
-            for (Entity cursor = ParentOf(world, entity); !cursor.IsNull(); cursor = ParentOf(world, cursor))
-            {
-                if (++depth >= kMaxHierarchyDepth)
-                    break;
-            }
-
-            return depth;
+            const Entity parent = index->ParentOf(entity);
+            return world.IsAlive(parent) ? parent : kNullEntity;
         }
 
         void InvalidateCache(World &world, Entity entity)
@@ -155,51 +94,74 @@ namespace mts
         }
 
         /**
-         * Runs before any entity is torn down. Unlinks it from its parent's
-         * chain, then destroys everything below it.
+         * Runs before any entity is torn down: destroys everything below it,
+         * then drops it from the graph.
          *
-         * Children are drained from the head rather than walked with
-         * NextSibling: each recursive destroy re-enters this hook and splices
-         * itself out, so the chain is rewritten underneath us at every step.
-         * Re-reading FirstChild each time is what makes that safe, and it also
-         * re-fetches the component, whose row a nested destroy may have moved.
+         * Children are drained from the front rather than iterated, because
+         * each recursive destroy removes itself from this entity's child list
+         * and so rewrites the vector underneath the walk. Re-reading the span
+         * every step is what makes that safe.
          */
         void OnEntityDestroyed(World &world, Entity entity, void *)
         {
-            if (world.Get<Hierarchy>(entity) == nullptr)
+            HierarchyIndex *index = world.TryResource<HierarchyIndex>();
+            if (index == nullptr)
                 return;
 
-            detail::HierarchyLinker::Detach(world, entity);
+            // Detached in one pass rather than drained one at a time. Removing
+            // them individually would make each child's Unlink scan and shift
+            // this vector, turning a wide subtree into O(N^2).
+            const std::vector<Entity> children = detail::HierarchyMutator::TakeChildren(*index, entity);
 
-            while (true)
+            for (const Entity child : children)
             {
-                const Hierarchy *node = world.Get<Hierarchy>(entity);
-                if (node == nullptr)
-                    return;
+                // The graph only ever holds handles put there by SetParent, and
+                // Remove takes them out again, so a dead one here would mean
+                // the graph and the world had already diverged. A cascade
+                // arriving from another direction is the one benign case.
+                MTS_ASSERT(world.IsAlive(child), "OnEntityDestroyed: dead entity left in the scene graph");
 
-                const Entity child = node->FirstChild();
-                if (child.IsNull())
-                    return;
-
-                // Only Detach and Attach write the chains, and both keep them
-                // in step with the live set, so a dead handle here would mean
-                // the invariant is already broken. Bail rather than loop.
-                MTS_ASSERT(world.IsAlive(child),
-                           "OnEntityDestroyed: dead entity left in a child chain");
-
-                if (!world.IsAlive(child))
-                    return;
-
-                world.DestroyEntity(child);
+                if (world.IsAlive(child))
+                    world.DestroyEntity(child);
             }
+
+            detail::HierarchyMutator::Remove(*index, entity);
         }
     }
 
-    void InstallHierarchyHooks(World &world)
+    HierarchyIndex &InstallHierarchy(World &world)
     {
-        // AddDestroyHook ignores a duplicate, so calling this from every entry
+        // Not EmplaceResource unconditionally: that replaces, which would throw
+        // the whole scene graph away on the second call.
+        if (!world.HasResource<HierarchyIndex>())
+            world.EmplaceResource<HierarchyIndex>();
+
+        // AddDestroyHook ignores a duplicate, so arming it from every entry
         // point costs a short scan and removes any way to forget it.
         world.AddDestroyHook(&OnEntityDestroyed);
+
+        return world.Resource<HierarchyIndex>();
+    }
+
+    Entity ParentOf(const World &world, Entity entity)
+    {
+        const HierarchyIndex *index = world.TryResource<HierarchyIndex>();
+        return index ? index->ParentOf(entity) : kNullEntity;
+    }
+
+    bool IsAncestorOf(const World &world, Entity ancestor, Entity entity)
+    {
+        // Reflexive before the lookup: an entity is its own ancestor whether or
+        // not a graph was ever installed, and callers write reparent guards
+        // against that contract.
+        if (ancestor.IsNull() || entity.IsNull())
+            return false;
+
+        if (ancestor == entity)
+            return true;
+
+        const HierarchyIndex *index = world.TryResource<HierarchyIndex>();
+        return index != nullptr && index->IsAncestorOf(ancestor, entity);
     }
 
     glm::mat4 ResolveWorld(World &world, Entity entity)
@@ -208,15 +170,17 @@ namespace mts
             return glm::mat4(1.0f);
 
         // Walk up first, recording the chain, because a node cannot be built
-        // until its parent is. Iterative rather than recursive so a cycle hits
-        // the depth assert instead of the stack guard page.
+        // until its parent is. Iterative rather than recursive, and bounded by
+        // the same cap the graph refuses to be built past.
+        const HierarchyIndex *index = world.TryResource<HierarchyIndex>();
+
         Entity chain[kMaxHierarchyDepth];
         uint32_t depth = 0;
 
-        for (Entity cursor = entity; !cursor.IsNull(); cursor = ParentOf(world, cursor))
+        for (Entity cursor = entity; !cursor.IsNull(); cursor = LiveParentOf(world, index, cursor))
         {
             MTS_ASSERT(depth < kMaxHierarchyDepth,
-                       "ResolveWorld: hierarchy deeper than {} - almost certainly a parent cycle",
+                       "ResolveWorld: hierarchy deeper than {} - the graph should have refused this",
                        kMaxHierarchyDepth);
 
             if (depth >= kMaxHierarchyDepth)
@@ -270,113 +234,33 @@ namespace mts
         return accumulated;
     }
 
-    Transform &AddTransform(World &world, Entity entity, const Transform &transform, Entity parent)
+    bool SetParent(World &world, Entity child, Entity parent)
     {
-        InstallHierarchyHooks(world);
-
-        // Guarded like the other two: World::AddComponent only asserts against
-        // a duplicate, so in a release build a second call would append a row
-        // to an archetype the entity already occupies and leave its record
-        // naming a row that no longer exists.
-        if (world.Has<Transform>(entity))
-            *world.Get<Transform>(entity) = transform;
-        else
-            world.AddComponent<Transform>(entity, transform);
-
-        if (!world.Has<Hierarchy>(entity))
-            world.AddComponent<Hierarchy>(entity, Hierarchy{});
-
-        if (!world.Has<WorldTransform>(entity))
-            world.AddComponent<WorldTransform>(entity, WorldTransform{});
-
-        // Routed through SetParent rather than calling Attach directly.
-        // AddTransform is idempotent, so it can land on an entity that is
-        // already in a chain, and Attach assumes an unlinked node - it would
-        // leave the entity in its old parent's chain as well as the new one.
-        // SetParent detaches first, rejects a cycle, and dirties the cache.
-        if (!parent.IsNull())
-            SetParent(world, entity, parent);
-
-        // Re-fetched, not carried over from AddComponent: each further add,
-        // and the Hierarchy that SetParent may give the parent, moves an
-        // entity to another archetype and relocates rows.
-        return *world.Get<Transform>(entity);
-    }
-
-    bool IsAncestorOf(World &world, Entity ancestor, Entity entity)
-    {
-        if (ancestor.IsNull() || entity.IsNull())
+        // Refusal is a documented return value, so these are logged rather
+        // than asserted. An assert here would halt a debug build on input the
+        // function is specified to handle, and would make every refusal path
+        // untestable in the configuration where asserts are live.
+        if (!world.IsAlive(child))
+        {
+            MTS_LOG_WARN("SetParent: child is not alive");
             return false;
-
-        uint32_t depth = 0;
-        for (Entity cursor = entity; !cursor.IsNull(); cursor = ParentOf(world, cursor))
-        {
-            if (cursor == ancestor)
-                return true;
-
-            // Incremented as its own statement: MTS_ASSERT compiles to
-            // ((void)0) under NDEBUG, so a side effect inside it would simply
-            // not happen in a release build and the bound below could never
-            // fire.
-            ++depth;
-
-            MTS_ASSERT(depth < kMaxHierarchyDepth,
-                       "IsAncestorOf: hierarchy deeper than {} - almost certainly a parent cycle",
-                       kMaxHierarchyDepth);
-
-            if (depth >= kMaxHierarchyDepth)
-                break;
         }
 
-        return false;
-    }
-
-    void SetParent(World &world, Entity child, Entity parent)
-    {
-        MTS_ASSERT(world.IsAlive(child), "SetParent: child is not alive");
-
-        if (!parent.IsNull())
+        // Aliveness is the world's business; cycles and depth are the graph's.
+        if (!parent.IsNull() && !world.IsAlive(parent))
         {
-            // Walking up from the proposed parent is what makes the cycle check
-            // O(depth): if `child` is already above it, linking closes a loop.
-            // Evaluated once, and only when the cheaper guards passed, since it
-            // is the walk that a cycle would make non-terminating.
-            const bool sane = world.IsAlive(parent) && child != parent;
-            const bool cycle = sane && IsAncestorOf(world, child, parent);
-
-            MTS_ASSERT(world.IsAlive(parent), "SetParent: parent is not alive");
-            MTS_ASSERT(child != parent, "SetParent: an entity cannot be its own parent");
-            MTS_ASSERT(!cycle,
-                       "SetParent: would create a cycle - parent is already a descendant of child");
-
-            // ResolveWorld and IsAncestorOf both stop at kMaxHierarchyDepth, so
-            // a chain built past it resolves against a truncated ancestor list
-            // - a silently wrong matrix in a release build - and IsAncestorOf
-            // stops detecting cycles that close above the cap. Bounding the
-            // graph where it is built is what keeps those walks honest.
-            const bool tooDeep = sane && DepthOf(world, parent) + 1 >= kMaxHierarchyDepth;
-            MTS_ASSERT(!tooDeep,
-                       "SetParent: chain would exceed kMaxHierarchyDepth ({})",
-                       kMaxHierarchyDepth);
-
-            // Refused outright, not merely asserted: MTS_ASSERT is compiled out
-            // under NDEBUG, and one cycle that reaches a release build makes
-            // every upward walk in this file non-terminating. Rejecting the
-            // edge keeps the graph acyclic and bounded in every build.
-            if (!sane || cycle || tooDeep)
-                return;
+            MTS_LOG_WARN("SetParent: parent is not alive");
+            return false;
         }
 
-        if (!world.Has<Hierarchy>(child) && parent.IsNull())
-            return; // rooting something with no links is already true
-
-        EnsureHierarchy(world, child);
-        if (!parent.IsNull())
-            EnsureHierarchy(world, parent);
-
-        detail::HierarchyLinker::Detach(world, child);
-        if (!parent.IsNull())
-            detail::HierarchyLinker::Attach(world, child, parent);
+        HierarchyIndex &index = InstallHierarchy(world);
+        if (!detail::HierarchyMutator::SetParent(index, child, parent))
+        {
+            MTS_LOG_WARN("SetParent: refused - self-parenting, a cycle, or deeper than "
+                         "kMaxHierarchyDepth ({})",
+                         kMaxHierarchyDepth);
+            return false;
+        }
 
         // Versions are per-entity counters, so the new parent's version can
         // coincidentally equal the stamp left by the old one - two freshly
@@ -384,6 +268,34 @@ namespace mts
         // so the cache is invalidated explicitly here. Only the child needs it:
         // its descendants stamp against *its* version, which the rebuild bumps.
         InvalidateCache(world, child);
+        return true;
+    }
+
+    Transform &AddTransform(World &world, Entity entity, const Transform &transform, Entity parent)
+    {
+        InstallHierarchy(world);
+
+        // Guarded rather than added blindly: World::AddComponent only asserts
+        // against a duplicate, so in a release build a second call would append
+        // a row to an archetype the entity already occupies and leave its
+        // record naming a row that no longer exists.
+        if (world.Has<Transform>(entity))
+            *world.Get<Transform>(entity) = transform;
+        else
+            world.AddComponent<Transform>(entity, transform);
+
+        if (!world.Has<WorldTransform>(entity))
+            world.AddComponent<WorldTransform>(entity, WorldTransform{});
+
+        // Through SetParent, so a repeat call on an already-linked entity gets
+        // the detach, the cycle rejection and the cache invalidation.
+        if (!parent.IsNull())
+            SetParent(world, entity, parent);
+
+        // Re-fetched, not carried over from AddComponent: adding WorldTransform
+        // moves the entity to another archetype and relocates the Transform row
+        // the first reference pointed at.
+        return *world.Get<Transform>(entity);
     }
 
     void TransformPropagateSystem::OnStart(SystemContext &context)

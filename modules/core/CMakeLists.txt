@@ -4,7 +4,8 @@ engine_add_module(core)
 target_sources(engine_core PRIVATE
     src/core/log/Log.cpp
     src/core/fs/Paths.cpp
-    src/core/ecs/TransformHierarchy.cpp)
+    src/core/ecs/TransformHierarchy.cpp
+    src/core/ecs/HierarchyIndex.cpp)
 
 # get external libraries here
 find_package(spdlog CONFIG REQUIRED)

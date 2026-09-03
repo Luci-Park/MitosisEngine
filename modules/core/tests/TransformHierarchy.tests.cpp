@@ -8,6 +8,8 @@
  */
 #include <core/ecs/TransformHierarchy.h>
 
+#include <core/ecs/HierarchyIndex.h>
+
 #include <core/ecs/CommandBuffer.h>
 #include <core/ecs/SystemScheduler.h>
 #include <core/ecs/World.h>
@@ -52,10 +54,12 @@ namespace
     }
 }
 
-TEST_CASE("Hierarchy components stay memcpy-safe", "[ecs][transform][hierarchy]")
+TEST_CASE("The transform components stay memcpy-safe", "[ecs][transform][hierarchy]")
 {
-    STATIC_REQUIRE(std::is_trivially_copyable_v<mts::Hierarchy>);
-    STATIC_REQUIRE(std::is_standard_layout_v<mts::Hierarchy>);
+    // The scene graph itself is a resource now, so only these two still ride in
+    // columns that ComponentColumn relocates with memcpy.
+    STATIC_REQUIRE(std::is_trivially_copyable_v<Transform>);
+    STATIC_REQUIRE(std::is_standard_layout_v<Transform>);
     STATIC_REQUIRE(std::is_trivially_copyable_v<WorldTransform>);
     STATIC_REQUIRE(std::is_standard_layout_v<WorldTransform>);
     STATIC_REQUIRE(alignof(WorldTransform) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__);
@@ -183,20 +187,18 @@ TEST_CASE("Rooting a child returns it to world space", "[ecs][transform][hierarc
 
     mts::SetParent(world, child, mts::kNullEntity);
 
-    // the component stays; being unparented is a null link, not an absence
-    CHECK(world.Has<mts::Hierarchy>(child));
-    CHECK(world.Get<mts::Hierarchy>(child)->IsRoot());
+    CHECK(mts::ParentOf(world, child).IsNull());
+    CHECK(world.Resource<mts::HierarchyIndex>().ChildrenOf(parent).empty());
     RequireNear(OriginOf(mts::ResolveWorld(world, child)), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-TEST_CASE("AddTransform gives every entity a rooted Hierarchy", "[ecs][transform][hierarchy]")
+TEST_CASE("AddTransform leaves an entity rooted", "[ecs][transform][hierarchy]")
 {
     World world;
     const Entity entity = MakeAt(world, glm::vec3(1.0f, 0.0f, 0.0f));
 
-    CHECK(world.Has<mts::Hierarchy>(entity));
-    CHECK(world.Get<mts::Hierarchy>(entity)->IsRoot());
-    CHECK_FALSE(world.Get<mts::Hierarchy>(entity)->HasChildren());
+    CHECK(mts::ParentOf(world, entity).IsNull());
+    CHECK(world.Resource<mts::HierarchyIndex>().ChildrenOf(entity).empty());
     CHECK(world.Has<WorldTransform>(entity));
 }
 
@@ -213,8 +215,8 @@ TEST_CASE("AddTransform can parent on creation", "[ecs][transform][hierarchy]")
 
 TEST_CASE("Reparenting never moves the entity between archetypes", "[ecs][transform][hierarchy]")
 {
-    // This is what the always-present Parent buys: parenting and rooting are
-    // field writes, so no Transform or WorldTransform is memcpy'd to a new table.
+    // Structure lives in a resource, so linking touches no component at all -
+    // no archetype move, and nothing memcpy'd.
     World world;
     const Entity first = MakeAt(world, glm::vec3(10.0f, 0.0f, 0.0f));
     const Entity second = MakeAt(world, glm::vec3(-10.0f, 0.0f, 0.0f));
@@ -415,6 +417,32 @@ TEST_CASE("ForEachChild visits every direct child and no deeper", "[ecs][transfo
     CHECK_FALSE(Contains(seen, grandchild));
 }
 
+TEST_CASE("RemoveComponent can no longer corrupt the graph", "[ecs][transform][hierarchy][walk]")
+{
+    // The hole that motivated moving structure out of components: removing the
+    // middle node's component used to truncate the parent's child walk. There
+    // is now no component holding an edge for RemoveComponent to reach.
+    World world;
+    const Entity root = MakeAt(world, glm::vec3(0.0f));
+    const Entity a = MakeAt(world, glm::vec3(0.0f));
+    const Entity b = MakeAt(world, glm::vec3(0.0f));
+    const Entity c = MakeAt(world, glm::vec3(0.0f));
+    mts::SetParent(world, a, root);
+    mts::SetParent(world, b, root);
+    mts::SetParent(world, c, root);
+
+    world.RemoveComponent<Transform>(b);
+    world.RemoveComponent<WorldTransform>(b);
+
+    std::vector<Entity> seen;
+    mts::ForEachChild(world, root, [&seen](Entity e) { seen.push_back(e); });
+
+    CHECK(seen.size() == 3);
+    CHECK(Contains(seen, a));
+    CHECK(Contains(seen, b));
+    CHECK(Contains(seen, c));
+}
+
 TEST_CASE("ForEachChild on a leaf visits nothing", "[ecs][transform][hierarchy][walk]")
 {
     World world;
@@ -426,10 +454,8 @@ TEST_CASE("ForEachChild on a leaf visits nothing", "[ecs][transform][hierarchy][
     CHECK(count == 0);
 }
 
-TEST_CASE("Unlinking repairs the chain around it", "[ecs][transform][hierarchy][walk]")
+TEST_CASE("Unlinking keeps the remaining children in order", "[ecs][transform][hierarchy][walk]")
 {
-    // Removing the middle of a chain is what mPrevSibling exists for; if the
-    // splice were wrong, the survivors would go missing from the walk.
     World world;
     const Entity root = MakeAt(world, glm::vec3(0.0f));
     const Entity a = MakeAt(world, glm::vec3(0.0f));
@@ -439,22 +465,35 @@ TEST_CASE("Unlinking repairs the chain around it", "[ecs][transform][hierarchy][
     mts::SetParent(world, b, root);
     mts::SetParent(world, c, root);
 
-    SECTION("middle")
+    mts::SetParent(world, b, mts::kNullEntity);
+
+    std::vector<Entity> seen;
+    mts::ForEachChild(world, root, [&seen](Entity e) { seen.push_back(e); });
+
+    // Insertion order survives an erase from the middle, which the intrusive
+    // chain this replaced could not promise.
+    REQUIRE(seen.size() == 2);
+    CHECK(seen[0] == a);
+    CHECK(seen[1] == c);
+}
+
+TEST_CASE("Children come back in insertion order", "[ecs][transform][hierarchy][walk]")
+{
+    World world;
+    const Entity root = MakeAt(world, glm::vec3(0.0f));
+
+    std::vector<Entity> added;
+    for (int i = 0; i < 8; ++i)
     {
-        mts::SetParent(world, b, mts::kNullEntity);
-    }
-    SECTION("head")
-    {
-        mts::SetParent(world, c, mts::kNullEntity);
-    }
-    SECTION("tail")
-    {
-        mts::SetParent(world, a, mts::kNullEntity);
+        const Entity child = MakeAt(world, glm::vec3(0.0f));
+        mts::SetParent(world, child, root);
+        added.push_back(child);
     }
 
     std::vector<Entity> seen;
     mts::ForEachChild(world, root, [&seen](Entity e) { seen.push_back(e); });
-    CHECK(seen.size() == 2);
+
+    CHECK(seen == added);
 }
 
 TEST_CASE("Reparenting moves a child between chains", "[ecs][transform][hierarchy][walk]")
@@ -526,9 +565,6 @@ TEST_CASE("A child may be destroyed inside ForEachChild", "[ecs][transform][hier
 
 TEST_CASE("Destroying a child leaves its siblings walkable", "[ecs][transform][hierarchy][destroy]")
 {
-    // The hook splices the dying entity out on the way down, so no dead handle
-    // is left in a chain to truncate iteration. The middle case is the one that
-    // would silently lose a sibling if the splice were skipped.
     World world;
     const Entity root = MakeAt(world, glm::vec3(0.0f));
     const Entity a = MakeAt(world, glm::vec3(0.0f));
@@ -540,8 +576,8 @@ TEST_CASE("Destroying a child leaves its siblings walkable", "[ecs][transform][h
 
     Entity removed = b;
     SECTION("middle") { removed = b; }
-    SECTION("head") { removed = c; }
-    SECTION("tail") { removed = a; }
+    SECTION("head") { removed = a; }
+    SECTION("tail") { removed = c; }
 
     world.DestroyEntity(removed);
 
@@ -594,17 +630,17 @@ TEST_CASE("AddTransform is idempotent", "[ecs][transform][hierarchy]")
 
 TEST_CASE("Parenting to a bare Transform still links", "[ecs][transform][hierarchy]")
 {
-    // A parent built with plain AddComponent has no Hierarchy of its own. That
-    // shape is supported, so SetParent has to give it one rather than drop the
-    // edge after it has already detached the child.
+    // A parent built with plain AddComponent has no WorldTransform of its own.
+    // That shape is supported, and the graph does not care either way now that
+    // structure is not carried by components.
     World world;
     const Entity parent = world.CreateEntity();
     world.AddComponent<Transform>(parent, Transform{glm::vec3(10.0f, 0.0f, 0.0f)});
 
     const Entity child = MakeAt(world, glm::vec3(0.0f, 1.0f, 0.0f));
-    mts::SetParent(world, child, parent);
+    CHECK(mts::SetParent(world, child, parent));
 
-    CHECK(world.Has<mts::Hierarchy>(parent));
+    CHECK(mts::ParentOf(world, child) == parent);
     RequireNear(OriginOf(mts::ResolveWorld(world, child)), glm::vec3(10.0f, 1.0f, 0.0f));
 
     std::vector<Entity> seen;
@@ -633,9 +669,9 @@ TEST_CASE("A pivot with no Transform is not fooled by matching versions", "[ecs]
 
 TEST_CASE("AddTransform relinks an already-parented entity", "[ecs][transform][hierarchy]")
 {
-    // AddTransform is idempotent, so it can legitimately land on an entity that
-    // is already in a chain. Attaching without detaching first would leave it
-    // in both parents at once.
+    // AddTransform is idempotent, so it can land on an entity already in the
+    // graph. It routes through SetParent, which detaches from the old parent
+    // first rather than leaving the entity under both.
     World world;
     const Entity a = MakeAt(world, glm::vec3(0.0f));
     const Entity c = MakeAt(world, glm::vec3(0.0f));
@@ -651,9 +687,87 @@ TEST_CASE("AddTransform relinks an already-parented entity", "[ecs][transform][h
 
     CHECK(fromA.empty());
     CHECK(fromC.size() == 1);
-    CHECK(world.Get<mts::Hierarchy>(b)->Parent() == c);
+    CHECK(mts::ParentOf(world, b) == c);
 }
 
+TEST_CASE("ForEachChild survives fn touching other children", "[ecs][transform][hierarchy][walk]")
+{
+    // Resuming by position can only recover from one removal at or before the
+    // cursor. Here fn destroys the child it was handed *and* reparents an
+    // earlier sibling away, which shifts the list twice in one step.
+    World world;
+    const Entity root = MakeAt(world, glm::vec3(0.0f));
+    const Entity a = MakeAt(world, glm::vec3(0.0f));
+    const Entity b = MakeAt(world, glm::vec3(0.0f));
+    const Entity c = MakeAt(world, glm::vec3(0.0f));
+    const Entity d = MakeAt(world, glm::vec3(0.0f));
+    const Entity elsewhere = MakeAt(world, glm::vec3(0.0f));
+    mts::SetParent(world, a, root);
+    mts::SetParent(world, b, root);
+    mts::SetParent(world, c, root);
+    mts::SetParent(world, d, root);
+
+    std::vector<Entity> seen;
+    mts::ForEachChild(world, root,
+                      [&](Entity child)
+                      {
+                          seen.push_back(child);
+                          if (child == b)
+                          {
+                              mts::SetParent(world, a, elsewhere);
+                              world.DestroyEntity(b);
+                          }
+                      });
+
+    CHECK(Contains(seen, c)); // the one a position-resume walk would skip
+    CHECK(Contains(seen, d));
+}
+
+TEST_CASE("IsAncestorOf is reflexive without a graph", "[ecs][transform][hierarchy]")
+{
+    // Nothing here installs the HierarchyIndex, and an entity is still its own
+    // ancestor - caller-side reparent guards are written against that.
+    World world;
+    const Entity entity = world.CreateEntity();
+    const Entity other = world.CreateEntity();
+
+    CHECK(mts::IsAncestorOf(world, entity, entity));
+    CHECK_FALSE(mts::IsAncestorOf(world, other, entity));
+    CHECK_FALSE(mts::IsAncestorOf(world, mts::kNullEntity, entity));
+}
+
+TEST_CASE("The depth bound counts the moved subtree height", "[ecs][transform][hierarchy]")
+{
+    // Two chains that are each legal on their own but illegal joined. Bounding
+    // only the new parent's depth would accept this and leave the deepest node
+    // past the cap, where ResolveWorld truncates its walk and silently drops
+    // the top of the chain.
+    World world;
+
+    // Each chain is legal alone - deepest index 33, under the cap of 63 - but
+    // joined they would put the tail at 33 + 1 + 33 = 67.
+    const uint32_t half = (mts::kMaxHierarchyDepth / 2) + 2;
+
+    Entity deepTail = MakeAt(world, glm::vec3(0.0f));
+    for (uint32_t i = 1; i < half; ++i)
+    {
+        const Entity next = MakeAt(world, glm::vec3(0.0f));
+        REQUIRE(mts::SetParent(world, next, deepTail));
+        deepTail = next;
+    }
+
+    const Entity tallRoot = MakeAt(world, glm::vec3(0.0f));
+    Entity tallTail = tallRoot;
+    for (uint32_t i = 1; i < half; ++i)
+    {
+        const Entity next = MakeAt(world, glm::vec3(0.0f));
+        REQUIRE(mts::SetParent(world, next, tallTail));
+        tallTail = next;
+    }
+
+    CHECK_FALSE(mts::SetParent(world, tallRoot, deepTail));
+    CHECK(mts::ParentOf(world, tallRoot).IsNull());
+}
 
 
 TEST_CASE("IsAncestorOf walks the chain", "[ecs][transform][hierarchy]")

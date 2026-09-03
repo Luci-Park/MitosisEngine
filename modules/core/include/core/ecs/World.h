@@ -17,11 +17,13 @@
 #include "StorageInfo.h"
 #include "core/log/Assert.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -79,6 +81,59 @@ namespace mts
             SparseSetStorage<T> mStorage;
         };
 
+        /**
+         * Resources are keyed on their own counter rather than TypeIdOf.
+         * ComponentBit uses TypeId::seq *directly* as a bitset index and
+         * asserts it stays under kMaxComponentTypes, so every non-component
+         * type that drew a seq would push real components toward that ceiling
+         * - an order-dependent failure a long way from its cause.
+         */
+        inline uint32_t NextResourceId()
+        {
+            static std::atomic<uint32_t> counter{0};
+            return counter.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        /**
+         * Normalized through remove_cvref_t so that TryResource<const T> names
+         * the same resource as TryResource<T>. Without it the const spelling
+         * is a separate instantiation with its own id, which compiles fine and
+         * then always reports the resource as absent - a silent no-op in any
+         * caller that treats nullptr as "no graph installed".
+         */
+        template <typename T>
+        uint32_t ResourceIdOf()
+        {
+            static const uint32_t id = NextResourceId();
+            return id;
+        }
+
+        template <typename T>
+        uint32_t ResourceKeyOf()
+        {
+            return ResourceIdOf<std::remove_cvref_t<T>>();
+        }
+
+        // Type-erased owner, so World can destroy a resource it knows nothing
+        // about. The virtual destructor is the whole point of the base.
+        class IResource
+        {
+        public:
+            virtual ~IResource() = default;
+        };
+
+        template <typename T>
+        class ResourceHolder final : public IResource
+        {
+        public:
+            template <typename... Args>
+            explicit ResourceHolder(Args &&...args) : mValue(std::forward<Args>(args)...)
+            {
+            }
+
+            T mValue;
+        };
+
         // table bitmask
         template <typename... Ts>
         Signature TableSignatureOf()
@@ -105,6 +160,11 @@ namespace mts
         World(World &&) = delete;
         World &operator=(World &&) = delete;
 
+        // Deliberately allowed during a query walk, unlike the mutators below.
+        // The new entity lands in the empty archetype, so no matched table's
+        // columns move; a sparse-only query does match that table, but its rows
+        // are appended and Query::ForEach never walks past the count it started
+        // with. Recording the component into a CommandBuffer is what defers.
         Entity CreateEntity()
         {
             const Entity entity = mPool.Create();
@@ -141,6 +201,7 @@ namespace mts
         void DestroyEntity(Entity entity)
         {
             MTS_ASSERT(mPool.IsAlive(entity), "World::DestroyEntity: entity is not alive");
+            AssertNoStructuralChange("DestroyEntity");
 
             // Hooks run first, while this entity's components are still
             // readable, and the record is read only afterwards. A hook may
@@ -177,6 +238,16 @@ namespace mts
         }
 
         bool IsAlive(Entity entity) const { return mPool.IsAlive(entity); }
+
+        /**
+         * True while a Query is walking this world.
+         *
+         * Structural changes are forbidden in that window - see
+         * AssertNoStructuralChange - so anything that mutates on behalf of a
+         * caller it does not control (a script binding, an editor command)
+         * should test this and record into a CommandBuffer instead.
+         */
+        bool IsIterating() const { return mQueryIterationDepth > 0; }
 
         // Get table of entity
         const Archetype *ArchetypeOf(Entity entity) const
@@ -251,6 +322,7 @@ namespace mts
             MTS_ASSERT_COMPONENT(T);
             MTS_ASSERT(mPool.IsAlive(entity), "World::AddComponent: entity is not alive");
             MTS_ASSERT(!Has<T>(entity), "World::AddComponent: entity already has this component");
+            AssertNoStructuralChange("AddComponent");
 
             if constexpr (kIsSparseComponent<T>)
             {
@@ -269,11 +341,102 @@ namespace mts
         {
             MTS_ASSERT(mPool.IsAlive(entity), "World::RemoveComponent: entity is not alive");
             MTS_ASSERT(Has<T>(entity), "World::RemoveComponent: entity does not have this component");
+            AssertNoStructuralChange("RemoveComponent");
 
             if constexpr (kIsSparseComponent<T>)
                 SparseStorageFor<T>().Remove(entity);
             else
                 RemoveTableComponent<T>(entity);
+        }
+
+        /**
+         * Installs this world's single instance of T, constructed in place, and
+         * replaces any previous one.
+         *
+         * A resource is engine state that belongs to the world rather than to
+         * an entity - a camera, an input snapshot, a hierarchy index, a script
+         * VM. Unlike a component it is never relocated, so it carries none of
+         * the trivially-copyable requirement: a resource may hold vectors,
+         * strings, or anything else with a destructor.
+         *
+         * Replacing destroys the old value, which invalidates any pointer a
+         * system cached from Resource() or TryResource(). Emplace during setup,
+         * not mid-frame, unless every holder of that pointer is re-fetching.
+         */
+        template <typename T, typename... Args>
+        T &EmplaceResource(Args &&...args)
+        {
+            static_assert(std::is_same_v<T, std::remove_cvref_t<T>>,
+                          "World::EmplaceResource: T must be a plain value type, not a reference or cv-qualified");
+
+            auto holder = std::make_unique<detail::ResourceHolder<T>>(std::forward<Args>(args)...);
+            T &value = holder->mValue;
+
+
+            // The value lives inside a heap-allocated holder, so rehashing the
+            // map moves the unique_ptr and never the resource itself: a
+            // pointer taken here survives any number of later emplacements of
+            // *other* resources.
+            mResources[detail::ResourceKeyOf<T>()] = std::move(holder);
+            return value;
+        }
+
+        /// The resource, or nullptr when none has been emplaced.
+        template <typename T>
+        T *TryResource()
+        {
+            const auto it = mResources.find(detail::ResourceKeyOf<T>());
+            if (it == mResources.end())
+                return nullptr;
+
+            using Bare = std::remove_cvref_t<T>;
+            return &static_cast<detail::ResourceHolder<Bare> *>(it->second.get())->mValue;
+        }
+
+        template <typename T>
+        const T *TryResource() const
+        {
+            const auto it = mResources.find(detail::ResourceKeyOf<T>());
+            if (it == mResources.end())
+                return nullptr;
+
+            using Bare = std::remove_cvref_t<T>;
+            return &static_cast<const detail::ResourceHolder<Bare> *>(it->second.get())->mValue;
+        }
+
+        /// The resource, which must exist. Use TryResource where absence is a
+        /// case the caller handles rather than a bug.
+        template <typename T>
+        T &Resource()
+        {
+            T *value = TryResource<T>();
+
+            // MTS_CHECK, not MTS_ASSERT: this returns a reference, so a missing
+            // resource in a release build would be a null dereference rather
+            // than a diagnosable stop.
+            MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
+            return *value;
+        }
+
+        template <typename T>
+        const T &Resource() const
+        {
+            const T *value = TryResource<T>();
+            MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
+            return *value;
+        }
+
+        template <typename T>
+        bool HasResource() const
+        {
+            return mResources.find(detail::ResourceKeyOf<T>()) != mResources.end();
+        }
+
+        /// Destroys the resource. True if there was one.
+        template <typename T>
+        bool RemoveResource()
+        {
+            return mResources.erase(detail::ResourceKeyOf<T>()) != 0;
         }
 
         // returns the world-owned query for this exact term + filter shape,
@@ -290,6 +453,41 @@ namespace mts
         friend class Query;
 
         const std::unordered_map<Signature, std::unique_ptr<Archetype>> &Archetypes() const { return mArchetypes; }
+
+        // Depth, not a flag: a query may legitimately be re-entered from its own
+        // callback (a pairwise scan), and the inner walk finishing must not
+        // report the world as idle while the outer one is still holding
+        // pointers into a table.
+        void BeginQueryIteration() { ++mQueryIterationDepth; }
+
+        void EndQueryIteration()
+        {
+            MTS_ASSERT(mQueryIterationDepth > 0, "World::EndQueryIteration: not iterating");
+            --mQueryIterationDepth;
+        }
+
+        /**
+         * Structural changes during a query walk corrupt it, and quietly.
+         *
+         * Query::ForEach hands its callback a reference derived from a cached
+         * column pointer and a row index. Adding or removing a component moves
+         * the entity to another table and swap-removes its old row, so an
+         * unvisited entity slides into a row already passed - silently skipped -
+         * while the walk runs on past the shortened table. Creating an entity
+         * can reallocate a column outright and leave the cached pointer
+         * dangling. Destroying now cascades, so one call can do all of that to
+         * an arbitrary number of rows at once.
+         *
+         * Record into a CommandBuffer instead; it applies at the phase boundary,
+         * which is what the boundary is for.
+         */
+        void AssertNoStructuralChange([[maybe_unused]] const char *what) const
+        {
+            MTS_ASSERT(mQueryIterationDepth == 0,
+                       "World::{}: structural change while a Query is iterating. Record it into a "
+                       "CommandBuffer instead - see World::IsIterating",
+                       what);
+        }
 
         // adding to archetype
         // move entityset to different table
@@ -463,7 +661,19 @@ namespace mts
         std::unordered_map<uint32_t, std::unique_ptr<detail::ISparseStorage>> mSparseStorages; // by TypeId::seq
         std::unordered_map<uint32_t, std::unique_ptr<detail::IQuery>> mQueries;                // by detail::QueryKeyOf
         std::vector<EntityDestroyHook> mDestroyHooks;
+
+        // Declared last, so it is destroyed first: reverse declaration order
+        // keeps entity storage alive while resources are torn down, which is
+        // what a resource holding entity handles needs.
+        //
+        // That is not licence to call back into the world from a resource
+        // destructor. ~World is already destroying this map, so DestroyEntity -
+        // whose hooks look resources up again - would search a container whose
+        // elements are being destroyed, in an order nothing defines. Release
+        // handles before the world goes down, not during.
+        std::unordered_map<uint32_t, std::unique_ptr<detail::IResource>> mResources; // by detail::ResourceIdOf
         std::size_t mArchetypeGeneration = 0;
+        uint32_t mQueryIterationDepth = 0;
     };
 }
 

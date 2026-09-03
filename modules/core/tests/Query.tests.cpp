@@ -494,6 +494,70 @@ TEST_CASE("Query Or terms are independent clauses", "[ecs][query]")
     }
 }
 
+TEST_CASE("The world reports itself as iterating during a walk", "[ecs][query]")
+{
+    // The assert that guards structural changes cannot be unit-tested - it
+    // breaks into the debugger - so the flag it reads is what gets pinned here.
+    // Script bindings and editor commands are meant to test this and record
+    // into a CommandBuffer rather than mutate.
+    World world;
+    const Entity entity = world.CreateEntity();
+    world.AddComponent(entity, QPosition{1.0f, 2.0f});
+
+    CHECK_FALSE(world.IsIterating());
+
+    bool sawIterating = false;
+    world.ForEach<QPosition>([&](Entity, QPosition &) { sawIterating = world.IsIterating(); });
+
+    CHECK(sawIterating);
+    CHECK_FALSE(world.IsIterating());
+}
+
+TEST_CASE("A nested walk does not report the outer one as finished", "[ecs][query]")
+{
+    // The reason the guard counts rather than flags: the inner walk's guard is
+    // destroyed while the outer is still holding column pointers, and a bool
+    // would declare the world idle right there.
+    World world;
+    for (int i = 0; i < 2; ++i)
+    {
+        const Entity e = world.CreateEntity();
+        world.AddComponent(e, QPosition{static_cast<float>(i), 0.0f});
+    }
+
+    auto &query = world.GetOrCreateQuery<QPosition>();
+
+    bool iteratingAfterInner = true;
+    query.ForEach([&](Entity, QPosition &)
+                  {
+                      query.ForEach([&](Entity, QPosition &) {});
+
+                      // the inner walk has finished; the outer has not
+                      iteratingAfterInner = world.IsIterating(); });
+
+    CHECK(iteratingAfterInner);
+    CHECK_FALSE(world.IsIterating());
+}
+
+TEST_CASE("A walk does not visit entities the callback spawns", "[ecs][query]")
+{
+    // CreateEntity stays legal mid-walk, so the row count at entry is what
+    // bounds the walk. Without that bound this callback would never terminate.
+    World world;
+    const Entity seed = world.CreateEntity();
+    world.AddComponent(seed, QPosition{0.0f, 0.0f});
+
+    auto &sparseQuery = world.GetOrCreateQuery<QPosition>();
+
+    int visits = 0;
+    sparseQuery.ForEach([&](Entity, QPosition &)
+                        {
+                            ++visits;
+                            world.CreateEntity(); });
+
+    CHECK(visits == 1);
+}
+
 TEST_CASE("Query allows a nested walk when no rebuild is needed", "[ecs][query]")
 {
     World world;
