@@ -7,6 +7,7 @@
 #include <core/log/Log.h>
 #include <editortheme/EditorTheme.h>
 
+#include <IconsFontAwesome6.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
@@ -59,6 +60,15 @@ namespace mts
             MTS_LOG_ERROR("Failed to load font: {}", fontPath);
             io.Fonts->AddFontDefault();
         }
+
+        static const ImWchar iconRanges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
+        ImFontConfig iconConfig;
+        iconConfig.MergeMode = true;
+        iconConfig.PixelSnapH = true;
+        iconConfig.GlyphMinAdvanceX = 16.0f;
+        const std::string iconFontPath = FontPath(FONT_ICON_FILE_NAME_FAS).string();
+        if (io.Fonts->AddFontFromFileTTF(iconFontPath.c_str(), 16.0f, &iconConfig, iconRanges) == nullptr)
+            MTS_LOG_ERROR("Failed to load icon font: {}", iconFontPath);
 
         EditorTheme::Apply();
 

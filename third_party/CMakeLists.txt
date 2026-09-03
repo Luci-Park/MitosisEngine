@@ -49,3 +49,8 @@ elseif(ENGINE_PLATFORM STREQUAL "Linux")
         VK_USE_PLATFORM_XLIB_KHR
         VK_USE_PLATFORM_WAYLAND_KHR)
 endif()
+
+add_library(iconfontcppheaders INTERFACE)
+add_library(iconfontcppheaders::iconfontcppheaders ALIAS iconfontcppheaders)
+target_include_directories(iconfontcppheaders INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/IconFontCppHeaders)

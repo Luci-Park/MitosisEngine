@@ -7,6 +7,7 @@ target_link_libraries(engine_app
            mts::renderer
     PRIVATE imgui::imgui
             mts::editortheme
+            iconfontcppheaders::iconfontcppheaders
 )
 
 target_sources(engine_app PRIVATE src/app/App.cpp)

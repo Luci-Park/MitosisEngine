@@ -45,6 +45,7 @@ cmake/                build helpers
 third_party/          vendored (not vcpkg) - see Dependencies below
   imgui/                submodule, docking branch, pinned tag
   imgui_config/         repo-owned imconfig.h override (IMGUI_USER_CONFIG)
+  IconFontCppHeaders/   icon codepoint header for Font Awesome
 
 modules/              one static library each, mts::<name>
   core/                 ECS, logging, paths, surface contract
@@ -96,6 +97,10 @@ submodule, MIT-licensed, `LICENSE.txt` ships inside the submodule. Clone with
 
 The editor UI font, `fonts/Inter.ttf`, is Inter by Rasmus Andersson,
 SIL Open Font License, `fonts/Inter-OFL.txt`.
+
+Icon glyphs come from Font Awesome Free, `fonts/fa-solid-900.ttf`
+(`fonts/FontAwesome-LICENSE.txt`), addressed through the codepoint macros in
+`third_party/IconFontCppHeaders/IconsFontAwesome6.h` (zlib license).
 
 # Adding Modules and Files
 This engine is aiming for modularity, therefore each part of the engine is its own static library. To make things easier VSCode tasks have been added.
