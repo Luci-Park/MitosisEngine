@@ -7,3 +7,7 @@
 
 # IDE
 /.idea
+
+# local docs
+docs/notes/*
+docs/decisions/*
