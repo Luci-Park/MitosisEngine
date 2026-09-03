@@ -1,6 +1,6 @@
 /**
  * @file MeshRenderer.h
- * @author Sumin Park
+ * @author Rahul Nair
  * @brief Marks an entity as drawing a mesh.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation

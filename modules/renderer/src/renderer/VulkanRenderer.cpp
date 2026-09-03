@@ -14,6 +14,9 @@
 
 #include <vk_mem_alloc.h>
 
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -374,6 +377,58 @@ namespace mts
 
         return true;
     }
+
+    namespace
+    {
+        void CheckImGuiVulkanResult(VkResult result)
+        {
+            if (result != VK_SUCCESS)
+                MTS_LOG_ERROR("ImGui Vulkan backend call failed: {}", static_cast<int>(result));
+        }
+    }
+
+    bool VulkanRenderer::InitImGuiVulkanBackend()
+    {
+        VkPipelineRenderingCreateInfo renderingInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &mSwapchainFormat,
+            .depthAttachmentFormat = kDepthFormat};
+
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.ApiVersion = VulkanVersion;
+        initInfo.Instance = mVulkanInstance;
+        initInfo.PhysicalDevice = mPhysicalDevice;
+        initInfo.Device = mDevice;
+        initInfo.QueueFamily = mGfxQueueFamIdx;
+        initInfo.Queue = mGfxQueue;
+        initInfo.DescriptorPoolSize = 64;
+        initInfo.MinImageCount = static_cast<uint32_t>(mSwapchainImages.size());
+        initInfo.ImageCount = static_cast<uint32_t>(mSwapchainImages.size());
+        initInfo.UseDynamicRendering = true;
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = renderingInfo;
+        initInfo.CheckVkResultFn = &CheckImGuiVulkanResult;
+
+        if (!ImGui_ImplVulkan_Init(&initInfo))
+        {
+            MTS_LOG_ERROR("ImGui_ImplVulkan_Init failed");
+            return false;
+        }
+
+        mImGuiBackendInitialized = true;
+        return true;
+    }
+
+    void VulkanRenderer::ShutdownImGuiVulkanBackend()
+    {
+        if (!mImGuiBackendInitialized)
+            return;
+
+        vkDeviceWaitIdle(mDevice);
+        ImGui_ImplVulkan_Shutdown();
+        mImGuiBackendInitialized = false;
+    }
+
     void VulkanRenderer::Shutdown()
     {
         if (mDevice != VK_NULL_HANDLE)
@@ -1426,6 +1481,9 @@ namespace mts
 
             vkCmdDrawIndexed(cmd, mesh->mIndexCount, 1, 0, 0, 0);
         }
+
+        if (mImguiDrawData != nullptr)
+            ImGui_ImplVulkan_RenderDrawData(mImguiDrawData, cmd);
 
         if (mValidationEnabled)
             vkCmdEndDebugUtilsLabelEXT(cmd);

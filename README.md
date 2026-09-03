@@ -42,10 +42,16 @@ cmake/                build helpers
   Assets.cmake          asset cooking
   VcpkgToolchain.cmake  resolves vcpkg from VCPKG_ROOT
 
+third_party/          vendored (not vcpkg) - see Dependencies below
+  imgui/                submodule, docking branch, pinned tag
+  imgui_config/         repo-owned imconfig.h override (IMGUI_USER_CONFIG)
+  IconFontCppHeaders/   icon codepoint header for Font Awesome
+
 modules/              one static library each, mts::<name>
   core/                 ECS, logging, paths, surface contract
   window/               GLFW window behind an interface
   renderer/             Vulkan 1.3 renderer
+  editortheme/          the Slate ImGui theme
   assets/               cooked asset blobs, manifest, cache
   app/                  composition root and main loop
     include/<name>/       public API - the whole surface of the module
@@ -61,6 +67,7 @@ games/                one directory per game - planned, none exist yet
 tools/                AssetCooker, new_module.ps1, new_file.ps1
 templates/            what the scaffolding scripts stamp out
 assets/               source assets, cooked into the build tree
+fonts/                editor UI fonts, copied to fonts/ next to the exe
 docs/                 setup, architecture, conventions, module docs
 builds/               build trees, gitignored
 logs/                 engine.log, gitignored
@@ -82,6 +89,18 @@ per machine and set `VCPKG_ROOT`. Prerequisites, setup and troubleshooting:
 First configure builds all dependencies and takes a few minutes. Downloads and
 prebuilt packages are cached in `%LOCALAPPDATA%\vcpkg` and shared with every other
 vcpkg project on the machine, so later configures are fast.
+
+One dependency is vendored instead: Dear ImGui, as a `third_party/imgui` git
+submodule, MIT-licensed, `LICENSE.txt` ships inside the submodule. Clone with
+`git clone --recurse-submodules`, or after the fact:
+`git submodule update --init --recursive`.
+
+The editor UI font, `fonts/Inter.ttf`, is Inter by Rasmus Andersson,
+SIL Open Font License, `fonts/Inter-OFL.txt`.
+
+Icon glyphs come from Font Awesome Free, `fonts/fa-solid-900.ttf`
+(`fonts/FontAwesome-LICENSE.txt`), addressed through the codepoint macros in
+`third_party/IconFontCppHeaders/IconsFontAwesome6.h` (zlib license).
 
 # Adding Modules and Files
 This engine is aiming for modularity, therefore each part of the engine is its own static library. To make things easier VSCode tasks have been added.

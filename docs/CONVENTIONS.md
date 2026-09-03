@@ -86,6 +86,8 @@ The rename is applied but not committed.
 Everything through `vcpkg.json`; nothing vendored or fetched at build time. Link
 `PRIVATE` unless a type appears in a public header, and say why in a comment.
 
+The one exception is `third_party/imgui`, a git submodule.
+
 ## Tests
 
 Catch2 v3 through `engine_add_module_tests`, one `TEST_CASE` per behaviour,
