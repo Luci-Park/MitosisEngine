@@ -1,6 +1,6 @@
 /**
  * @file Mesh.h
- * @author Sumin Park
+ * @author Rahul Nair
  * @brief Vertex layout and the handle that names an uploaded mesh.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation

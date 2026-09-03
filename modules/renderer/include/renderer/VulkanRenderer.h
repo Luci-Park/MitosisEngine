@@ -25,6 +25,8 @@
 VK_DEFINE_HANDLE(VmaAllocator)
 VK_DEFINE_HANDLE(VmaAllocation)
 
+struct ImDrawData;
+
 namespace mts
 {
     struct RendererDesc
@@ -57,6 +59,14 @@ namespace mts
     public:
         VulkanRenderer() = default;
         bool Initialize(const RendererDesc &desc);
+
+        bool InitImGuiVulkanBackend();
+        void ShutdownImGuiVulkanBackend();
+
+        /// RenderSystem drives DrawFrame from SystemPhase::Render and has no
+        /// reason to know ImGui exists, so App feeds this frame's draw data in
+        /// separately, before the scheduler update that reaches DrawFrame.
+        void SetImGuiDrawData(ImDrawData *drawData) { mImguiDrawData = drawData; }
 
         // Uploads geometry and returns a handle to it.
         // Use on load time
@@ -184,5 +194,8 @@ namespace mts
         uint32_t mFrameIndex = 0;
         bool mNeedRecreate = false;
         bool mValidationEnabled = false;
+
+        bool mImGuiBackendInitialized = false;
+        ImDrawData *mImguiDrawData = nullptr;
     };
 }

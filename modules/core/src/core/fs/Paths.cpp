@@ -49,6 +49,11 @@ namespace mts
         return ExecutableDir() / "shaders" / name;
     }
 
+    std::filesystem::path FontPath(std::string_view name)
+    {
+        return ExecutableDir() / "fonts" / name;
+    }
+
     std::filesystem::path CookedAssetsDir()
     {
         return ExecutableDir() / "cooked";

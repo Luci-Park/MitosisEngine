@@ -1,6 +1,6 @@
 /**
  * @file Camera.h
- * @author Sumin Park
+ * @author Rahul Nair
  * @brief Marks an entity as the viewpoint RenderSystem projects from.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation

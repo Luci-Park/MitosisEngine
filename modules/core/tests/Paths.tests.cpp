@@ -22,6 +22,12 @@ TEST_CASE("ShaderPath appends shaders/<name> under the executable directory", "[
     REQUIRE(path == mts::ExecutableDir() / "shaders" / "triangle.spv");
 }
 
+TEST_CASE("FontPath appends fonts/<name> under the executable directory", "[paths]")
+{
+    const auto path = mts::FontPath("Inter.ttf");
+    REQUIRE(path == mts::ExecutableDir() / "fonts" / "Inter.ttf");
+}
+
 TEST_CASE("CookedAssetsDir points at cooked/ under the executable directory", "[paths]")
 {
     const auto path = mts::CookedAssetsDir();

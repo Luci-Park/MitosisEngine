@@ -90,6 +90,14 @@ namespace mts
         return glfwWindowShouldClose(mHandle) == GLFW_TRUE;
     }
 
+    float GLFWWindow::ContentScale() const
+    {
+        float xscale = 1.0f;
+        float yscale = 1.0f;
+        glfwGetWindowContentScale(mHandle, &xscale, &yscale);
+        return xscale;
+    }
+
     void GLFWWindow::OnFramebufferSize(GLFWwindow *handle, int width, int height)
     {
         auto *self = static_cast<GLFWWindow *>(glfwGetWindowUserPointer(handle));

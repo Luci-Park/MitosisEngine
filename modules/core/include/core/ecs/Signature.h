@@ -21,8 +21,7 @@ namespace mts
      * components together.
      *
      * 256 rather than 128 because component types are no longer a closed set
-     * the author can count: a script may declare one
-     * ([0023](../../../../../docs/decisions/0023-runtime-component-types.md)).
+     * the author can count: a script may declare one.
      * The budget is charged per *distinct name* for the life of the process,
      * not per registration, so reloading a script costs nothing - see
      * ComponentRegistry::SeqForHash.

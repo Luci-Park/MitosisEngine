@@ -34,6 +34,11 @@ namespace mts
         virtual void PollEvents() = 0;
         virtual bool ShouldClose() const = 0;
 
+        virtual void *NativeHandleForImGui() const { return nullptr; }
+
+        /// 1.0 at 96 DPI, scaling up with the monitor's content scale.
+        virtual float ContentScale() const { return 1.0f; }
+
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 
     protected:

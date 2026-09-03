@@ -5,8 +5,15 @@
 #include <core/ecs/TransformHierarchy.h>
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
+#include <editortheme/EditorTheme.h>
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
+
+#include <IconsFontAwesome6.h>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <chrono>
@@ -43,6 +50,70 @@ namespace mts
             return false;
         }
 
+        ImGui::CreateContext();
+
+        ImGuiIO &io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        mImGuiIniPath = (ExecutableDir() / "imgui.ini").string();
+        io.IniFilename = mImGuiIniPath.c_str();
+
+        ImFontConfig fontConfig;
+        fontConfig.OversampleH = 3;
+        const std::string fontPath = FontPath("Inter.ttf").string();
+        if (io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 16.0f, &fontConfig) == nullptr)
+        {
+            MTS_LOG_ERROR("Failed to load font: {}", fontPath);
+            io.Fonts->AddFontDefault();
+        }
+
+        static const ImWchar iconRanges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
+        ImFontConfig iconConfig;
+        iconConfig.MergeMode = true;
+        iconConfig.PixelSnapH = true;
+        iconConfig.GlyphMinAdvanceX = 16.0f;
+        const std::string iconFontPath = FontPath(FONT_ICON_FILE_NAME_FAS).string();
+        if (io.Fonts->AddFontFromFileTTF(iconFontPath.c_str(), 16.0f, &iconConfig, iconRanges) == nullptr)
+            MTS_LOG_ERROR("Failed to load icon font: {}", iconFontPath);
+
+        EditorTheme::Apply();
+        EditorTheme::ScaleForDpi(mWindow->ContentScale());
+
+        void *nativeHandle = mWindow->NativeHandleForImGui();
+        if (nativeHandle == nullptr)
+        {
+            MTS_LOG_ERROR("Window backend has no native handle for ImGui");
+            ImGui::DestroyContext();
+            mRenderer.Shutdown();
+            mWindow.reset();
+            return false;
+        }
+
+        if (!ImGui_ImplGlfw_InitForVulkan(static_cast<GLFWwindow *>(nativeHandle), true))
+        {
+            MTS_LOG_ERROR("ImGui_ImplGlfw_InitForVulkan failed");
+            ImGui::DestroyContext();
+            mRenderer.Shutdown();
+            mWindow.reset();
+            return false;
+        }
+
+        if (!mRenderer.InitImGuiVulkanBackend())
+        {
+            MTS_LOG_ERROR("ImGui Vulkan backend initialization failed");
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            mRenderer.Shutdown();
+            mWindow.reset();
+            return false;
+        }
+
+        mImGuiInitialized = true;
+        // Nothing past this point can fail, so this is where Initialize is
+        // committed - Shutdown's cleanup, including ImGui teardown, is gated
+        // on this flag alone.
+        mInitialized = true;
+
         // Destruction needs no system: InstallHierarchy puts the scene graph
         // in place and arms the destroy hook, so World::DestroyEntity cascades
         // and nothing is ever left orphaned for a pass to reap. Called here so
@@ -69,7 +140,6 @@ namespace mts
         // already current for this frame - see RenderSystem's own comment.
         mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
 
-        mInitialized = true;
         return true;
     }
 
@@ -101,6 +171,52 @@ namespace mts
         return SystemContext{mWorld, mCommands, dt, mElapsed, mFrame};
     }
 
+    void App::DrawEditorUI()
+    {
+        const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(
+            0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+
+        ImGuiDockNode *dockspaceNode = ImGui::DockBuilderGetNode(dockspaceId);
+        if (dockspaceNode != nullptr && dockspaceNode->IsEmpty())
+        {
+            ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
+
+            ImGuiID center = dockspaceId;
+            const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.2f, nullptr, &center);
+            const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
+            const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.25f, nullptr, &center);
+
+            ImGui::DockBuilderDockWindow("Scene", left);
+            ImGui::DockBuilderDockWindow("Inspector", right);
+            ImGui::DockBuilderDockWindow("Output", bottom);
+
+            ImGui::DockBuilderFinish(dockspaceId);
+        }
+
+        for (const char *name : {"Scene", "Inspector", "Output"})
+        {
+            ImGui::Begin(name);
+            ImGui::End();
+        }
+
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("Debug"))
+            {
+                ImGui::MenuItem("Style Editor", nullptr, &mShowStyleEditor);
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if (mShowStyleEditor)
+        {
+            if (ImGui::Begin("Style Editor", &mShowStyleEditor))
+                ImGui::ShowStyleEditor();
+            ImGui::End();
+        }
+    }
+
     void App::Run()
     {
         if (!mInitialized)
@@ -122,6 +238,29 @@ namespace mts
                                       mDesc.mMaxDeltaSeconds);
             previous = now;
             mElapsed += dt;
+
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            // NewFrame/Render must run every iteration regardless (ImGui's frame
+            // state requires the pair), but building window content for a frame
+            // DrawFrame is about to discard wastes the CPU work, not the pairing.
+            if (mWindow->Width() != 0 && mWindow->Height() != 0)
+            {
+                if (mDesc.mEnableEditorLayout)
+                    DrawEditorUI();
+
+                if (mDesc.mShowImGuiDemo)
+                    ImGui::ShowDemoWindow();
+            }
+
+            ImGui::Render();
+
+            // RenderSystem calls VulkanRenderer::DrawFrame from inside
+            // Update (SystemPhase::Render), so this frame's draw data has to
+            // be handed to the renderer before Update runs, not after.
+            mRenderer.SetImGuiDrawData(ImGui::GetDrawData());
 
             SystemContext context = MakeContext(dt);
             mScheduler.Update(context);
@@ -153,6 +292,17 @@ namespace mts
         mAssetCache.reset();
         mAssetManifest.reset();
         mAssetLoadFailed = false;
+
+        if (mImGuiInitialized)
+        {
+            // Reverse of Initialize: Vulkan backend needs mDevice still alive,
+            // so it goes before mRenderer.Shutdown(); the GLFW backend needs
+            // mWindow still alive, so it goes before mWindow.reset().
+            mRenderer.ShutdownImGuiVulkanBackend();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            mImGuiInitialized = false;
+        }
 
         mRenderer.Shutdown();
         // Renderer holds the surface built from the window: window dies last.
