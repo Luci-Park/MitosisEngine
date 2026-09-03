@@ -892,9 +892,6 @@ namespace mts
         if (!CreateRenderCompleteSemaphores())
             return false;
 
-        if (mImGuiBackendInitialized)
-            ImGui_ImplVulkan_SetMinImageCount(static_cast<uint32_t>(mSwapchainImages.size()));
-
         mNeedRecreate = false;
         return true;
     }

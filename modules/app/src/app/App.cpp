@@ -75,9 +75,19 @@ namespace mts
             MTS_LOG_ERROR("Failed to load icon font: {}", iconFontPath);
 
         EditorTheme::Apply();
+        EditorTheme::ScaleForDpi(mWindow->ContentScale());
 
-        if (!ImGui_ImplGlfw_InitForVulkan(
-                static_cast<GLFWwindow *>(mWindow->NativeHandleForImGui()), true))
+        void *nativeHandle = mWindow->NativeHandleForImGui();
+        if (nativeHandle == nullptr)
+        {
+            MTS_LOG_ERROR("Window backend has no native handle for ImGui");
+            ImGui::DestroyContext();
+            mRenderer.Shutdown();
+            mWindow.reset();
+            return false;
+        }
+
+        if (!ImGui_ImplGlfw_InitForVulkan(static_cast<GLFWwindow *>(nativeHandle), true))
         {
             MTS_LOG_ERROR("ImGui_ImplGlfw_InitForVulkan failed");
             ImGui::DestroyContext();
@@ -97,6 +107,10 @@ namespace mts
         }
 
         mImGuiInitialized = true;
+        // Nothing past this point can fail, so this is where Initialize is
+        // committed - Shutdown's cleanup, including ImGui teardown, is gated
+        // on this flag alone.
+        mInitialized = true;
 
         // Destruction needs no system: InstallHierarchy puts the scene graph
         // in place and arms the destroy hook, so World::DestroyEntity cascades
@@ -119,7 +133,6 @@ namespace mts
         // should be before any other system in PostUpdate
         mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);
 
-        mInitialized = true;
         return true;
     }
 
@@ -162,6 +175,52 @@ namespace mts
                             { mDrawInstances.push_back(world.Matrix()); });
     }
 
+    void App::DrawEditorUI()
+    {
+        const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(
+            0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+
+        ImGuiDockNode *dockspaceNode = ImGui::DockBuilderGetNode(dockspaceId);
+        if (dockspaceNode != nullptr && dockspaceNode->IsEmpty())
+        {
+            ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
+
+            ImGuiID center = dockspaceId;
+            const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.2f, nullptr, &center);
+            const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
+            const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.25f, nullptr, &center);
+
+            ImGui::DockBuilderDockWindow("Scene", left);
+            ImGui::DockBuilderDockWindow("Inspector", right);
+            ImGui::DockBuilderDockWindow("Output", bottom);
+
+            ImGui::DockBuilderFinish(dockspaceId);
+        }
+
+        for (const char *name : {"Scene", "Inspector", "Output"})
+        {
+            ImGui::Begin(name);
+            ImGui::End();
+        }
+
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("Debug"))
+            {
+                ImGui::MenuItem("Style Editor", nullptr, &mShowStyleEditor);
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if (mShowStyleEditor)
+        {
+            if (ImGui::Begin("Style Editor", &mShowStyleEditor))
+                ImGui::ShowStyleEditor();
+            ImGui::End();
+        }
+    }
+
     void App::Run()
     {
         if (!mInitialized)
@@ -191,53 +250,16 @@ namespace mts
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(
-                0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
-
-            ImGuiDockNode *dockspaceNode = ImGui::DockBuilderGetNode(dockspaceId);
-            if (dockspaceNode != nullptr && dockspaceNode->IsEmpty())
+            // NewFrame/Render must run every iteration regardless (ImGui's frame
+            // state requires the pair), but building window content for a frame
+            // DrawFrame is about to discard wastes the CPU work, not the pairing.
+            if (mWindow->Width() != 0 && mWindow->Height() != 0)
             {
-                ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
+                if (mDesc.mEnableEditorLayout)
+                    DrawEditorUI();
 
-                ImGuiID center = dockspaceId;
-                const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.2f, nullptr, &center);
-                const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &center);
-                const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.25f, nullptr, &center);
-
-                ImGui::DockBuilderDockWindow("Scene", left);
-                ImGui::DockBuilderDockWindow("Inspector", right);
-                ImGui::DockBuilderDockWindow("Output", bottom);
-
-                ImGui::DockBuilderFinish(dockspaceId);
-            }
-
-            ImGui::Begin("Scene");
-            ImGui::End();
-
-            ImGui::Begin("Inspector");
-            ImGui::End();
-
-            ImGui::Begin("Output");
-            ImGui::End();
-
-            if (mDesc.mShowImGuiDemo)
-                ImGui::ShowDemoWindow();
-
-            if (ImGui::BeginMainMenuBar())
-            {
-                if (ImGui::BeginMenu("Debug"))
-                {
-                    ImGui::MenuItem("Style Editor", nullptr, &mShowStyleEditor);
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMainMenuBar();
-            }
-
-            if (mShowStyleEditor)
-            {
-                if (ImGui::Begin("Style Editor", &mShowStyleEditor))
-                    ImGui::ShowStyleEditor();
-                ImGui::End();
+                if (mDesc.mShowImGuiDemo)
+                    ImGui::ShowDemoWindow();
             }
 
             ImGui::Render();

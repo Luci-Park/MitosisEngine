@@ -6,7 +6,7 @@ through presets and VSCode tasks.
 
 Each game is its own directory under `games/`, defined by configs, assets and Lua
 scripts rather than by C++ - one shared runtime loads them, so making a game needs
-no rebuild ([decision 0018](docs/decisions/0018-game-definition.md)).
+no rebuild.
 
 # Document Structure
 

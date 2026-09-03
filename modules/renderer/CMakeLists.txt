@@ -9,6 +9,9 @@ find_package(glm CONFIG REQUIRED)
 target_link_libraries(engine_renderer
     PUBLIC volk::volk_headers
             mts::core
+            # glm is PUBLIC: VulkanRenderer::DrawFrame takes glm::mat4 in the
+            # public header. mts::core already carries glm publicly, but this
+            # target's own interface needs it, so it is declared here too.
             glm::glm
     PRIVATE GPUOpen::VulkanMemoryAllocator
             imgui::imgui
@@ -21,13 +24,7 @@ find_file(VOLK_SOURCE volk.c PATHS ${_volk_includes} NO_DEFAULT_PATH REQUIRED)
 target_sources(engine_renderer PRIVATE ${VOLK_SOURCE})
 
 # for volk macro definition
-if(ENGINE_PLATFORM STREQUAL "Windows")
-    target_compile_definitions(engine_renderer PRIVATE VK_USE_PLATFORM_WIN32_KHR)
-elseif(ENGINE_PLATFORM STREQUAL "Linux")
-    target_compile_definitions(engine_renderer PRIVATE
-        VK_USE_PLATFORM_XLIB_KHR
-        VK_USE_PLATFORM_WAYLAND_KHR)
-endif()
+engine_target_vulkan_platform_defines(engine_renderer)
 
 # makes VMA compatible with volk
 target_compile_definitions(engine_renderer PRIVATE

@@ -5,6 +5,12 @@ function(engine_copy_fonts target)
         message(FATAL_ERROR "engine_copy_fonts: SOURCE_DIR is required")
     endif()
 
+    if(ARG_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR
+            "engine_copy_fonts: unrecognised arguments (keywords are "
+            "case-sensitive): ${ARG_UNPARSED_ARGUMENTS}")
+    endif()
+
     get_filename_component(source_abs "${ARG_SOURCE_DIR}" ABSOLUTE)
 
     add_custom_command(TARGET ${target} POST_BUILD

@@ -28,6 +28,7 @@ namespace mts
 
         NativeWindowHandle NativeWindow() const override;
         void *NativeHandleForImGui() const override { return mHandle; }
+        float ContentScale() const override;
 
     private:
         static void OnFramebufferSize(GLFWwindow *handle, int width, int height);

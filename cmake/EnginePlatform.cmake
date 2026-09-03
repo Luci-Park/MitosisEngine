@@ -30,3 +30,17 @@ else()
 endif()
 
 message(STATUS "Engine platform: ${ENGINE_PLATFORM}")
+
+# engine_target_vulkan_platform_defines(<target>)
+#
+# VK_USE_PLATFORM_* PRIVATE compile definitions for anything touching
+# platform-specific Vulkan surface types (volk, the ImGui Vulkan backend).
+function(engine_target_vulkan_platform_defines target)
+    if(ENGINE_PLATFORM STREQUAL "Windows")
+        target_compile_definitions(${target} PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+    elseif(ENGINE_PLATFORM STREQUAL "Linux")
+        target_compile_definitions(${target} PRIVATE
+            VK_USE_PLATFORM_XLIB_KHR
+            VK_USE_PLATFORM_WAYLAND_KHR)
+    endif()
+endfunction()

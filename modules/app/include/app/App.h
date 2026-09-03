@@ -36,7 +36,12 @@ namespace mts
         const char *mAppName = "MitosisEngine";
         bool mEnableValidation = true;
 
+#ifdef NDEBUG
+        bool mShowImGuiDemo = false;
+#else
         bool mShowImGuiDemo = true;
+#endif
+        bool mEnableEditorLayout = true;
 
         float mMaxDeltaSeconds = 0.25f;
     };
@@ -78,14 +83,19 @@ namespace mts
         /// Refills mDrawInstances from the world :
         void CollectDrawInstances();
 
+        /// Dockspace, the default Scene/Inspector/Output split, and the
+        /// Debug menu - the Slate editor shell, not a generic App concern.
+        /// Gated separately from the ImGui context itself by mEnableEditorLayout
+        /// so a non-editor consumer of App can keep ImGui without this layout.
+        void DrawEditorUI();
+
         std::unique_ptr<Window> mWindow;
         VulkanRenderer mRenderer;
 
         // Before mWorld, so it is destroyed after it. mWorld holds a
         // FrameCommands resource pointing here, and reverse-order destruction
         // would otherwise leave that pointer dangling for the whole of ~World -
-        // which tears down resources and could reach a destroy hook. See
-        // decision 0019 on releasing handles before the world goes down.
+        // which tears down resources and could reach a destroy hook.
         CommandBuffer mCommands;
 
         World mWorld;

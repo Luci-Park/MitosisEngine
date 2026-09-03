@@ -1,6 +1,6 @@
 # Dear ImGui, vendored as a submodule pinned to a tagged release on the
-# docking branch (docs/decisions/0022-imgui-vendored-submodule.md - this is a
-# deliberate exception to 0001, everything else comes through vcpkg.json).
+# docking branch - a deliberate exception, everything else comes through
+# vcpkg.json.
 #
 # Never edit files under imgui/ directly - imconfig overrides live in
 # imgui_config/ImGuiConfig.h instead, wired through IMGUI_USER_CONFIG.
@@ -42,13 +42,7 @@ find_package(volk CONFIG REQUIRED)
 target_link_libraries(imgui PUBLIC volk::volk_headers)
 target_compile_definitions(imgui PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK)
 
-if(ENGINE_PLATFORM STREQUAL "Windows")
-    target_compile_definitions(imgui PRIVATE VK_USE_PLATFORM_WIN32_KHR)
-elseif(ENGINE_PLATFORM STREQUAL "Linux")
-    target_compile_definitions(imgui PRIVATE
-        VK_USE_PLATFORM_XLIB_KHR
-        VK_USE_PLATFORM_WAYLAND_KHR)
-endif()
+engine_target_vulkan_platform_defines(imgui)
 
 add_library(iconfontcppheaders INTERFACE)
 add_library(iconfontcppheaders::iconfontcppheaders ALIAS iconfontcppheaders)
