@@ -42,6 +42,12 @@ namespace
         mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
         world.AddComponent<mts::MeshRenderer>(cubeEntity, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f)});
 
+        const mts::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mts::MaterialDesc{.shaderName = "unlit"});
+
+        const mts::Entity unlitCube = world.CreateEntity();
+        mts::AddTransform(world, unlitCube, mts::Transform{glm::vec3(1.8f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.5f)});
+        world.AddComponent<mts::MeshRenderer>(unlitCube, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f), unlitMaterial});
+
         const mts::Entity camera = world.CreateEntity();
         mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
         world.AddComponent<mts::Camera>(camera, mts::Camera{});

@@ -17,6 +17,8 @@
 #include <renderer/components/Camera.h>
 #include <renderer/components/MeshRenderer.h>
 
+#include <glm/gtc/matrix_inverse.hpp>
+
 #include <vector>
 
 namespace mts
@@ -56,7 +58,9 @@ namespace mts
             if (haveCamera)
             {
                 mMeshQuery->ForEach([this, &viewProj](Entity, const WorldTransform &world, const MeshRenderer &renderer)
-                                    { mDrawItems.push_back(DrawItem{renderer.mesh, viewProj * world.Matrix(), renderer.tint}); });
+                                    {
+                    const glm::mat3 normalMatrix = glm::inverseTranspose(glm::mat3(world.Matrix()));
+                    mDrawItems.push_back(DrawItem{renderer.mesh, viewProj * world.Matrix(), normalMatrix, renderer.tint, renderer.material}); });
             }
             else if (!mWarnedNoCamera)
             {

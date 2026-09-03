@@ -18,6 +18,7 @@ namespace mts
     {
         glm::vec3 pos;
         glm::vec3 color;
+        glm::vec3 normal;
     };
 
     struct MeshHandle

@@ -47,6 +47,10 @@ engine_add_shaders(HelloWorld
     SOURCE assets/shaders/triangle.slang
     ENTRIES vertexMain:vertex fragmentMain:fragment)
 
+engine_add_shaders(HelloWorld
+    SOURCE assets/shaders/unlit.slang
+    ENTRIES vertexMain:vertex fragmentMain:fragment)
+
 engine_cook_assets(HelloWorld
     SOURCE_ROOTS assets/
     OUT_DIR ${CMAKE_BINARY_DIR}/cooked_assets)
