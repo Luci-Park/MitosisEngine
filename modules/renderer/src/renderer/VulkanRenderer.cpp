@@ -20,7 +20,6 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
-#include <cmath>
 #include <fstream>
 #include <optional>
 #include <array>
@@ -1349,18 +1348,13 @@ namespace mts
                      VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
                      VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
-        // just a little test
-        static uint64_t frameCounter = 0;
-        const float t = static_cast<float>(frameCounter++) * 0.01f;
-        const float pulse = 0.5f + 0.5f * std::sin(t);
-
         const VkRenderingAttachmentInfo colorAttachment{
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = mSwapchainViews[imageIndex],
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .clearValue{.color{{0.0f, pulse, pulse * 0.5f, 1.0f}}}};
+            .clearValue{.color{{mClearColor.r, mClearColor.g, mClearColor.b, mClearColor.a}}}};
 
         const VkRenderingAttachmentInfo depthAttachment{
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,

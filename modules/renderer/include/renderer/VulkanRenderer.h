@@ -65,6 +65,8 @@ namespace mts
 
         void DrawFrame(std::span<const DrawItem> items);
 
+        void SetClearColor(const glm::vec4 &color) { mClearColor = color; }
+
         void Shutdown();
 
     private:
@@ -97,6 +99,9 @@ namespace mts
 
         // 32-bit float depth, no stencil.
         constexpr static VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
+
+        // Default: dark gray. Overridden via SetClearColor.
+        glm::vec4 mClearColor{0.02f, 0.02f, 0.02f, 1.0f};
 
         const ISurfaceProvider *mWindow;
         VkInstance mVulkanInstance = VK_NULL_HANDLE;
