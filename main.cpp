@@ -2,6 +2,7 @@
 #include <core/ecs/TransformHierarchy.h>
 #include <core/log/Log.h>
 #include <renderer/Shapes.h>
+#include <renderer/components/Camera.h>
 #include <renderer/components/MeshRenderer.h>
 
 #include <glm/gtc/quaternion.hpp>
@@ -50,6 +51,14 @@ namespace
                           mts::Transform{glm::vec3(1.2f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.5f)},
                           parent);
         world.AddComponent<mts::MeshRenderer>(child, mts::MeshRenderer{quadMesh, glm::vec4(0.4f, 0.6f, 1.0f, 1.0f)});
+
+        const mts::Entity nearer = world.CreateEntity();
+        mts::AddTransform(world, nearer, mts::Transform{glm::vec3(0.15f, 0.0f, 1.5f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.6f)});
+        world.AddComponent<mts::MeshRenderer>(nearer, mts::MeshRenderer{quadMesh, glm::vec4(1.0f, 1.0f, 0.2f, 1.0f)});
+
+        const mts::Entity camera = world.CreateEntity();
+        mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
+        world.AddComponent<mts::Camera>(camera, mts::Camera{});
 
         app.Systems().Add<SpinSystem>(mts::SystemPhase::Update, parent, 1.0f);
     }

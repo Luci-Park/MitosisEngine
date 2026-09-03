@@ -240,7 +240,7 @@ namespace mts
                                        caps.maxImageExtent.height);
             return extent;
         }
-        void ImageBarrier(VkCommandBuffer cmd, VkImage image,
+        void ImageBarrier(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags aspectMask,
                           VkImageLayout oldLayout, VkImageLayout newLayout,
                           VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
                           VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
@@ -257,7 +257,7 @@ namespace mts
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = image,
                 .subresourceRange{
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .aspectMask = aspectMask,
                     .levelCount = 1,
                     .layerCount = 1}};
 
@@ -788,7 +788,7 @@ namespace mts
                      extent.width, extent.height, actualCount, imageCount,
                      presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? "MAILBOX" : "FIFO");
 
-        return CreateImageViews();
+        return CreateImageViews() && CreateDepthResources();
     }
     bool VulkanRenderer::CreateImageViews()
     {
@@ -817,9 +817,88 @@ namespace mts
 
         return true;
     }
+    bool VulkanRenderer::CreateDepthResources()
+    {
+        VkFormatProperties formatProps{};
+        vkGetPhysicalDeviceFormatProperties(mPhysicalDevice, kDepthFormat, &formatProps);
+        if ((formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0)
+        {
+            MTS_LOG_CRITICAL("VK_FORMAT_D32_SFLOAT unsupported as an optimal-tiling depth attachment");
+            return false;
+        }
+
+        for (uint32_t i = 0; i < kFramesInFlight; ++i)
+        {
+            const VkImageCreateInfo imageInfo{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format = kDepthFormat,
+                .extent{mSwapchainExtent.width, mSwapchainExtent.height, 1},
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .tiling = VK_IMAGE_TILING_OPTIMAL,
+                .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
+
+            const VmaAllocationCreateInfo allocInfo{.usage = VMA_MEMORY_USAGE_AUTO};
+
+            if (vmaCreateImage(mAllocator, &imageInfo, &allocInfo,
+                               &mDepthImages[i], &mDepthAllocations[i], nullptr) != VK_SUCCESS)
+            {
+                MTS_LOG_CRITICAL("vmaCreateImage failed for depth buffer {}", i);
+                return false;
+            }
+
+            const VkImageViewCreateInfo viewInfo{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = mDepthImages[i],
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = kDepthFormat,
+                .subresourceRange{
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1}};
+
+            if (vkCreateImageView(mDevice, &viewInfo, nullptr, &mDepthViews[i]) != VK_SUCCESS)
+            {
+                MTS_LOG_CRITICAL("vkCreateImageView failed for depth buffer {}", i);
+                return false;
+            }
+
+            NameObject(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<uint64_t>(mDepthImages[i]),
+                       std::format("Depth buffer {}", i).c_str());
+        }
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyDepthResources()
+    {
+        for (uint32_t i = 0; i < kFramesInFlight; ++i)
+        {
+            if (mDepthViews[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(mDevice, mDepthViews[i], nullptr);
+                mDepthViews[i] = VK_NULL_HANDLE;
+            }
+            if (mDepthImages[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyImage(mAllocator, mDepthImages[i], mDepthAllocations[i]);
+                mDepthImages[i] = VK_NULL_HANDLE;
+                mDepthAllocations[i] = VK_NULL_HANDLE;
+            }
+        }
+    }
+
     void VulkanRenderer::DestroySwapchain()
     {
-        // The views are ours. The images are not -- never destroy those.
+        // swapchain and depth go hand in hand
+        DestroyDepthResources();
+
         for (VkImageView view : mSwapchainViews)
         {
             if (view != VK_NULL_HANDLE)
@@ -906,7 +985,7 @@ namespace mts
             .depthClampEnable = VK_FALSE,
             .rasterizerDiscardEnable = VK_FALSE,
             .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_NONE,
+            .cullMode = VK_CULL_MODE_BACK_BIT,
             .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
             .depthBiasEnable = VK_FALSE,
             .lineWidth = 1.0f};
@@ -920,6 +999,14 @@ namespace mts
             .blendEnable = VK_FALSE,
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                               VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
+
+        const VkPipelineDepthStencilStateCreateInfo depthStencil{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = VK_TRUE,
+            .depthWriteEnable = VK_TRUE,
+            .depthCompareOp = VK_COMPARE_OP_LESS,
+            .depthBoundsTestEnable = VK_FALSE,
+            .stencilTestEnable = VK_FALSE};
 
         const VkPipelineColorBlendStateCreateInfo colorBlend{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
@@ -958,7 +1045,8 @@ namespace mts
         const VkPipelineRenderingCreateInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &mSwapchainFormat};
+            .pColorAttachmentFormats = &mSwapchainFormat,
+            .depthAttachmentFormat = kDepthFormat};
 
         const VkGraphicsPipelineCreateInfo pipelineInfo{
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -970,7 +1058,7 @@ namespace mts
             .pViewportState = &viewportState,
             .pRasterizationState = &rasterizer,
             .pMultisampleState = &multisample,
-            .pDepthStencilState = nullptr,
+            .pDepthStencilState = &depthStencil,
             .pColorBlendState = &colorBlend,
             .pDynamicState = &dynamicState,
             .layout = mPipelineLayout,
@@ -1247,12 +1335,19 @@ namespace mts
     void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const DrawItem> items)
     {
         // get image ready
-        ImageBarrier(cmd, mSwapchainImages[imageIndex],
+        ImageBarrier(cmd, mSwapchainImages[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_UNDEFINED,
                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+
+        ImageBarrier(cmd, mDepthImages[mFrameIndex], VK_IMAGE_ASPECT_DEPTH_BIT,
+                     VK_IMAGE_LAYOUT_UNDEFINED,
+                     VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                     VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0,
+                     VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         // just a little test
         static uint64_t frameCounter = 0;
@@ -1267,13 +1362,22 @@ namespace mts
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue{.color{{0.0f, pulse, pulse * 0.5f, 1.0f}}}};
 
+        const VkRenderingAttachmentInfo depthAttachment{
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = mDepthViews[mFrameIndex],
+            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .clearValue{.depthStencil{.depth = 1.0f}}};
+
         const VkRenderingInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
             // The stored extent, never the window: re-deriving it invites drift.
             .renderArea{.offset{0, 0}, .extent = mSwapchainExtent},
             .layerCount = 1,
             .colorAttachmentCount = 1,
-            .pColorAttachments = &colorAttachment};
+            .pColorAttachments = &colorAttachment,
+            .pDepthAttachment = &depthAttachment};
 
         vkCmdBeginRendering(cmd, &renderingInfo);
 
@@ -1335,7 +1439,7 @@ namespace mts
         vkCmdEndRendering(cmd);
 
         // give it back
-        ImageBarrier(cmd, mSwapchainImages[imageIndex],
+        ImageBarrier(cmd, mSwapchainImages[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,

@@ -33,12 +33,14 @@ namespace mts
     };
 
     /// One draw call's worth of data, built by RenderSystem from a
-    /// WorldTransform + MeshRenderer pair. Plain data crossing the ECS/renderer
-    /// boundary - the renderer never sees a World or an Entity.
+    /// WorldTransform + MeshRenderer pair.
     struct DrawItem
     {
         MeshHandle mesh;
+
+        /// model * view projection
         glm::mat4 model{1.0f};
+
         glm::vec4 tint{1.0f, 1.0f, 1.0f, 1.0f};
     };
 
@@ -52,6 +54,14 @@ namespace mts
         // Use on load time
         MeshHandle CreateMesh(std::span<const Vertex> vertices,
                               std::span<const uint32_t> indices);
+
+        /// Width/height of the current swapchain
+        float AspectRatio() const
+        {
+            return mSwapchainExtent.height == 0
+                       ? 1.0f
+                       : static_cast<float>(mSwapchainExtent.width) / static_cast<float>(mSwapchainExtent.height);
+        }
 
         void DrawFrame(std::span<const DrawItem> items);
 
@@ -68,6 +78,8 @@ namespace mts
         bool CreateAllocator();
         bool CreateSwapchain();
         bool CreateImageViews();
+        bool CreateDepthResources();
+        void DestroyDepthResources();
         void DestroySwapchain();
         bool RecreateSwapchain();
         bool CreateFrameResources();
@@ -82,6 +94,9 @@ namespace mts
     private:
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
         constexpr static uint32_t kFramesInFlight = 2;
+
+        // 32-bit float depth, no stencil.
+        constexpr static VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
 
         const ISurfaceProvider *mWindow;
         VkInstance mVulkanInstance = VK_NULL_HANDLE;
@@ -98,6 +113,10 @@ namespace mts
         VkExtent2D mSwapchainExtent{};
         std::vector<VkImage> mSwapchainImages;
         std::vector<VkImageView> mSwapchainViews;
+
+        VkImage mDepthImages[kFramesInFlight]{};
+        VmaAllocation mDepthAllocations[kFramesInFlight]{};
+        VkImageView mDepthViews[kFramesInFlight]{};
 
         // queue for render + present
         uint32_t mGfxQueueFamIdx = UINT32_MAX;

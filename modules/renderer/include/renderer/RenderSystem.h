@@ -7,27 +7,20 @@
  *
  */
 #pragma once
+#include "renderer/CameraMath.h"
 #include "renderer/VulkanRenderer.h"
 
 #include <core/ecs/Query.h>
 #include <core/ecs/System.h>
 #include <core/ecs/components/WorldTransform.h>
+#include <core/log/Log.h>
+#include <renderer/components/Camera.h>
 #include <renderer/components/MeshRenderer.h>
 
 #include <vector>
 
 namespace mts
 {
-    /**
-     * Replaces App::CollectDrawInstances + the direct DrawFrame call: the
-     * renderer no longer needs App to know it exists, only that Render runs
-     * after TransformPropagateSystem (PostUpdate), so every WorldTransform
-     * read here is already current for this frame.
-     *
-     * Holds the renderer by reference, not by resource lookup - the same
-     * pattern SpinSystem uses for its target Entity. A World resource would
-     * make the renderer reachable from a script; that is not wanted yet.
-     */
     class RenderSystem final : public ISystem
     {
     public:
@@ -38,25 +31,50 @@ namespace mts
 
         void OnStart(SystemContext &context) override
         {
-            mQuery = &context.world.GetOrCreateQuery<const WorldTransform, const MeshRenderer>();
+            mMeshQuery = &context.world.GetOrCreateQuery<const WorldTransform, const MeshRenderer>();
+            mCameraQuery = &context.world.GetOrCreateQuery<const WorldTransform, const Camera>();
         }
 
         void OnUpdate(SystemContext &) override
         {
+            // First match wins
+            bool haveCamera = false;
+            glm::mat4 viewProj{1.0f};
+
+            mCameraQuery->ForEach([&](Entity, const WorldTransform &world, const Camera &camera)
+                                  {
+                if (haveCamera)
+                    return;
+
+                viewProj = MakeViewProjection(world.Matrix(), camera.mFovYDegrees,
+                                              camera.mNearZ, camera.mFarZ,
+                                              mRenderer.AspectRatio());
+                haveCamera = true; });
+
             mDrawItems.clear();
 
-            mQuery->ForEach([this](Entity, const WorldTransform &world, const MeshRenderer &renderer)
-                            { mDrawItems.push_back(DrawItem{renderer.mesh, world.Matrix(), renderer.tint}); });
+            if (haveCamera)
+            {
+                mMeshQuery->ForEach([this, &viewProj](Entity, const WorldTransform &world, const MeshRenderer &renderer)
+                                    { mDrawItems.push_back(DrawItem{renderer.mesh, viewProj * world.Matrix(), renderer.tint}); });
+            }
+            else if (!mWarnedNoCamera)
+            {
+                MTS_LOG_WARN("RenderSystem: no Camera entity in the world; nothing will be drawn");
+                mWarnedNoCamera = true;
+            }
 
             mRenderer.DrawFrame(mDrawItems);
         }
 
     private:
         VulkanRenderer &mRenderer;
-        Query<const WorldTransform, const MeshRenderer> *mQuery = nullptr;
+        Query<const WorldTransform, const MeshRenderer> *mMeshQuery = nullptr;
+        Query<const WorldTransform, const Camera> *mCameraQuery = nullptr;
 
         /// Rebuilt every frame but keeps its capacity to steady allocation,
-        /// same reasoning as the mDrawInstances it replaces in App.
         std::vector<DrawItem> mDrawItems;
+
+        bool mWarnedNoCamera = false;
     };
 }
