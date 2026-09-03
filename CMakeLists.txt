@@ -32,6 +32,8 @@ if(BUILD_TESTING)
     include(Catch)
 endif()
 
+add_subdirectory(third_party)
+
 add_subdirectory(modules/app)
 add_subdirectory(modules/assets)
 add_subdirectory(modules/core)

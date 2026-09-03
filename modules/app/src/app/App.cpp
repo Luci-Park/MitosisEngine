@@ -6,6 +6,10 @@
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+
 #include <algorithm>
 #include <chrono>
 
@@ -40,6 +44,31 @@ namespace mts
             mWindow.reset();
             return false;
         }
+
+        ImGui::CreateContext();
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        if (!ImGui_ImplGlfw_InitForVulkan(
+                static_cast<GLFWwindow *>(mWindow->NativeHandleForImGui()), true))
+        {
+            MTS_LOG_ERROR("ImGui_ImplGlfw_InitForVulkan failed");
+            ImGui::DestroyContext();
+            mRenderer.Shutdown();
+            mWindow.reset();
+            return false;
+        }
+
+        if (!mRenderer.InitImGuiVulkanBackend())
+        {
+            MTS_LOG_ERROR("ImGui Vulkan backend initialization failed");
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            mRenderer.Shutdown();
+            mWindow.reset();
+            return false;
+        }
+
+        mImGuiInitialized = true;
 
         // Destruction needs no system: InstallHierarchy puts the scene graph
         // in place and arms the destroy hook, so World::DestroyEntity cascades
@@ -130,8 +159,17 @@ namespace mts
             SystemContext context = MakeContext(dt);
             mScheduler.Update(context);
 
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            if (mDesc.mShowImGuiDemo)
+                ImGui::ShowDemoWindow();
+
+            ImGui::Render();
+
             CollectDrawInstances();
-            mRenderer.DrawFrame(mDrawInstances);
+            mRenderer.DrawFrame(mDrawInstances, ImGui::GetDrawData());
 
             ++mFrame;
         }
@@ -162,6 +200,17 @@ namespace mts
         mAssetCache.reset();
         mAssetManifest.reset();
         mAssetLoadFailed = false;
+
+        if (mImGuiInitialized)
+        {
+            // Reverse of Initialize: Vulkan backend needs mDevice still alive,
+            // so it goes before mRenderer.Shutdown(); the GLFW backend needs
+            // mWindow still alive, so it goes before mWindow.reset().
+            mRenderer.ShutdownImGuiVulkanBackend();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            mImGuiInitialized = false;
+        }
 
         mRenderer.Shutdown();
         // Renderer holds the surface built from the window: window dies last.

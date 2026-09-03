@@ -16,7 +16,6 @@ no rebuild ([decision 0018](docs/decisions/0018-game-definition.md)).
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | What the engine is today, and how it fits together |
 | [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | How to write code that fits in |
 | [docs/EXTENDING.md](docs/EXTENDING.md) | Adding a module, component, system, shader or asset |
-| [docs/decisions/](docs/decisions/README.md) | Why it is the way it is |
 | [docs/README.md](docs/README.md) | The full documentation index, and where your own docs go |
 
 The rest of this file is the short version.
@@ -43,6 +42,10 @@ cmake/                build helpers
   Assets.cmake          asset cooking
   VcpkgToolchain.cmake  resolves vcpkg from VCPKG_ROOT
 
+third_party/          vendored (not vcpkg) - see Dependencies below
+  imgui/                submodule, docking branch, pinned tag
+  imgui_config/         repo-owned imconfig.h override (IMGUI_USER_CONFIG)
+
 modules/              one static library each, mts::<name>
   core/                 ECS, logging, paths, surface contract
   window/               GLFW window behind an interface
@@ -62,13 +65,12 @@ games/                one directory per game - planned, none exist yet
 tools/                AssetCooker, new_module.ps1, new_file.ps1
 templates/            what the scaffolding scripts stamp out
 assets/               source assets, cooked into the build tree
-docs/                 setup, architecture, conventions, decisions
+docs/                 setup, architecture, conventions
 builds/               build trees, gitignored
 logs/                 engine.log, gitignored
 ```
 
-Module details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), game rules in
-[decision 0018](docs/decisions/0018-game-definition.md).
+Module details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 # Getting the Source
 
@@ -84,6 +86,11 @@ per machine and set `VCPKG_ROOT`. Prerequisites, setup and troubleshooting:
 First configure builds all dependencies and takes a few minutes. Downloads and
 prebuilt packages are cached in `%LOCALAPPDATA%\vcpkg` and shared with every other
 vcpkg project on the machine, so later configures are fast.
+
+One dependency is vendored instead: Dear ImGui, as a `third_party/imgui` git
+submodule, MIT-licensed, `LICENSE.txt` ships inside the submodule. Clone with
+`git clone --recurse-submodules`, or after the fact:
+`git submodule update --init --recursive`.
 
 # Adding Modules and Files
 This engine is aiming for modularity, therefore each part of the engine is its own static library. To make things easier VSCode tasks have been added.

@@ -5,6 +5,7 @@ target_link_libraries(engine_app
            mts::core
            mts::window
            mts::renderer
+    PRIVATE imgui::imgui
 )
 
 target_sources(engine_app PRIVATE src/app/App.cpp)

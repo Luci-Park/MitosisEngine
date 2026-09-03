@@ -92,6 +92,8 @@ Everything through `vcpkg.json`; nothing vendored or fetched at build time. Link
 dependency in a public header, or affecting every platform, gets a decision
 record.
 
+The one exception is `third_party/imgui`, a git submodule.
+
 ## Tests
 
 Catch2 v3 through `engine_add_module_tests`, one `TEST_CASE` per behaviour,

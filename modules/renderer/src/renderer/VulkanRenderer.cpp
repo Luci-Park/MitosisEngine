@@ -14,6 +14,9 @@
 
 #include <vk_mem_alloc.h>
 
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -367,6 +370,57 @@ namespace mts
 
         return true;
     }
+
+    namespace
+    {
+        void CheckImGuiVulkanResult(VkResult result)
+        {
+            if (result != VK_SUCCESS)
+                MTS_LOG_ERROR("ImGui Vulkan backend call failed: {}", static_cast<int>(result));
+        }
+    }
+
+    bool VulkanRenderer::InitImGuiVulkanBackend()
+    {
+        VkPipelineRenderingCreateInfo renderingInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &mSwapchainFormat};
+
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.ApiVersion = VulkanVersion;
+        initInfo.Instance = mVulkanInstance;
+        initInfo.PhysicalDevice = mPhysicalDevice;
+        initInfo.Device = mDevice;
+        initInfo.QueueFamily = mGfxQueueFamIdx;
+        initInfo.Queue = mGfxQueue;
+        initInfo.DescriptorPoolSize = 64;
+        initInfo.MinImageCount = static_cast<uint32_t>(mSwapchainImages.size());
+        initInfo.ImageCount = static_cast<uint32_t>(mSwapchainImages.size());
+        initInfo.UseDynamicRendering = true;
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = renderingInfo;
+        initInfo.CheckVkResultFn = &CheckImGuiVulkanResult;
+
+        if (!ImGui_ImplVulkan_Init(&initInfo))
+        {
+            MTS_LOG_ERROR("ImGui_ImplVulkan_Init failed");
+            return false;
+        }
+
+        mImGuiBackendInitialized = true;
+        return true;
+    }
+
+    void VulkanRenderer::ShutdownImGuiVulkanBackend()
+    {
+        if (!mImGuiBackendInitialized)
+            return;
+
+        vkDeviceWaitIdle(mDevice);
+        ImGui_ImplVulkan_Shutdown();
+        mImGuiBackendInitialized = false;
+    }
+
     void VulkanRenderer::Shutdown()
     {
         if (mDevice != VK_NULL_HANDLE)
@@ -838,6 +892,9 @@ namespace mts
         if (!CreateRenderCompleteSemaphores())
             return false;
 
+        if (mImGuiBackendInitialized)
+            ImGui_ImplVulkan_SetMinImageCount(static_cast<uint32_t>(mSwapchainImages.size()));
+
         mNeedRecreate = false;
         return true;
     }
@@ -1190,7 +1247,7 @@ namespace mts
         }
         mRenderComplete.clear();
     }
-    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances)
+    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances, ImDrawData *imguiDrawData)
     {
         // get image ready
         ImageBarrier(cmd, mSwapchainImages[imageIndex],
@@ -1251,9 +1308,6 @@ namespace mts
         const VkDeviceSize vertexOffset = 0;
         vkCmdBindVertexBuffers(cmd, 0, 1, &mVertexBuffer, &vertexOffset);
 
-        // One draw per instance rather than instanced rendering: the transform
-        // arrives as a push constant, and there is no per-instance buffer yet.
-        // should be replaced soon
         for (const glm::mat4 &transform : instances)
         {
             const PushData pushData{.transform = transform};
@@ -1263,6 +1317,9 @@ namespace mts
 
             vkCmdDraw(cmd, 3, 1, 0, 0);
         }
+
+        if (imguiDrawData != nullptr)
+            ImGui_ImplVulkan_RenderDrawData(imguiDrawData, cmd);
 
         if (mValidationEnabled)
             vkCmdEndDebugUtilsLabelEXT(cmd);
@@ -1278,7 +1335,7 @@ namespace mts
                      VK_PIPELINE_STAGE_2_NONE, 0);
     }
 
-    void VulkanRenderer::DrawFrame(std::span<const glm::mat4> instances)
+    void VulkanRenderer::DrawFrame(std::span<const glm::mat4> instances, ImDrawData *imguiDrawData)
     {
         if (mWindow->Width() == 0 || mWindow->Height() == 0)
             return;
@@ -1338,7 +1395,7 @@ namespace mts
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
         vkBeginCommandBuffer(cmd, &beginInfo);
-        RecordCommands(cmd, imageIndex, instances);
+        RecordCommands(cmd, imageIndex, instances, imguiDrawData);
         vkEndCommandBuffer(cmd);
 
         const VkSemaphoreSubmitInfo waitSem{

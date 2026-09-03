@@ -35,6 +35,8 @@ namespace mts
         const char *mAppName = "MitosisEngine";
         bool mEnableValidation = true;
 
+        bool mShowImGuiDemo = true;
+
         float mMaxDeltaSeconds = 0.25f;
     };
 
@@ -103,5 +105,6 @@ namespace mts
         std::optional<AssetCache> mAssetCache;
         bool mAssetLoadFailed = false;
         bool mInitialized = false;
+        bool mImGuiInitialized = false;
     };
 }

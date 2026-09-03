@@ -34,6 +34,8 @@ namespace mts
         virtual void PollEvents() = 0;
         virtual bool ShouldClose() const = 0;
 
+        virtual void *NativeHandleForImGui() const { return nullptr; }
+
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 
     protected:

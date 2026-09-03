@@ -21,6 +21,8 @@
 VK_DEFINE_HANDLE(VmaAllocator)
 VK_DEFINE_HANDLE(VmaAllocation)
 
+struct ImDrawData;
+
 namespace mts
 {
     struct RendererDesc
@@ -36,7 +38,10 @@ namespace mts
         VulkanRenderer() = default;
         bool Initialize(const RendererDesc &desc);
 
-        void DrawFrame(std::span<const glm::mat4> instances);
+        bool InitImGuiVulkanBackend();
+        void ShutdownImGuiVulkanBackend();
+
+        void DrawFrame(std::span<const glm::mat4> instances, ImDrawData *imguiDrawData = nullptr);
 
         void Shutdown();
 
@@ -58,7 +63,7 @@ namespace mts
         bool CreateVertexBuffer();
         void DestroyVertexBuffer();
         void NameObject(VkObjectType type, uint64_t handle, const char *name);
-        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances);
+        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances, ImDrawData *imguiDrawData);
 
     private:
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
@@ -103,5 +108,7 @@ namespace mts
         uint32_t mFrameIndex = 0;
         bool mNeedRecreate = false;
         bool mValidationEnabled = false;
+
+        bool mImGuiBackendInitialized = false;
     };
 }
