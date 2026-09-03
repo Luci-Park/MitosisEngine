@@ -1,28 +1,37 @@
-# Module docs
+# Module documentation
 
-One file per module, in depth, written by whoever works on it. `ARCHITECTURE.md`
-gives each module a paragraph and says how they connect; these go deeper on one
-module at a time.
+One document per module, `docs/modules/<module>.md`, kept current by whoever
+works on it. [ARCHITECTURE.md](../ARCHITECTURE.md) says how the modules fit
+together; these say how one of them works.
 
 ## Index
 
-| Module | Owns |
-|---|---|
-| [app](app.md) | The composition root: owns window, renderer, editor, ECS world, runs the loop |
-| [editor](editor.md) | ImGui context, backend, and the Slate editor shell |
-| [renderer](renderer.md) | The whole Vulkan path: meshes, materials, camera, the scene pass |
+| Module | Document | Maintainer |
+|---|---|---|
+| core | [core.md](core.md) | Sumin Park |
+| assets | - | - |
+| window | [window.md](window.md) | Sumin Park |
+| renderer | - | - |
+| app | [app.md](app.md) | Sumin Park |
 
-Not yet written (see [ARCHITECTURE.md](../ARCHITECTURE.md) for what exists in
-the meantime): `core`, `window`, `assets`, `editortheme`.
+Add your row when you start a document.
 
 ## Writing one
 
-Copy [TEMPLATE.md](TEMPLATE.md) to `<module>.md` and fill it in. Keep it to
-what a consumer of the module - not its author a year later - needs: the
-public API's shape and why, not a narrated history of how it got there.
-State reasoning inline, in plain English - do not link out to `docs/notes/`
-or `docs/decisions/`, both of which are local-only (gitignored) and will be a
-dead link for anyone else reading this. Update it in the same change that
-changes the module's shape; a module doc that only gets written once and
-never touched again is worse than no module doc, because it's wrong and
-looks authoritative.
+Copy [TEMPLATE.md](TEMPLATE.md) to `<module>.md`, delete the sections that do not
+apply rather than leaving them empty, and add yourself to the index.
+[core.md](core.md) is the worked example.
+
+**Belongs here:** the mental model, what the module refuses to do, the key types
+and how they relate, invariants a caller must not break, anything surprising in
+the implementation and why, current limits, what the tests cover.
+
+**Does not:** API reference copied from headers (it goes stale in a month),
+cross-module reasoning (that goes in [ARCHITECTURE.md](../ARCHITECTURE.md)),
+task instructions (those are in [EXTENDING.md](../EXTENDING.md)).
+
+## Keeping it honest
+
+A stale module document is worse than none, because it is believed. Change it in
+the same commit as the code, and date the "Current state" section so a reader can
+judge its age.

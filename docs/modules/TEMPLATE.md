@@ -1,29 +1,54 @@
-# <name>
+# <module>
 
-- **Owns:** one sentence - the thing this module is responsible for.
-- **Depends on:** other `mts::` modules, and any third-party library whose
-  type appears in a public header.
-- **Depended on by:** who links this module and why (skip if nobody does yet).
+- **Maintainer:**
+- **Depends on:** `mts::` modules and third-party libraries
+- **Public API:** `modules/<module>/include/<module>/`
+- **Last reviewed:** YYYY-MM-DD
 
-## What it does
+## Purpose
 
-The module in a few paragraphs: its main type(s), how a consumer is expected
-to use it, and anything surprising about its shape. Assume the reader has
-read [ARCHITECTURE.md](../ARCHITECTURE.md)'s one-paragraph summary already -
-this is the detail that didn't fit there.
+What this module is responsible for, and what it deliberately does not do.
 
-## Public API
+## Mental model
 
-The types and functions a consumer actually calls, not an exhaustive header
-dump. Point at the header for the rest.
+The paragraph a reader needs before opening a header: the central abstraction,
+what flows through it, what owns what.
+
+## Key types
+
+| Type | Header | Role |
+|---|---|---|
+| `Foo` | `<module>/Foo.h` | one line |
+
+Expand only on the types that are not self-explanatory, and on how they relate -
+the header says what each method does.
+
+## Usage
+
+The shortest representative example. Copy it from a test so it stays compilable.
+
+```cpp
+```
+
+## Invariants
+
+Rules a caller must not break, each with the consequence of breaking it. The most
+valuable section - this is what otherwise lives only in the maintainer's head.
+
+## Implementation notes
+
+Anything surprising in `src/`: a layout chosen for a reason, an ordering that
+matters, a workaround. Why, not what.
 
 ## Current state
 
-What exists today, stated so it goes stale visibly - a claim someone can
-check against the code, not a status feeling. Update this when the module
-changes; a note that isn't kept current is worse than no note.
+*As of YYYY-MM-DD.* What works, what is stubbed, what is broken - specific enough
+that a reader can tell whether what they need exists.
 
-## Known gaps
+## Tests
 
-What's deliberately missing and why, if that's not already a decision
-record. Delete this section if everything worth saying is a decision.
+Where they are, what they cover, what is deliberately untested and why.
+
+## Open questions
+
+Undecided things, and what would settle them.

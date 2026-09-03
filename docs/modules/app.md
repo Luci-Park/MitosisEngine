@@ -1,76 +1,179 @@
 # app
 
-- **Owns:** the composition root - window, renderer, editor, ECS world,
-  scheduler, and the main loop.
-- **Depends on:** `assets`, `core`, `window`, `renderer`, `editor` - all
-  `PUBLIC`. `App` is the only module that knows all the others; nothing else
-  in the engine is allowed to reach across this many module boundaries.
-- **Depended on by:** `HelloWorld` (`main.cpp`); any future game executable.
+- **Maintainer:** Sumin Park
+- **Depends on:** `mts::core`, `mts::window`, `mts::renderer`, `mts::assets`, all public
+- **Public API:** `modules/app/include/app/`
+- **Last reviewed:** 2026-09-01
 
-## What it does
+## Purpose
 
-`App` is a fixed-member composition root, not a subsystem registry - adding a
-new always-on subsystem (input, audio) means adding a member to `App` by
-hand, on purpose, so every subsystem `App` owns is visible in one place
-rather than scattered across a runtime-registered list. A caller does:
+The composition root and the frame loop. `App` is the one place that knows every
+other module exists: it constructs the window and renderer in the right order,
+owns the ECS world, command buffer and scheduler, lazily opens the asset cache,
+and ticks everything until the window closes.
+
+It contains no gameplay and no subsystem of its own. It is also deliberately not
+a framework - there is no registry, no service locator and no virtual `Game` to
+subclass. `main` constructs an `App`, registers systems on it, and runs it.
+
+## Mental model
+
+Fixed members, three calls.
+
+```
+Initialize(desc) -> Run() -> Shutdown()
+```
+
+The member list *is* the initialisation order, and reverse-order destruction is
+what makes teardown correct, so declaration order in `App.h` is load-bearing
+rather than cosmetic.
+
+`Run` is a plain loop with no fixed timestep:
+
+```
+Start(scheduler)                 systems cache their queries
+while not ShouldClose:
+    PollEvents                   close flag and size refresh here
+    dt = min(elapsed, mMaxDeltaSeconds)
+    Update(scheduler)            PreUpdate, Update, PostUpdate; flush between
+    renderer.DrawFrame()         not a system - see below
+    ++frame
+```
+
+A `SystemContext` is rebuilt every tick rather than stored: it bundles references
+to the world and command buffer with the values that change each frame (`dt`,
+elapsed, frame index), so keeping one around would only be a stale copy.
+
+`DrawFrame` is called directly instead of from a system in the `Render` phase.
+The phase exists in `core`, but a render system would have to reach the renderer,
+and `engine_core` must not link `engine_renderer` - so the phase stays empty and
+the loop draws. This is the single largest piece of temporary wiring in the
+engine.
+
+## Key types
+
+| Type | Header | Role |
+|---|---|---|
+| `AppDesc` | `app/App.h` | Window size and title, Vulkan app name and validation flag, `dt` clamp |
+| `App` | `app/App.h` | Owns the subsystems, runs the loop |
+
+Everything `App` owns is documented in its own module: `World`, `CommandBuffer`
+and `SystemScheduler` in [core.md](core.md), `Window` in [window.md](window.md),
+`VulkanRenderer` and `AssetCache` in [ARCHITECTURE.md](../ARCHITECTURE.md).
+
+### Ownership and order
+
+| Member | Created | Destroyed | Because |
+|---|---|---|---|
+| `mWindow` | first | last | the renderer's surface is built from it |
+| `mRenderer` | after the window | before it | holds `VkSurfaceKHR` and the device |
+| `mWorld`, `mCommands`, `mScheduler` | with `App` | with `App` | no external resources |
+| `mAssetManifest` | first `Assets()` | after the cache | owns the parsed manifest |
+| `mAssetCache` | with the manifest | before it | holds a raw pointer into it |
+
+The manifest/cache pair is the one real aliasing hazard, and it is handled twice
+over: by declaration order, so implicit destruction is already correct, and by
+explicit `reset()` calls in `Shutdown` in the same order, because `Initialize`
+may follow.
+
+## Usage
+
+`main.cpp`, in full:
 
 ```cpp
-mts::App app;
-app.Initialize(mts::AppDesc{ .mTitle = "My Game" });
+mts::InitLog();                 // outside App: early failures must still log
 
-// scene setup: app.GetWorld(), app.Renderer().CreateMesh/CreateMaterial,
-// app.Systems().Add<MySystem>(SystemPhase::Update), all before Run()
+mts::App app;
+
+mts::AppDesc desc{};
+desc.mTitle = "MitosisEngine - Window Test";
+
+if (!app.Initialize(desc))
+{
+    mts::FlushLog();
+    return -1;
+}
 
 app.Run();
-app.Shutdown();
+app.Shutdown();                 // idempotent; the destructor would do it too
+mts::FlushLog();
 ```
 
-`Run`'s per-iteration shape: poll window events, `Editor::BeginFrame` ->
-`DrawLayout` -> `EndFrame`, hand the resulting `ImDrawData*` and scene
-viewport rect to the renderer, then `SystemScheduler::Update` (which reaches
-`RenderSystem` in the `Render` phase). `App.cpp` has no ImGui calls of its
-own; all editor UI lives in `editor` - `App` only calls its four lifecycle
-methods.
+Systems are registered on `app.Systems()` between `Initialize` and `Run`,
+components created through `app.GetWorld()`.
 
-## Public API
+## Invariants
 
-```cpp
-bool Initialize(const AppDesc &desc);
-void Run();
-void Shutdown();
+- **Register systems before `Run`.** `Run` calls `SystemScheduler::Start`, and
+  the scheduler requires registration to be finished by then. A system added
+  afterwards never gets `OnStart`.
+- **`Initialize` before anything else.** `Run` and `Shutdown` return immediately
+  when `mInitialized` is false, silently - a caller that ignores the `bool` gets
+  a process that exits successfully having done nothing.
+- **`Initialize` cleans up after itself.** A renderer failure resets the window
+  before returning `false`, so a failed `Initialize` leaves no half-built state.
+- **`Shutdown` is idempotent and the destructor calls it.** Calling it explicitly
+  is the documented style; forgetting it is not a leak.
+- **Systems stop before subsystems die.** `Shutdown` runs `Stop` first, so
+  `OnStop` still sees a live world - but the renderer and window are already on
+  their way out, and touching them from `OnStop` is not supported.
+- **`Assets()` may return `nullptr`,** and the failure is sticky: no manifest
+  means the disk is not re-checked every frame. A caller loses an asset, not the
+  process. `Shutdown` clears the flag so a later `Initialize` retries.
+- **`dt` is clamped, and `mElapsed` accumulates the clamped value.** After a
+  breakpoint or a window drag, `mElapsed` is behind the wall clock on purpose -
+  it is simulated time, not a timestamp, and must not be used as one.
+- **`App` is neither copyable nor movable,** and hands out references to its own
+  members through `SystemContext`.
+- **`App` does not own logging.** `InitLog` and `FlushLog` are the caller's, so
+  that a construction failure inside `App` is still visible.
 
-World &GetWorld();
-SystemScheduler &Systems();
-VulkanRenderer &Renderer();     // temporary seam - see the comment on it in App.h
-AssetCache *Assets();           // nullptr if no manifest; sticky failure, not retried every call
-```
+## Implementation notes
 
-`AppDesc`: `mWidth`/`mHeight`/`mTitle`/`mAppName`, `mEnableValidation`,
-`mShowImGuiDemo` (defaults true in Debug, false in Release),
-`mEnableEditorLayout` (gates `Editor::DrawLayout`'s dockspace - an ImGui
-context still runs either way), `mMaxDeltaSeconds` (clamps `dt`).
+- The clock is `std::chrono::steady_clock` - monotonic, so a system clock change
+  mid-session cannot produce a negative `dt`.
+- `MakeContext(0.0f)` is used for both `Start` and `Stop`: neither is a frame,
+  and a nonzero `dt` there would be a lie.
+- `mFrame` increments after the draw, so the first tick runs as frame 0.
+- The `if (!mWindow)` branch after `Window::Create` is currently unreachable -
+  the GLFW backend aborts through `MTS_CHECK` instead of returning null (see
+  [window.md](window.md)).
+- `mDesc` is kept after `Initialize` only for `mMaxDeltaSeconds`; the rest is
+  consumed at startup.
+- The renderer is a value member, not a `unique_ptr`: `Renderer.h` is still an
+  empty placeholder, so there is no interface to hold and `App` names
+  `VulkanRenderer` directly.
 
 ## Current state
 
-Initialize order: `Window::Create` -> `VulkanRenderer::Initialize` ->
-`Editor::Initialize` -> install the scene-graph destroy hook -> register core
-and renderer components -> publish `FrameCommands` as a world resource ->
-register `TransformPropagateSystem` (`PostUpdate`, so it runs before
-`Render` sees this frame's transforms) and `RenderSystem` (`Render`). Any
-failure before the last successful step rolls back what it already created
-and returns `false` - `Initialize` either fully succeeds or leaves nothing
-behind. `Shutdown` is safe to call from the destructor or manually, is
-idempotent (`mInitialized` gate), and its ordering is the mirror image of
-`Initialize` for exactly the pieces that need it: `Editor::Shutdown` before
-`VulkanRenderer::Shutdown` (the editor's Vulkan backend needs the device
-still alive), and the renderer's shutdown before the window is destroyed
-(the renderer holds a surface built from it). `mEditor` is declared right
-after `mRenderer` in `App`'s member list, before `mWorld`/`mCommands`, so
-this same ordering holds even if `Shutdown()` were somehow skipped and
-`App`'s own destructor had to unwind it.
+*As of 2026-09-01.* The loop runs, the scheduler ticks, the triangle draws. What
+is missing is mostly the connective tissue:
 
-## Known gaps
+- **Nothing in the world reaches the screen.** The `Render` phase is empty and
+  `DrawFrame` ignores the ECS entirely.
+- No fixed timestep, so physics-style systems have no stable substep.
+- No input, no pause, no frame limiter, no headless mode, no window-event
+  handling beyond the renderer re-querying size.
+- `Initialize` after `Shutdown` is written to work - the sticky asset flag and
+  the explicit resets exist for it - but nothing exercises it.
+- One `App` per process is assumed everywhere, though nothing enforces it.
 
-- `Renderer()` is called out in its own doc comment as a temporary seam -
-  scene code reaches the renderer through `App` because there's no
-  asset-facing mesh/material service yet.
+## Tests
+
+None. `modules/app/` has no `tests/` directory.
+
+`App` is composition; its behaviour is a window opening, a device initialising
+and a loop running, all of which need a display and a GPU. The parts worth
+asserting - phase ordering, command buffer flushing, asset cache lookup - are
+tested where they live, in `core` and `assets`. A headless renderer would be the
+prerequisite for testing anything here, and that is also the trigger for
+revisiting the whole shape of this class.
+
+## Open questions
+
+- How the ECS reaches the renderer without `core` depending on it: a renderer
+  handle in `SystemContext`, an extractor owned by `App`, or leaving drawing out
+  of the ECS entirely. This decides whether `SystemPhase::Render` survives.
+- Whether `App` should own logging after all, given that the only reason it does
+  not is the ordering in `main`.
+- Whether a fixed-timestep phase belongs in the scheduler or in the loop.
