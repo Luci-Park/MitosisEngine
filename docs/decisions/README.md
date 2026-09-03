@@ -29,6 +29,9 @@ that day.
 | [0016](0016-manual-formatting.md) | Formatting is manual |
 | [0017](0017-member-naming.md) | Members are named `mPascalCase` |
 | [0018](0018-game-definition.md) | A game is data: config, assets and Lua scripts |
+| [0019](0019-world-resources.md) | Per-world state lives in typed resources |
+| [0020](0020-scene-graph-as-a-resource.md) | Scene structure lives in a resource, and destruction cascades |
+| [0021](0021-world-transforms-resolve-on-read.md) | World transforms resolve on read |
 
 All Accepted.
 

@@ -36,7 +36,10 @@ engine dependencies.
 | `ComponentColumn` | `ecs/ComponentColumn.h` | One type's data in one archetype |
 | `Archetype` | `ecs/Archetype.h` | Rows of entities sharing a signature |
 | `SparseSetStorage<T>` | `ecs/SparseSetStorage.h` | Storage for churny components |
-| `World` | `ecs/World.h` | Owns entities, archetypes, sparse storages |
+| `World` | `ecs/World.h` | Owns entities, archetypes, sparse storages, resources |
+| `HierarchyIndex` | `ecs/HierarchyIndex.h` | The scene graph, held as a resource |
+| `Transform` | `ecs/components/Transform.h` | Authored local TRS, versioned on write |
+| `WorldTransform` | `ecs/components/WorldTransform.h` | Derived world matrix plus staleness stamps |
 | `Query<Ts...>` | `ecs/Query.h` | Cached view over matching archetypes |
 | `CommandBuffer` | `ecs/CommandBuffer.h` | Deferred structural changes |
 | `ISystem`, `SystemContext` | `ecs/System.h` | Per-frame work and its inputs |
@@ -66,7 +69,22 @@ the moved entity's record.
 **Sparse set (opt in).** `MTS_COMPONENT_SPARSE(T)`. `World` keeps one type-erased
 storage per such type, outside the archetype system, cleared on destroy.
 
-### Queries
+#### Resources
+
+State that belongs to a world but not to an entity - the scene graph, a camera,
+an asset cache, a script VM - lives in `World` keyed by type:
+
+```cpp
+world.EmplaceResource<HierarchyIndex>();
+HierarchyIndex *index = world.TryResource<HierarchyIndex>();
+```
+
+Resources are not components and carry none of the POD constraints: nothing
+relocates one, so they may own heap memory and have destructors. They are
+invisible to queries and have no per-entity form. See
+[0019](../decisions/0019-world-resources.md).
+
+## Queries
 
 `GetOrCreateQuery<Ts...>(filters...)` returns a cached `Query&` that resolves
 matching archetypes and re-resolves when `World::Generation()` changes. Filters
@@ -106,9 +124,24 @@ private:
   elsewhere, referenced by handle.
 - **Component names are globally unique.** A collision asserts in Debug and would
   silently alias in Release.
-- **No structural change during iteration.** Use the `CommandBuffer`; `Query` also
-  holds a Debug-only guard that fires if a callback creates an archetype and the
-  query is re-entered.
+- **No structural change during iteration.** `AddComponent`, `RemoveComponent`
+  and `DestroyEntity` assert if a `Query` is walking; use the `CommandBuffer`.
+  `World::IsIterating()` reports it, so a binding layer can route rather than
+  guess. `CreateEntity` is deliberately exempt - the new entity lands in the
+  empty archetype, so no matched table moves.
+- **A resource destructor must not call back into `World`.** `~World` is already
+  destroying the resource map. Anything holding entity handles needs an explicit
+  shutdown call.
+- **Scene structure is not in components.** Parent and child edges live in the
+  `HierarchyIndex` resource, so `RemoveComponent` cannot tear them apart.
+  `SetParent` refuses cycles and anything past `kMaxHierarchyDepth`, returning
+  `false` rather than asserting. Destroying an entity destroys its subtree. See
+  [0020](../decisions/0020-scene-graph-as-a-resource.md).
+- **`Transform` is written through its setters.** Each bumps a version that
+  `WorldTransform` compares against; a raw write leaves descendants stale
+  permanently. `ResolveWorld` is correct at any point in the frame, so no reader
+  needs to reason about phase order. See
+  [0021](../decisions/0021-world-transforms-resolve-on-read.md).
 - **At most 128 component types.** `ComponentBit` asserts past the limit.
 - **A stale `Entity` is detected, not honoured.** `Get` returns `nullptr` for a
   dead handle; `AddComponent` and friends assert.
@@ -128,11 +161,16 @@ private:
 
 ## Current state
 
-*As of 2026-09-01.* Enough to build systems on: entities, both storages, filtered
+*As of 2026-09-02.* Enough to build systems on: entities, both storages, filtered
 queries, deferred structural change and phase scheduling all work and are tested.
+Since 2026-09-01: typed resources on `World`, a transform hierarchy with lazy
+world-matrix resolution, and cascading destruction through a `World` destroy
+hook.
+
 Missing: parallelism, dependency ordering, change detection, component lifecycle
-hooks, entity hierarchy, serialisation (the stable hash exists, nothing uses it),
-and debugging tools. `SystemPhase::Render` is unused.
+hooks, serialisation (the stable hash exists, nothing uses it), a runtime
+component registry, and debugging tools. `SystemPhase::Render` is unused - the
+ECS-to-renderer bridge is a pair of calls in `App::Run`.
 
 ## Tests
 
@@ -144,6 +182,9 @@ and debugging tools. `SystemPhase::Render` is unused.
 | `Archetype.tests.cpp` | Row add/remove, signature transitions |
 | `Query.tests.cpp` | Matching, filters, cache invalidation |
 | `CommandBuffer.tests.cpp` | Recording and flush semantics |
+| `Resources.tests.cpp` | Type keying, pointer stability, destruction |
+| `Transform.tests.cpp` | TRS composition and the memcpy traits |
+| `TransformHierarchy.tests.cpp` | Linking, walking, cascade destroy, staleness |
 | `System.tests.cpp` | Phase ordering, lifecycle, spawn visibility |
 | `Paths.tests.cpp` | Executable-relative path resolution |
 
