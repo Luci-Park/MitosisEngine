@@ -43,6 +43,7 @@ namespace mts
         // No OpenGL context. The renderer owns the graphics API.
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, desc.mResizable ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(GLFW_MAXIMIZED, desc.mMaximized ? GLFW_TRUE : GLFW_FALSE);
 
         mHandle = glfwCreateWindow(static_cast<int>(desc.mWidth),
                                     static_cast<int>(desc.mHeight),

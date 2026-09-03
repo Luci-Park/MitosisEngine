@@ -45,10 +45,10 @@ namespace mts
         void BeginFrame();
 
         /// Builds the dockspace, the default Hierarchy/Inspector/Output
-        /// split, the Debug menu, and (if requested) the demo/style
-        /// editors - the Slate editor shell. Pass enableLayout = false to
-        /// keep ImGui running (e.g. a caller's own UI) without this shell.
-        void DrawLayout(bool enableLayout, bool showDemoWindow);
+        /// split, the Debug menu, and (if requested) the style editor -
+        /// the Slate editor shell. Pass enableLayout = false to keep ImGui
+        /// running (e.g. a caller's own UI) without this shell.
+        void DrawLayout(bool enableLayout);
 
         /// Ends this frame's ImGui state and returns its draw data, which
         /// the caller hands to VulkanRenderer::SetImGuiDrawData. Always
@@ -58,9 +58,9 @@ namespace mts
 
         /// The dockspace's central passthru node - where the 3D scene
         /// shows through, since ImGuiDockNodeFlags_PassthruCentralNode
-        /// leaves it undocked. Valid after DrawLayout(true, ...); zero
-        /// extent (the default, and what DrawLayout(false, ...) leaves it
-        /// at) means "use the full swapchain" to VulkanRenderer.
+        /// leaves it undocked. Valid after DrawLayout(true); zero extent
+        /// (the default, and what DrawLayout(false) leaves it at) means
+        /// "use the full swapchain" to VulkanRenderer.
         VkRect2D SceneViewportRect() const { return mSceneViewportRect; }
 
         bool IsInitialized() const { return mInitialized; }

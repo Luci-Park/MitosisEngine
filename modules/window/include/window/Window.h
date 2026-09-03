@@ -21,6 +21,7 @@ namespace mts
         uint32_t mHeight = 720;
         const char *mTitle = "MitosisEngine";
         bool mResizable = true;
+        bool mMaximized = false;
     };
 
     class Window : public ISurfaceProvider

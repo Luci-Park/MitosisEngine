@@ -98,7 +98,7 @@ namespace mts
         ImGui::NewFrame();
     }
 
-    void Editor::DrawLayout(bool enableLayout, bool showDemoWindow)
+    void Editor::DrawLayout(bool enableLayout)
     {
         if (enableLayout)
         {
@@ -164,9 +164,6 @@ namespace mts
             // full swapchain, same as before a layout is ever drawn.
             mSceneViewportRect = VkRect2D{};
         }
-
-        if (showDemoWindow)
-            ImGui::ShowDemoWindow();
     }
 
     ImDrawData *Editor::EndFrame()

@@ -26,6 +26,7 @@ namespace mts
         windowDesc.mWidth = desc.mWidth;
         windowDesc.mHeight = desc.mHeight;
         windowDesc.mTitle = desc.mTitle;
+        windowDesc.mMaximized = true;
 
         mWindow = Window::Create(windowDesc);
         if (!mWindow)
@@ -126,7 +127,7 @@ namespace mts
             mEditor.BeginFrame();
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
-                mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo);
+                mEditor.DrawLayout(mDesc.mEnableEditorLayout);
 
             // RenderSystem calls VulkanRenderer::DrawFrame from inside
             // Update (SystemPhase::Render), so this frame's draw data has to

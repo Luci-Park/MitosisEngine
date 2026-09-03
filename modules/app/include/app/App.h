@@ -31,11 +31,6 @@ namespace mts
         const char *mAppName = "MitosisEngine";
         bool mEnableValidation = true;
 
-#ifdef NDEBUG
-        bool mShowImGuiDemo = false;
-#else
-        bool mShowImGuiDemo = true;
-#endif
         bool mEnableEditorLayout = true;
 
         float mMaxDeltaSeconds = 0.25f;
