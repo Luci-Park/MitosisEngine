@@ -6,6 +6,7 @@ target_link_libraries(engine_app
            mts::window
            mts::renderer
     PRIVATE imgui::imgui
+            mts::editortheme
 )
 
 target_sources(engine_app PRIVATE src/app/App.cpp)

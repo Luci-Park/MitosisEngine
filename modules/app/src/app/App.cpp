@@ -5,6 +5,7 @@
 #include <core/ecs/TransformHierarchy.h>
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
+#include <editortheme/EditorTheme.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -47,6 +48,7 @@ namespace mts
 
         ImGui::CreateContext();
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        EditorTheme::Apply();
 
         if (!ImGui_ImplGlfw_InitForVulkan(
                 static_cast<GLFWwindow *>(mWindow->NativeHandleForImGui()), true))

@@ -37,6 +37,7 @@ add_subdirectory(third_party)
 add_subdirectory(modules/app)
 add_subdirectory(modules/assets)
 add_subdirectory(modules/core)
+add_subdirectory(modules/editortheme)
 add_subdirectory(modules/renderer)
 add_subdirectory(modules/window)
 
