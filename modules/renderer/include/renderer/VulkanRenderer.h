@@ -9,10 +9,12 @@
 #pragma once
 
 #include <core/platform/Surface.h>
+#include <renderer/Material.h>
 #include <renderer/Mesh.h>
 
 #include <volk.h>
 
+#include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
@@ -43,7 +45,13 @@ namespace mts
         /// model * view projection
         glm::mat4 model{1.0f};
 
+        /// transpose(inverse(mat3(model)))
+        glm::mat3 normalMatrix{1.0f};
+
         glm::vec4 tint{1.0f, 1.0f, 1.0f, 1.0f};
+
+        /// kNullMaterial means "use the renderer's default material".
+        MaterialHandle material;
     };
 
     class VulkanRenderer
@@ -60,17 +68,28 @@ namespace mts
         /// separately, before the scheduler update that reaches DrawFrame.
         void SetImGuiDrawData(ImDrawData *drawData) { mImguiDrawData = drawData; }
 
+        /// Viewport/scissor rect (window pixels) the scene pass is clipped to
+        void SetSceneViewport(VkRect2D rect) { mSceneViewportRect = rect; }
+
         // Uploads geometry and returns a handle to it.
         // Use on load time
         MeshHandle CreateMesh(std::span<const Vertex> vertices,
                               std::span<const uint32_t> indices);
 
-        /// Width/height of the current swapchain
+        /// Handle of a pipeline
+        /// kNullMaterial means default material
+        MaterialHandle CreateMaterial(const MaterialDesc &desc);
+
+        /// Width/height of whatever the scene actually renders into: the
+        /// editor viewport once one is set, else the full swapchain.
         float AspectRatio() const
         {
-            return mSwapchainExtent.height == 0
+            const VkExtent2D extent = HasSceneViewport()
+                                          ? mSceneViewportRect.extent
+                                          : mSwapchainExtent;
+            return extent.height == 0
                        ? 1.0f
-                       : static_cast<float>(mSwapchainExtent.width) / static_cast<float>(mSwapchainExtent.height);
+                       : static_cast<float>(extent.width) / static_cast<float>(extent.height);
         }
 
         void DrawFrame(std::span<const DrawItem> items);
@@ -81,6 +100,12 @@ namespace mts
 
     private:
         struct GpuMesh;
+        struct GpuMaterial;
+
+        bool HasSceneViewport() const
+        {
+            return mSceneViewportRect.extent.width > 0 && mSceneViewportRect.extent.height > 0;
+        }
 
         bool CreateVulkanInstance(const RendererDesc &desc);
         bool CreateDebugMessenger();
@@ -97,9 +122,13 @@ namespace mts
         bool CreateFrameResources();
         bool CreateRenderCompleteSemaphores();
         void DestroyRenderCompleteSemaphores();
-        bool CreateGraphicsPipeline();
+        bool CreatePipelineLayout();
+        /// Builds one VkPipeline from a desc.
+        VkPipeline BuildPipeline(const MaterialDesc &desc);
         void DestroyMeshes();
+        void DestroyMaterials();
         const GpuMesh *FindMesh(MeshHandle handle) const;
+        const GpuMaterial *FindMaterial(MaterialHandle handle) const;
         void NameObject(VkObjectType type, uint64_t handle, const char *name);
         void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const DrawItem> items);
 
@@ -126,6 +155,8 @@ namespace mts
         VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
         VkFormat mSwapchainFormat = VK_FORMAT_UNDEFINED;
         VkExtent2D mSwapchainExtent{};
+
+        VkRect2D mSceneViewportRect{};
         std::vector<VkImage> mSwapchainImages;
         std::vector<VkImageView> mSwapchainViews;
 
@@ -147,8 +178,9 @@ namespace mts
         // dont start at 0 or 1 or else underflows
         uint64_t mNextSignalValue = kFramesInFlight + 1;
 
+        /// Shared among materials as all inputs are shaped the same
+        /// = DrawItem + Vertex format
         VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
-        VkPipeline mPipeline = VK_NULL_HANDLE;
 
         // One buffer pair per mesh
         struct GpuMesh
@@ -161,9 +193,17 @@ namespace mts
             uint32_t mGeneration = 0; //< 0 = slot never filled
         };
 
-        /// Indices are stable: nothing is ever erased from this vector, which
-        /// is what makes MeshHandle::mIndex a plain subscript.
         std::vector<GpuMesh> mMeshes;
+
+        // One pipeline per material.
+        struct GpuMaterial
+        {
+            VkPipeline mPipeline = VK_NULL_HANDLE;
+        };
+
+        std::vector<GpuMaterial> mMaterials;
+
+        MaterialHandle mDefaultMaterial;
 
         uint32_t mFrameIndex = 0;
         bool mNeedRecreate = false;

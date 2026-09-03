@@ -54,14 +54,16 @@ namespace mts
             return vmaCreateBuffer(allocator, &bufferInfo, &allocInfo,
                                    &outBuffer, &outAllocation, outInfo) == VK_SUCCESS;
         }
-
-        // 64 + 16 = 80 bytes: inside the 128-byte guaranteed minimum for push
-        // constants. A second mat4 (view-projection, rung 4) will not fit
-        // beside this - that is why rung 4 premultiplies on the CPU instead.
+        // normalCols = Normal matrix
+        // vulkan's guaranteed minimum constant size = 128
+        // vulkan pads every column to 16 anyways
         struct PushData
         {
-            glm::mat4 transform;
-            glm::vec4 tint;
+            glm::mat4 transform;  // 64
+            glm::vec4 normalCol0; // 16
+            glm::vec4 normalCol1; // 16
+            glm::vec4 normalCol2; // 16
+            glm::vec4 tint;       // 16
         };
         VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -361,13 +363,17 @@ namespace mts
         if (!CreateFrameResources())
             return false;
 
-        if (!CreateGraphicsPipeline())
+        if (!CreatePipelineLayout())
+            return false;
+
+        mDefaultMaterial = CreateMaterial(MaterialDesc{});
+        if (mDefaultMaterial.IsNull())
             return false;
 
         NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MitosisEngine device");
         NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(mGfxQueue), "Graphics+present queue");
         NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(mSwapchain), "Swapchain");
-        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mPipeline), "Mesh pipeline");
+        NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mMaterials[mDefaultMaterial.mIndex].mPipeline), "Default material pipeline");
 
         for (size_t i = 0; i < mSwapchainImages.size(); ++i)
         {
@@ -452,12 +458,7 @@ namespace mts
 
             // before mAllocator
             DestroyMeshes();
-
-            if (mPipeline != VK_NULL_HANDLE)
-            {
-                vkDestroyPipeline(mDevice, mPipeline, nullptr);
-                mPipeline = VK_NULL_HANDLE;
-            }
+            DestroyMaterials();
 
             if (mPipelineLayout != VK_NULL_HANDLE)
             {
@@ -983,10 +984,32 @@ namespace mts
         return true;
     }
 
-    bool VulkanRenderer::CreateGraphicsPipeline()
+    bool VulkanRenderer::CreatePipelineLayout()
     {
-        VkShaderModule vertModule = CreateShaderModule(mDevice, ShaderPath("triangle.vertexMain.spv"));
-        VkShaderModule fragModule = CreateShaderModule(mDevice, ShaderPath("triangle.fragmentMain.spv"));
+        const VkPushConstantRange pushConstantRange{
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset = 0,
+            .size = sizeof(PushData)};
+
+        const VkPipelineLayoutCreateInfo layoutInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .setLayoutCount = 0,
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pushConstantRange};
+
+        if (vkCreatePipelineLayout(mDevice, &layoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS)
+        {
+            MTS_LOG_CRITICAL("vkCreatePipelineLayout failed");
+            return false;
+        }
+
+        return true;
+    }
+
+    VkPipeline VulkanRenderer::BuildPipeline(const MaterialDesc &desc)
+    {
+        VkShaderModule vertModule = CreateShaderModule(mDevice, ShaderPath(desc.shaderName + ".vertexMain.spv"));
+        VkShaderModule fragModule = CreateShaderModule(mDevice, ShaderPath(desc.shaderName + ".fragmentMain.spv"));
 
         if (vertModule == VK_NULL_HANDLE || fragModule == VK_NULL_HANDLE)
         {
@@ -994,7 +1017,7 @@ namespace mts
                 vkDestroyShaderModule(mDevice, vertModule, nullptr);
             if (fragModule != VK_NULL_HANDLE)
                 vkDestroyShaderModule(mDevice, fragModule, nullptr);
-            return false;
+            return VK_NULL_HANDLE;
         }
 
         const VkPipelineShaderStageCreateInfo stages[]{
@@ -1012,8 +1035,9 @@ namespace mts
             .stride = sizeof(Vertex),
             .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
 
-        const std::array<VkVertexInputAttributeDescription, 2> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos)},
-                                                                                 {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, color)}}};
+        const std::array<VkVertexInputAttributeDescription, 3> vertexAttributes{{{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos)},
+                                                                                 {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, color)},
+                                                                                 {.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, normal)}}};
 
         const VkPipelineVertexInputStateCreateInfo vertexInput{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -1038,8 +1062,8 @@ namespace mts
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
             .depthClampEnable = VK_FALSE,
             .rasterizerDiscardEnable = VK_FALSE,
-            .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_BACK_BIT,
+            .polygonMode = desc.polygonMode,
+            .cullMode = desc.cullMode,
             .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
             .depthBiasEnable = VK_FALSE,
             .lineWidth = 1.0f};
@@ -1077,25 +1101,6 @@ namespace mts
             .dynamicStateCount = 2,
             .pDynamicStates = dynamicStates};
 
-        const VkPushConstantRange pushConstantRange{
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-            .offset = 0,
-            .size = sizeof(PushData)};
-
-        const VkPipelineLayoutCreateInfo layoutInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .setLayoutCount = 0,
-            .pushConstantRangeCount = 1,
-            .pPushConstantRanges = &pushConstantRange};
-
-        if (vkCreatePipelineLayout(mDevice, &layoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS)
-        {
-            MTS_LOG_CRITICAL("vkCreatePipelineLayout failed");
-            vkDestroyShaderModule(mDevice, vertModule, nullptr);
-            vkDestroyShaderModule(mDevice, fragModule, nullptr);
-            return false;
-        }
-
         const VkPipelineRenderingCreateInfo renderingInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,
@@ -1119,8 +1124,9 @@ namespace mts
             .renderPass = VK_NULL_HANDLE,
             .subpass = 0};
 
+        VkPipeline pipeline = VK_NULL_HANDLE;
         const VkResult result = vkCreateGraphicsPipelines(
-            mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mPipeline);
+            mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
 
         vkDestroyShaderModule(mDevice, vertModule, nullptr);
         vkDestroyShaderModule(mDevice, fragModule, nullptr);
@@ -1128,12 +1134,40 @@ namespace mts
         if (result != VK_SUCCESS)
         {
             MTS_LOG_CRITICAL("vkCreateGraphicsPipelines failed: {}", static_cast<int>(result));
-            mPipeline = VK_NULL_HANDLE;
-            return false;
+            return VK_NULL_HANDLE;
         }
 
-        MTS_LOG_INFO("Graphics pipeline created");
-        return true;
+        return pipeline;
+    }
+
+    MaterialHandle VulkanRenderer::CreateMaterial(const MaterialDesc &desc)
+    {
+        const VkPipeline pipeline = BuildPipeline(desc);
+        if (pipeline == VK_NULL_HANDLE)
+            return kNullMaterial;
+
+        mMaterials.push_back(GpuMaterial{pipeline});
+
+        MTS_LOG_INFO("Material created: {} (index {})", desc.shaderName, mMaterials.size() - 1);
+        return MaterialHandle{static_cast<uint32_t>(mMaterials.size() - 1), 0};
+    }
+
+    void VulkanRenderer::DestroyMaterials()
+    {
+        for (GpuMaterial &material : mMaterials)
+        {
+            if (material.mPipeline != VK_NULL_HANDLE)
+                vkDestroyPipeline(mDevice, material.mPipeline, nullptr);
+        }
+        mMaterials.clear();
+    }
+
+    const VulkanRenderer::GpuMaterial *VulkanRenderer::FindMaterial(MaterialHandle handle) const
+    {
+        if (handle.IsNull() || handle.mIndex >= mMaterials.size())
+            return nullptr;
+
+        return &mMaterials[handle.mIndex];
     }
 
     MeshHandle VulkanRenderer::CreateMesh(std::span<const Vertex> vertices,
@@ -1267,9 +1301,6 @@ namespace mts
 
         const GpuMesh &mesh = mMeshes[handle.mIndex];
 
-        // Nothing bumps a generation yet, so this can only fail on a
-        // hand-built handle today. It is the check that makes freeing a mesh a
-        // local change later instead of an audit of every call site.
         if (mesh.mGeneration != handle.mGeneration)
             return nullptr;
 
@@ -1439,42 +1470,60 @@ namespace mts
             vkCmdBeginDebugUtilsLabelEXT(cmd, &label);
         }
 
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+        // clip the scene pass if there is a specified viewport
+        const VkRect2D requestedRect = HasSceneViewport()
+                                           ? mSceneViewportRect
+                                           : VkRect2D{.offset{0, 0}, .extent = mSwapchainExtent};
+        VkRect2D sceneRect = requestedRect;
+        sceneRect.offset.x = std::clamp(sceneRect.offset.x, 0, static_cast<int32_t>(mSwapchainExtent.width));
+        sceneRect.offset.y = std::clamp(sceneRect.offset.y, 0, static_cast<int32_t>(mSwapchainExtent.height));
+        sceneRect.extent.width = std::min(sceneRect.extent.width,
+                                          mSwapchainExtent.width - static_cast<uint32_t>(sceneRect.offset.x));
+        sceneRect.extent.height = std::min(sceneRect.extent.height,
+                                           mSwapchainExtent.height - static_cast<uint32_t>(sceneRect.offset.y));
 
         const VkViewport viewport{
-            .x = 0.0f,
-            .y = 0.0f,
-            .width = static_cast<float>(mSwapchainExtent.width),
-            .height = static_cast<float>(mSwapchainExtent.height),
+            .x = static_cast<float>(sceneRect.offset.x),
+            .y = static_cast<float>(sceneRect.offset.y),
+            .width = static_cast<float>(sceneRect.extent.width),
+            .height = static_cast<float>(sceneRect.extent.height),
             .minDepth = 0.0f,
             .maxDepth = 1.0f};
         vkCmdSetViewport(cmd, 0, 1, &viewport);
+        vkCmdSetScissor(cmd, 0, 1, &sceneRect);
 
-        const VkRect2D scissor{
-            .offset{0, 0},
-            .extent = mSwapchainExtent};
-        vkCmdSetScissor(cmd, 0, 1, &scissor);
+        VkPipeline boundPipeline = VK_NULL_HANDLE;
 
-        // One draw per item, each keyed by its own mesh handle: an item whose
-        // mesh does not resolve (not yet loaded, or a stale handle) costs
-        // that one item, not the frame - see FindMesh. No dedup across items
-        // that share a mesh; sorting the list to skip redundant binds is a
-        // later optimisation, invisible at the object counts here.
+        // no mesh/material batching yet, just draw per item
         for (const DrawItem &item : items)
         {
             const GpuMesh *const mesh = FindMesh(item.mesh);
             if (mesh == nullptr)
                 continue;
 
+            const GpuMaterial *material = FindMaterial(item.material);
+            if (material == nullptr)
+                material = FindMaterial(mDefaultMaterial);
+            if (material == nullptr)
+                continue;
+
+            if (material->mPipeline != boundPipeline)
+            {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, material->mPipeline);
+                boundPipeline = material->mPipeline;
+            }
+
             const VkDeviceSize vertexOffset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->mVertexBuffer, &vertexOffset);
 
-            // UINT32 to match std::vector<uint32_t>. UINT16 halves the index
-            // buffer and is worth it once meshes are cooked; picking it now
-            // would mean two index paths for no measurable gain.
             vkCmdBindIndexBuffer(cmd, mesh->mIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-            const PushData pushData{.transform = item.model, .tint = item.tint};
+            const PushData pushData{
+                .transform = item.model,
+                .normalCol0 = glm::vec4(item.normalMatrix[0], 0.0f),
+                .normalCol1 = glm::vec4(item.normalMatrix[1], 0.0f),
+                .normalCol2 = glm::vec4(item.normalMatrix[2], 0.0f),
+                .tint = item.tint};
 
             vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(PushData), &pushData);

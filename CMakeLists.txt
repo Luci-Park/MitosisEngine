@@ -38,6 +38,7 @@ add_subdirectory(third_party)
 add_subdirectory(modules/app)
 add_subdirectory(modules/assets)
 add_subdirectory(modules/core)
+add_subdirectory(modules/editor)
 add_subdirectory(modules/editortheme)
 add_subdirectory(modules/renderer)
 add_subdirectory(modules/window)
@@ -49,6 +50,10 @@ target_sources(HelloWorld PRIVATE main.cpp)
 
 engine_add_shaders(HelloWorld
     SOURCE assets/shaders/triangle.slang
+    ENTRIES vertexMain:vertex fragmentMain:fragment)
+
+engine_add_shaders(HelloWorld
+    SOURCE assets/shaders/unlit.slang
     ENTRIES vertexMain:vertex fragmentMain:fragment)
 
 engine_cook_assets(HelloWorld

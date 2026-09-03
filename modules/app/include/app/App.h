@@ -13,13 +13,13 @@
 #include <core/ecs/World.h>
 #include <assets/AssetCache.h>
 #include <assets/AssetManifest.h>
+#include <editor/Editor.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <string>
 
 namespace mts
 {
@@ -76,14 +76,9 @@ namespace mts
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
 
-        /// Dockspace, the default Scene/Inspector/Output split, and the
-        /// Debug menu - the Slate editor shell, not a generic App concern.
-        /// Gated separately from the ImGui context itself by mEnableEditorLayout
-        /// so a non-editor consumer of App can keep ImGui without this layout.
-        void DrawEditorUI();
-
         std::unique_ptr<Window> mWindow;
         VulkanRenderer mRenderer;
+        Editor mEditor;
 
         // Before mWorld, so it is destroyed after it. mWorld holds a
         // FrameCommands resource pointing here, and reverse-order destruction
@@ -104,8 +99,5 @@ namespace mts
         std::optional<AssetCache> mAssetCache;
         bool mAssetLoadFailed = false;
         bool mInitialized = false;
-        bool mImGuiInitialized = false;
-        bool mShowStyleEditor = false;
-        std::string mImGuiIniPath;
     };
 }
