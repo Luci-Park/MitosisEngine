@@ -32,6 +32,12 @@ namespace mts
 {
     class World;
 
+    namespace detail
+    {
+        class ArchetypeMatcher;
+        struct QueryIterationGuard;
+    }
+
     /**
      * Called just before an entity is torn down, while all of its components
      * are still readable. Registered with World::AddDestroyHook.
@@ -349,6 +355,91 @@ namespace mts
                 RemoveTableComponent<T>(entity);
         }
 
+        // -- erased access -------------------------------------------------
+        //
+        // The same four operations without a C++ type, for callers that only
+        // have a TypeId at runtime: a scripting binding, an editor inspector, a
+        // deserializer. Table storage only - a sparse component's storage is
+        // std::vector<T> and cannot be reached without T - so a caller that may
+        // hold either kind should go through ComponentRegistry, which recorded
+        // each type's StorageKind at registration and picks the right path.
+        //
+        // "Should" is not enough on a public API, so a sparse TypeId is refused
+        // here rather than quietly mishandled. AddRaw would otherwise build a
+        // table column shadowing the sparse store, and every typed reader would
+        // go on seeing the old value; GetRaw and HasRaw would report the
+        // component absent. IsSparseComponentSeq is what makes that detectable
+        // from a TypeId alone - see Signature.h.
+
+        /// The component's bytes, or nullptr when the entity is dead, or has
+        /// no such component. Never asserts: unlike engine code, a script holds
+        /// handles across frames and asking about a destroyed one is routine.
+        void *GetRaw(Entity entity, TypeId type)
+        {
+            AssertNotSparse("GetRaw", type);
+
+            if (!mPool.IsAlive(entity))
+                return nullptr;
+
+            const EntityRecord &record = mRecords[entity.mIndex];
+            ComponentColumn *column = record.archetype->FindColumn(type);
+            return column ? column->At(record.row) : nullptr;
+        }
+
+        const void *GetRaw(Entity entity, TypeId type) const
+        {
+            AssertNotSparse("GetRaw", type);
+
+            if (!mPool.IsAlive(entity))
+                return nullptr;
+
+            const EntityRecord &record = mRecords[entity.mIndex];
+            const ComponentColumn *column = record.archetype->FindColumn(type);
+            return column ? column->At(record.row) : nullptr;
+        }
+
+        bool HasRaw(Entity entity, TypeId type) const
+        {
+            AssertNotSparse("HasRaw", type);
+            return mPool.IsAlive(entity) && mRecords[entity.mIndex].archetype->GetSignature().test(ComponentBitOf(type));
+        }
+
+        /// Adds `type` to `entity` and copies `size` bytes from `value`.
+        /// Returns the stored bytes. `size` and `align` must be the ones the
+        /// type was registered with - a mismatch is a corrupt column, not a
+        /// diagnosable error, so ComponentRegistry is the intended caller.
+        void *AddRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
+        {
+            // MTS_CHECK, unlike the read paths: this one corrupts rather than
+            // misreports, and does so silently - the shadowed sparse value goes
+            // on being returned to every typed reader.
+            MTS_CHECK(!IsSparseComponentSeq(type.seq),
+                      "World::AddRaw: \"{}\" is a sparse component. The erased path is table-only, and a "
+                      "table row here would shadow the sparse one. Go through ComponentRegistry, which "
+                      "knows the StorageKind.",
+                      type.name);
+
+            MTS_ASSERT(mPool.IsAlive(entity), "World::AddRaw: entity is not alive");
+            MTS_ASSERT(!HasRaw(entity, type), "World::AddRaw: entity already has {}", type.name);
+            AssertNoStructuralChange("AddRaw");
+
+            return AddTableComponentRaw(entity, type, size, align, value);
+        }
+
+        void RemoveRaw(Entity entity, TypeId type)
+        {
+            MTS_CHECK(!IsSparseComponentSeq(type.seq),
+                      "World::RemoveRaw: \"{}\" is a sparse component. The erased path is table-only. Go "
+                      "through ComponentRegistry, which knows the StorageKind.",
+                      type.name);
+
+            MTS_ASSERT(mPool.IsAlive(entity), "World::RemoveRaw: entity is not alive");
+            MTS_ASSERT(HasRaw(entity, type), "World::RemoveRaw: entity does not have {}", type.name);
+            AssertNoStructuralChange("RemoveRaw");
+
+            RemoveTableComponentRaw(entity, type);
+        }
+
         /**
          * Installs this world's single instance of T, constructed in place, and
          * replaces any previous one.
@@ -452,6 +543,16 @@ namespace mts
         template <typename...>
         friend class Query;
 
+        // The two helpers that reach past the public surface, and the reason
+        // the archetype table is not simply public. ArchetypeMatcher is the
+        // only walker of mArchetypes; QueryIterationGuard is the only way to
+        // raise the iteration depth. A public accessor would let any caller
+        // hold column pointers with no guard raised, which is exactly the
+        // silent corruption AssertNoStructuralChange exists to catch - so the
+        // walk stays inside types that pair the two by construction.
+        friend class detail::ArchetypeMatcher;
+        friend struct detail::QueryIterationGuard;
+
         const std::unordered_map<Signature, std::unique_ptr<Archetype>> &Archetypes() const { return mArchetypes; }
 
         // Depth, not a flag: a query may legitimately be re-entered from its own
@@ -481,6 +582,15 @@ namespace mts
          * Record into a CommandBuffer instead; it applies at the phase boundary,
          * which is what the boundary is for.
          */
+        static void AssertNotSparse([[maybe_unused]] const char *what, [[maybe_unused]] TypeId type)
+        {
+            MTS_ASSERT(!IsSparseComponentSeq(type.seq),
+                       "World::{}: \"{}\" is a sparse component, which the erased path cannot reach - it "
+                       "would report the component absent. Go through ComponentRegistry, which knows the "
+                       "StorageKind.",
+                       what, type.name);
+        }
+
         void AssertNoStructuralChange([[maybe_unused]] const char *what) const
         {
             MTS_ASSERT(mQueryIterationDepth == 0,
@@ -489,47 +599,72 @@ namespace mts
                        what);
         }
 
-        // adding to archetype
-        // move entityset to different table
-        template <typename T>
-        T &AddTableComponent(Entity entity, const T &value)
+        /**
+         * Moves an entity to the table that also holds `type`, and copies
+         * `size` bytes of `value` into the new row.
+         *
+         * Erased rather than templated because a script-declared component has
+         * no C++ type to instantiate against - only a TypeId, a size and an
+         * alignment, which is exactly what ComponentColumn's constructor has
+         * always taken. The templated overload below is a thin façade over
+         * this, so there is one implementation of the archetype move rather
+         * than two that drift.
+         *
+         * Callers are responsible for the preconditions; the public AddRaw and
+         * AddComponent do that checking.
+         */
+        void *AddTableComponentRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
         {
             // get archetype
             const EntityRecord from = mRecords[entity.mIndex];
 
             Signature signature = from.archetype->GetSignature();
             // signature if added target component
-            signature.set(ComponentBit<T>());
+            signature.set(ComponentBitOf(type));
 
-            Archetype &target = GetOrCreateAdded(signature, *from.archetype, ComponentColumn::For<T>());
+            Archetype &target = GetOrCreateAdded(signature, *from.archetype, ComponentColumn(type, size, align));
             const uint32_t row = target.AddRow(entity);
             CopySharedColumns(*from.archetype, from.row, target, row);
 
-            T *slot = static_cast<T *>(target.FindColumn(TypeIdOf<T>())->At(row));
-            *slot = value;
+            void *slot = target.FindColumn(type)->At(row);
+            std::memcpy(slot, value, size);
 
             RemoveRow(*from.archetype, from.row);
             mRecords[entity.mIndex] = EntityRecord{&target, row};
-            return *slot;
+            return slot;
         }
 
         // removing from archetype
         // move entityset to different table
-        template <typename T>
-        void RemoveTableComponent(Entity entity)
+        void RemoveTableComponentRaw(Entity entity, TypeId type)
         {
             const EntityRecord from = mRecords[entity.mIndex];
             Signature signature = from.archetype->GetSignature();
             // signature if removed target component
-            signature.reset(ComponentBit<T>());
+            signature.reset(ComponentBitOf(type));
 
-            Archetype &target = GetOrCreateRemoved(signature, *from.archetype, TypeIdOf<T>());
+            Archetype &target = GetOrCreateRemoved(signature, *from.archetype, type);
             const uint32_t row = target.AddRow(entity);
 
             CopySharedColumns(*from.archetype, from.row, target, row);
 
             RemoveRow(*from.archetype, from.row);
             mRecords[entity.mIndex] = EntityRecord{&target, row};
+        }
+
+        // adding to archetype
+        // move entityset to different table
+        template <typename T>
+        T &AddTableComponent(Entity entity, const T &value)
+        {
+            return *static_cast<T *>(
+                AddTableComponentRaw(entity, TypeIdOf<T>(), sizeof(T), alignof(T), &value));
+        }
+
+        template <typename T>
+        void RemoveTableComponent(Entity entity)
+        {
+            RemoveTableComponentRaw(entity, TypeIdOf<T>());
         }
 
         // lazy creation

@@ -57,7 +57,15 @@ The rename is applied but not committed; see 0017 for how to split it.
 - Never add, remove or destroy while iterating. Use the `CommandBuffer`.
 - Systems cache queries in `OnStart`.
 - Ordering between systems is a phase, never registration order.
-- 128 component types max; raising it is a deliberate edit to `Signature.h`.
+- 256 component types max, C++ and script-declared together; raising it is a
+  deliberate edit to `Signature.h`.
+- Register a new C++ component in `RegisterCoreComponents`, with a field table if
+  scripts should reach its values. Unregistered means unreachable by name, with
+  no error to say so.
+- A field table uses accessor thunks, never offsets, for any component with an
+  invariant to keep ([0022](decisions/0022-component-registry.md)).
+- Register the C++ components before loading any script: a name belongs to
+  whoever claims it first.
 
 ## Errors
 

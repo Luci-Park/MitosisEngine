@@ -9,6 +9,7 @@
 
 #pragma once
 #include "core/ecs/ComponentAsserts.h"
+#include "core/ecs/ComponentFields.h"
 
 #include <cstdint>
 #include <glm/gtc/quaternion.hpp>
@@ -113,6 +114,38 @@ namespace mts
     };
 
     MTS_ASSERT_COMPONENT(Transform);
+
+    /**
+     * Transform as a script or an inspector sees it.
+     *
+     * Accessor thunks, not offsets, and that is the entire point of FieldDesc
+     * carrying thunks at all. The members are private so Version() cannot fall
+     * behind the data, and WorldTransform detects staleness in O(1) off that
+     * version. A generic offset write to mPosition would move the object and
+     * leave mVersion untouched, so every world matrix downstream would keep
+     * rebuilding from a version it still considers current - no crash, no
+     * assert, just a frame drawn in the old place. Routing through SetPosition
+     * keeps the invariant where the class enforces it.
+     */
+    inline constexpr FieldDesc kTransformFields[] = {
+        {"position", FieldKind::Vec3, 0,
+         [](const void *component, void *out)
+         { *static_cast<glm::vec3 *>(out) = static_cast<const Transform *>(component)->Position(); },
+         [](void *component, const void *in)
+         { static_cast<Transform *>(component)->SetPosition(*static_cast<const glm::vec3 *>(in)); }},
+
+        {"rotation", FieldKind::Quat, 0,
+         [](const void *component, void *out)
+         { *static_cast<glm::quat *>(out) = static_cast<const Transform *>(component)->Rotation(); },
+         [](void *component, const void *in)
+         { static_cast<Transform *>(component)->SetRotation(*static_cast<const glm::quat *>(in)); }},
+
+        {"scale", FieldKind::Vec3, 0,
+         [](const void *component, void *out)
+         { *static_cast<glm::vec3 *>(out) = static_cast<const Transform *>(component)->Scale(); },
+         [](void *component, const void *in)
+         { static_cast<Transform *>(component)->SetScale(*static_cast<const glm::vec3 *>(in)); }},
+    };
 }
 
 // Storage is left at the Table default: a transform is dense - most entities

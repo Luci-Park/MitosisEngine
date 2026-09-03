@@ -57,7 +57,7 @@ Entities are `{index, generation}` handles, the generation guarding against ABA.
 Components are POD ([0006](decisions/0006-pod-components.md)) in one of two
 storages ([0005](decisions/0005-archetype-plus-sparse.md)): archetype tables by
 default, sparse sets for churny components via `MTS_COMPONENT_SPARSE(T)`.
-`Signature` is a 128-bit bitset over sequence-numbered types and keys the
+`Signature` is a 256-bit bitset over sequence-numbered types and keys the
 archetype map. `Query<Ts...>` caches matching archetypes, re-resolving when the
 world's archetype generation changes; filters are `With`, `Without`, `Or`.
 

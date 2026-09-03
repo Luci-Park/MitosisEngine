@@ -9,6 +9,7 @@
 
 #pragma once
 #include "core/ecs/ComponentAsserts.h"
+#include "core/ecs/ComponentFields.h"
 
 #include <cstdint>
 #include <glm/mat4x4.hpp>
@@ -65,6 +66,17 @@ namespace mts
     };
 
     MTS_ASSERT_COMPONENT(WorldTransform);
+
+    /// Read-only, expressed as a getter with no setter: a game never authors a
+    /// world matrix, it authors a Transform and a parent. Writing here would be
+    /// overwritten by the next resolve anyway, so the absent setter says so
+    /// instead of letting a script discover it.
+    inline constexpr FieldDesc kWorldTransformFields[] = {
+        {"matrix", FieldKind::Mat4, 0,
+         [](const void *component, void *out)
+         { *static_cast<glm::mat4 *>(out) = static_cast<const WorldTransform *>(component)->Matrix(); },
+         nullptr},
+    };
 }
 
 // Table storage, same reasoning as Transform: read by every renderer and

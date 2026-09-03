@@ -8,4 +8,7 @@ engine_add_module_tests(core
     Transform.tests.cpp
     TransformHierarchy.tests.cpp
     Resources.tests.cpp
+    Entity.tests.cpp
+    ComponentRegistry.tests.cpp
+    RuntimeQuery.tests.cpp
 )

@@ -1,5 +1,7 @@
 #include <app/App.h>
 
+#include <core/ecs/ComponentRegistry.h>
+#include <core/ecs/DeferredAccess.h>
 #include <core/ecs/TransformHierarchy.h>
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
@@ -44,6 +46,18 @@ namespace mts
         // and nothing is ever left orphaned for a pass to reap. Called here so
         // a world destroyed into before its first AddTransform still cascades.
         InstallHierarchy(mWorld);
+
+        // Before anything may load a script: the registry gives a name to
+        // whoever claims it first, and a script-declared component that stole
+        // "Transform" would be refused here rather than at its own callsite.
+        RegisterCoreComponents();
+
+        // Publishes the frame's buffer so a caller with only a World - a script
+        // binding, an editor command - can defer a structural change it is not
+        // allowed to make immediately. The scheduler already flushes this
+        // buffer at every phase boundary; a second one would be flushed by
+        // nobody, which is why the resource holds a pointer.
+        mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
 
         // should be before any other system in PostUpdate
         mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);

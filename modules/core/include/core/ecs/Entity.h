@@ -24,4 +24,24 @@ namespace mts
     };
 
     inline constexpr Entity kNullEntity{};
+
+    /**
+     * The one encoding for handing an Entity to a scripting VM or a save file.
+     *
+     * Both halves matter: mGeneration is the ABA guard, so an encoding that
+     * drops it turns a stale handle into one that reports itself alive. That is
+     * the failure mode to watch for on the binding side - a VM whose only
+     * numeric type is a double carries 53 significant bits and would silently
+     * truncate the generation. Pass this through an integer slot (userdata, a
+     * boxed value, Lua 5.3+ integers), never a floating-point one.
+     */
+    constexpr uint64_t PackEntity(Entity entity)
+    {
+        return (static_cast<uint64_t>(entity.mGeneration) << 32) | static_cast<uint64_t>(entity.mIndex);
+    }
+
+    constexpr Entity UnpackEntity(uint64_t packed)
+    {
+        return Entity{static_cast<uint32_t>(packed), static_cast<uint32_t>(packed >> 32)};
+    }
 }

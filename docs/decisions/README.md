@@ -32,6 +32,9 @@ that day.
 | [0019](0019-world-resources.md) | Per-world state lives in typed resources |
 | [0020](0020-scene-graph-as-a-resource.md) | Scene structure lives in a resource, and destruction cascades |
 | [0021](0021-world-transforms-resolve-on-read.md) | World transforms resolve on read |
+| [0022](0022-component-registry.md) | A process-wide component registry behind erased operations |
+| [0023](0023-runtime-component-types.md) | Scripts may declare component types, and a name keeps its bit forever |
+| [0024](0024-runtime-queries-stay-behind-friendship.md) | Runtime queries walk archetypes through friendship, not a public accessor |
 
 All Accepted.
 

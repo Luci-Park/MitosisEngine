@@ -78,8 +78,14 @@ namespace mts
         std::unique_ptr<Window> mWindow;
         VulkanRenderer mRenderer;
 
-        World mWorld;
+        // Before mWorld, so it is destroyed after it. mWorld holds a
+        // FrameCommands resource pointing here, and reverse-order destruction
+        // would otherwise leave that pointer dangling for the whole of ~World -
+        // which tears down resources and could reach a destroy hook. See
+        // decision 0019 on releasing handles before the world goes down.
         CommandBuffer mCommands;
+
+        World mWorld;
         SystemScheduler mScheduler;
 
         /// Rebuilt every frame but keeps its capacity to steady allocation.

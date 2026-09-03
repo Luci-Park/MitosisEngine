@@ -27,6 +27,132 @@ namespace mts
         {
             return static_cast<const SparseSetStorage<T> *>(storage)->Has(entity);
         }
+
+        /**
+         * Held for the duration of a table walk, by every walker.
+         *
+         * It stops the owning query rebuilding its match list under the walk,
+         * and tells the world to refuse structural changes while references
+         * into a table are live. It is a type rather than a pair of calls
+         * because it is the *only* way to raise World's iteration depth - see
+         * the friend declarations in World - so a walker cannot forget the
+         * matching decrement, and no caller outside these types can walk
+         * archetypes with the guard down.
+         *
+         * A depth rather than a flag: the same query may be re-entered from its
+         * own callback for a pairwise scan, and a flag would let the inner
+         * walk's destructor declare the outer one finished.
+         */
+        struct QueryIterationGuard
+        {
+            QueryIterationGuard(uint32_t &depth, World &world) : mDepth(depth), mWorld(world)
+            {
+                ++mDepth;
+                mWorld.BeginQueryIteration();
+            }
+
+            ~QueryIterationGuard()
+            {
+                mWorld.EndQueryIteration();
+                --mDepth;
+            }
+
+            QueryIterationGuard(const QueryIterationGuard &) = delete;
+            QueryIterationGuard &operator=(const QueryIterationGuard &) = delete;
+
+            uint32_t &mDepth;
+            World &mWorld;
+        };
+
+        /**
+         * The archetype-level match test and its generation cache, shared by
+         * Query<Ts...> and RuntimeQuery.
+         *
+         * Both need the same three things - fold the terms into signature
+         * masks once, reject whole tables by mask, and rescan only when the
+         * world grew an archetype - and the two differ only in what they cache
+         * per match (a fixed std::array of columns against a runtime-sized
+         * one). Keeping the test here means a fix to the Or-clause semantics or
+         * the rescan trigger lands in one place rather than in two copies that
+         * drift.
+         *
+         * This is also the only walker of World::Archetypes, which is why that
+         * accessor can stay protected.
+         */
+        class ArchetypeMatcher
+        {
+        public:
+            /// Every listed bit must be present. Data terms and With members
+            /// impose the identical test, so they share one mask.
+            void RequireAll(const Signature &signature) { mAll |= signature; }
+
+            /// No listed bit may be present.
+            void RequireNone(const Signature &signature) { mNone |= signature; }
+
+            /// One clause: at least one of its bits must be present. Members
+            /// within a clause OR together, clauses AND together, so (A|B) AND
+            /// (C|D) is two calls. Merging them into one mask would silently
+            /// widen that to any-of-all-four.
+            void RequireAny(const Signature &clause) { mOrClauses.push_back(clause); }
+
+            /// A sparse component has no signature bit, so its filter becomes a
+            /// per-row test instead of being dropped.
+            void AddSparseCheck(const SparseFilterCheck &check) { mSparseChecks.push_back(check); }
+
+            bool MatchesSignature(const Signature &signature) const
+            {
+                // every required bit must be present
+                if ((signature & mAll) != mAll)
+                    return false;
+                // no excluded bit may be present
+                if ((signature & mNone).any())
+                    return false;
+                // clauses AND together: each must be satisfied by one of its members
+                for (const Signature &clause : mOrClauses)
+                {
+                    if ((signature & clause).none())
+                        return false;
+                }
+                return true;
+            }
+
+            bool PassesSparseChecks(Entity entity) const
+            {
+                for (const SparseFilterCheck &check : mSparseChecks)
+                {
+                    if (check.has(check.storage, entity) != check.wantPresent)
+                        return false;
+                }
+                return true;
+            }
+
+            bool NeedsRefresh(const World &world) const { return world.Generation() != mSeenGeneration; }
+
+            /// Forces the next NeedsRefresh to say yes. Needed by any owner
+            /// that may add a term after the first walk - the generation stamp
+            /// tracks the world's archetypes, not this matcher's own masks.
+            void Invalidate() { mSeenGeneration = static_cast<std::size_t>(-1); }
+
+            /// Calls `onMatch(Archetype *)` for every matching table, then
+            /// stamps the generation. The caller owns the cache it fills.
+            template <typename Fn>
+            void Refresh(World &world, Fn &&onMatch)
+            {
+                for (const auto &[signature, archetype] : world.Archetypes())
+                {
+                    if (MatchesSignature(signature))
+                        onMatch(archetype.get());
+                }
+                mSeenGeneration = world.Generation();
+            }
+
+        private:
+            Signature mAll;
+            Signature mNone;
+            std::vector<Signature> mOrClauses; // one per Or term; empty for most queries
+            std::vector<SparseFilterCheck> mSparseChecks;
+            std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
+        };
     }
 
     /**
@@ -75,75 +201,29 @@ namespace mts
 
         template <typename... Filters>
         explicit Query(World &world, Filters... filters)
-            : mWorld(&world), mDataMask(detail::TableSignatureOf<Ts...>())
+            : mWorld(&world)
         {
+            mMatcher.RequireAll(detail::TableSignatureOf<Ts...>());
+
             // filters are fixed for the life of a Query instance, so fold them
             // into the masks here rather than on every ForEach call
             (ApplyFilter(filters), ...);
             ResolveSparseStorages(std::index_sequence_for<Ts...>{});
         }
 
-        // Held for the duration of a table walk. It stops EnsureFresh
-        // rebuilding mMatches under the walk, and tells the world to refuse
-        // structural changes while references into a table are live.
-        //
-        // A depth rather than a flag: the same query may be re-entered from its
-        // own callback for a pairwise scan, and a flag would let the inner
-        // walk's destructor declare the outer one finished.
-        struct IterationGuard
-        {
-            IterationGuard(uint32_t &depth, World &world) : mDepth(depth), mWorld(world)
-            {
-                ++mDepth;
-                mWorld.BeginQueryIteration();
-            }
-
-            ~IterationGuard()
-            {
-                mWorld.EndQueryIteration();
-                --mDepth;
-            }
-
-            IterationGuard(const IterationGuard &) = delete;
-            IterationGuard &operator=(const IterationGuard &) = delete;
-
-            uint32_t &mDepth;
-            World &mWorld;
-        };
-
         // -- archetype-level match ----------------------------------------------
-
-        bool Matches(const Signature &signature) const
-        {
-            // every dense data term must be present
-            if ((signature & mDataMask) != mDataMask)
-                return false;
-            // every dense With member must be present
-            if ((signature & mWithMask) != mWithMask)
-                return false;
-            // no dense Without member may be present
-            if ((signature & mWithoutMask).any())
-                return false;
-            // clauses AND together: each must be satisfied by one of its members
-            for (const Signature &clause : mOrClauses)
-            {
-                if ((signature & clause).none())
-                    return false;
-            }
-            return true;
-        }
 
         template <typename... Es>
         void ApplyFilter(With<Es...>)
         {
-            mWithMask |= detail::TableSignatureOf<Es...>();
+            mMatcher.RequireAll(detail::TableSignatureOf<Es...>());
             (AddSparseFilter<Es>(true), ...);
         }
 
         template <typename... Es>
         void ApplyFilter(Without<Es...>)
         {
-            mWithoutMask |= detail::TableSignatureOf<Es...>();
+            mMatcher.RequireNone(detail::TableSignatureOf<Es...>());
             (AddSparseFilter<Es>(false), ...);
         }
 
@@ -166,7 +246,7 @@ namespace mts
                           "Query: Or<> members must be dense components - a sparse component has no "
                           "signature bit, so it cannot take part in an archetype-level or-test");
 
-            mOrClauses.push_back(detail::TableSignatureOf<Es...>());
+            mMatcher.RequireAny(detail::TableSignatureOf<Es...>());
         }
 
         // dense members are already covered by the masks; a sparse member has no
@@ -177,26 +257,16 @@ namespace mts
             if constexpr (kIsSparseComponent<detail::Bare<E>>)
             {
                 using BareE = detail::Bare<E>;
-                mSparseFilterChecks.push_back(detail::SparseFilterCheck{
+                mMatcher.AddSparseCheck(detail::SparseFilterCheck{
                     &detail::SparseHasThunk<BareE>, &mWorld->SparseStorageFor<BareE>(), wantPresent});
             }
-        }
-
-        bool PassesSparseFilters(Entity entity) const
-        {
-            for (const detail::SparseFilterCheck &check : mSparseFilterChecks)
-            {
-                if (check.has(check.storage, entity) != check.wantPresent)
-                    return false;
-            }
-            return true;
         }
 
         // -- cache --------------------------------------------------------------
 
         void EnsureFresh()
         {
-            if (mWorld->Generation() == mSeenGeneration)
+            if (!mMatcher.NeedsRefresh(*mWorld))
                 return;
 
             MTS_ASSERT(mIterationDepth == 0,
@@ -204,15 +274,8 @@ namespace mts
                        "ForEach callback must not create archetypes and then re-run the same query");
 
             mMatches.clear();
-            for (const auto &[signature, archetype] : mWorld->Archetypes())
-            {
-                if (!Matches(signature))
-                    continue;
-
-                Archetype *table = archetype.get();
-                mMatches.push_back(Match{table, ResolveColumns(table)});
-            }
-            mSeenGeneration = mWorld->Generation();
+            mMatcher.Refresh(*mWorld, [this](Archetype *table)
+                             { mMatches.push_back(Match{table, ResolveColumns(table)}); });
         }
 
         static Columns ResolveColumns(Archetype *table)
@@ -246,7 +309,7 @@ namespace mts
 
             // index rather than iterator, and the guard makes a rebuild under the
             // walk a loud failure instead of a dangling reference
-            const IterationGuard guard(mIterationDepth, *mWorld);
+            const detail::QueryIterationGuard guard(mIterationDepth, *mWorld);
             for (std::size_t i = 0; i < mMatches.size(); ++i)
             {
                 Match &match = mMatches[i];
@@ -282,7 +345,7 @@ namespace mts
                                               ...))
                                             continue;
 
-                                        if (!PassesSparseFilters(entity))
+                                        if (!mMatcher.PassesSparseChecks(entity))
                                             continue;
 
                                         fn(entity, ResolveRef<Ts>(columns[Is], std::get<Is>(mSparseStorages),
@@ -303,16 +366,10 @@ namespace mts
         }
 
         World *mWorld;
+        detail::ArchetypeMatcher mMatcher;
         std::vector<Match> mMatches;
-        std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
         uint32_t mIterationDepth = 0;
         std::tuple<SparseSetStorage<detail::Bare<Ts>> *...> mSparseStorages{};
-
-        Signature mDataMask;
-        Signature mWithMask;
-        Signature mWithoutMask;
-        std::vector<Signature> mOrClauses; // one per Or term; empty for most queries
-        std::vector<detail::SparseFilterCheck> mSparseFilterChecks;
     };
 
     template <typename... Ts, typename... Filters>

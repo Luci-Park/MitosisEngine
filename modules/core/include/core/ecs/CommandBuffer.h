@@ -10,6 +10,7 @@
 #pragma once
 #include "ComponentAsserts.h"
 #include "Entity.h"
+#include "TypeId.h"
 #include "World.h"
 
 #include <cstddef>
@@ -74,6 +75,46 @@ namespace mts
             mCommands.push_back(Command{&ApplyDestroy, entity, kNoPayload});
         }
 
+        /**
+         * The erased twin of Add, for a component whose C++ type the caller
+         * does not have - a script-declared one, or one named by TypeId at
+         * runtime. Table storage only, same restriction as World::AddRaw.
+         *
+         * The type, size and alignment travel in a header written into the same
+         * payload buffer, immediately before the value. They cannot live on
+         * Command: TypeId carries a string_view, so folding it in would grow
+         * every command - including the payload-free ones - by 24 bytes to
+         * serve the rare case.
+         */
+        void AddRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
+        {
+            MTS_ASSERT(align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+                       "CommandBuffer::AddRaw: over-aligned component \"{}\" ({})", type.name, align);
+
+            const std::size_t headerOffset = AlignUp(mStorage.size(), alignof(RawHeader));
+            const std::size_t valueOffset = AlignUp(headerOffset + sizeof(RawHeader), align);
+            mStorage.resize(valueOffset + size);
+
+            // written after every resize: an offset survives reallocation, a
+            // pointer taken before it would not
+            const RawHeader header{type, size, align, static_cast<uint32_t>(valueOffset - headerOffset)};
+            std::memcpy(mStorage.data() + headerOffset, &header, sizeof(header));
+            std::memcpy(mStorage.data() + valueOffset, value, size);
+
+            mCommands.push_back(Command{&ApplyAddRaw, entity, headerOffset});
+        }
+
+        void RemoveRaw(Entity entity, TypeId type)
+        {
+            const std::size_t headerOffset = AlignUp(mStorage.size(), alignof(RawHeader));
+            mStorage.resize(headerOffset + sizeof(RawHeader));
+
+            const RawHeader header{type, 0, 0, 0};
+            std::memcpy(mStorage.data() + headerOffset, &header, sizeof(header));
+
+            mCommands.push_back(Command{&ApplyRemoveRaw, entity, headerOffset});
+        }
+
         bool Empty() const { return mCommands.empty(); }
         std::size_t Size() const { return mCommands.size(); }
 
@@ -95,6 +136,17 @@ namespace mts
 
     private:
         static constexpr std::size_t kNoPayload = 0; // unread by the payload-free thunks
+
+        // Trivially copyable so it can be memcpy'd in and out of the byte
+        // buffer; TypeId::name points at static or registry-interned storage,
+        // which outlives the flush.
+        struct RawHeader
+        {
+            TypeId type;
+            uint32_t size;
+            uint32_t align;
+            uint32_t valueOffset; // bytes from this header to the value
+        };
 
         // alignment is always a power of two, so the mask form is exact
         static constexpr std::size_t AlignUp(std::size_t n, std::size_t alignment)
@@ -126,6 +178,32 @@ namespace mts
         {
             if (world.IsAlive(entity) && world.Has<T>(entity))
                 world.RemoveComponent<T>(entity);
+        }
+
+        static void ApplyAddRaw(World &world, Entity entity, void *payload)
+        {
+            if (!world.IsAlive(entity))
+                return;
+
+            RawHeader header{};
+            std::memcpy(&header, payload, sizeof(header));
+            const void *value = static_cast<const std::byte *>(payload) + header.valueOffset;
+
+            // overwrite rather than assert on a duplicate, for the same reason
+            // ApplyAdd does
+            if (void *existing = world.GetRaw(entity, header.type))
+                std::memcpy(existing, value, header.size);
+            else
+                world.AddRaw(entity, header.type, header.size, header.align, value);
+        }
+
+        static void ApplyRemoveRaw(World &world, Entity entity, void *payload)
+        {
+            RawHeader header{};
+            std::memcpy(&header, payload, sizeof(header));
+
+            if (world.IsAlive(entity) && world.HasRaw(entity, header.type))
+                world.RemoveRaw(entity, header.type);
         }
 
         static void ApplyDestroy(World &world, Entity entity, void *)

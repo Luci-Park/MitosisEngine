@@ -32,7 +32,7 @@ engine dependencies.
 | `Entity` | `ecs/Entity.h` | `{index, generation}` handle, 8 bytes |
 | `EntityPool` | `ecs/EntityPool.h` | Allocates and recycles slots, bumps generations |
 | `TypeId` | `ecs/TypeId.h` | Per-type `{seq, hash, name}` |
-| `Signature` | `ecs/Signature.h` | 128-bit component set, the archetype key |
+| `Signature` | `ecs/Signature.h` | 256-bit component set, the archetype key |
 | `ComponentColumn` | `ecs/ComponentColumn.h` | One type's data in one archetype |
 | `Archetype` | `ecs/Archetype.h` | Rows of entities sharing a signature |
 | `SparseSetStorage<T>` | `ecs/SparseSetStorage.h` | Storage for churny components |
@@ -41,6 +41,10 @@ engine dependencies.
 | `Transform` | `ecs/components/Transform.h` | Authored local TRS, versioned on write |
 | `WorldTransform` | `ecs/components/WorldTransform.h` | Derived world matrix plus staleness stamps |
 | `Query<Ts...>` | `ecs/Query.h` | Cached view over matching archetypes |
+| `RuntimeQuery` | `ecs/RuntimeQuery.h` | The same walk for terms known only at runtime |
+| `ComponentRegistry` | `ecs/ComponentRegistry.h` | Name -> `ComponentOps`, for callers with no C++ type |
+| `FieldDesc` | `ecs/ComponentFields.h` | One named, typed value inside a component |
+| `FrameCommands` | `ecs/DeferredAccess.h` | The frame's `CommandBuffer`, published as a resource |
 | `CommandBuffer` | `ecs/CommandBuffer.h` | Deferred structural changes |
 | `ISystem`, `SystemContext` | `ecs/System.h` | Per-frame work and its inputs |
 | `SystemScheduler` | `ecs/SystemScheduler.h` | Owns systems, runs them by phase |
@@ -92,6 +96,45 @@ are `With`, `Without`, `Or`; each `Or` is its own clause, ORed within. Sparse
 components in the pack are fetched per entity rather than per column. `ForEach`
 passes `(Entity, Ts&...)`, with `const T` arriving as `const T&`.
 
+`RuntimeQuery` is the same walk for terms that are only `TypeId`s at runtime. It
+shares `detail::ArchetypeMatcher` with `Query`, so the match test and the cache
+rule have one implementation, and it hands the callback
+`(Entity, std::span<void *const>)` - one pointer per term, valid for that call
+only. Every term must be a registered table component. Unlike `Query`, the caller
+owns it. See [0024](../decisions/0024-runtime-queries-stay-behind-friendship.md).
+
+## Erased access
+
+For a caller that has a name rather than a type - a script binding, an editor
+inspector, a deserializer. `ComponentRegistry::Instance()` maps a name to
+`ComponentOps`, whose operations are total on a stale handle, and to a
+`FieldDesc` table for named values.
+
+```cpp
+const ComponentOps *ops = ComponentRegistry::Instance().Find("Transform");
+if (ops == nullptr)
+    return;                                       // a script named something we do not have
+
+// Immediate outside a walk, recorded into the frame's CommandBuffer inside one.
+// The binding cannot know which it is in; World::IsIterating can.
+AddDefaultComponentOrDefer(world, entity, *ops);
+
+if (void *component = ops->Get(world, entity))
+{
+    const FieldDesc *position = ops->FindField("position");
+    const glm::vec3 target{1.0f, 0.0f, 0.0f};
+    position->Write(component, &target);           // through SetPosition, so the version moves
+}
+```
+
+A script declares its own component the same way, and it lands in the same
+archetype tables:
+
+```cpp
+constexpr RuntimeFieldDecl fields[] = {{"hp", FieldKind::Int}, {"speed", FieldKind::Float}};
+const ComponentOps &health = ComponentRegistry::Instance().RegisterRuntime("Health", fields);
+```
+
 ## Usage
 
 ```cpp
@@ -142,7 +185,20 @@ private:
   permanently. `ResolveWorld` is correct at any point in the frame, so no reader
   needs to reason about phase order. See
   [0021](../decisions/0021-world-transforms-resolve-on-read.md).
-- **At most 128 component types.** `ComponentBit` asserts past the limit.
+- **At most 256 component types**, C++ and script-declared together. The budget
+  is charged per distinct name for the life of the process, so a script reload
+  costs nothing. Overflow stops the process in every build, at allocation
+  (`ComponentRegistry`) and again on use (`ComponentBitOf`) - the second catches
+  a C++ component that was never registered.
+- **The erased `*Raw` API is table-only and says so.** A sparse TypeId is
+  refused, not mishandled: a table row would shadow the sparse store and every
+  typed reader would go on seeing the old value.
+- **A component is reachable by name only once registered.** Forgetting is not an
+  error, just a name scripts cannot find.
+- **Erased operations are total.** `ComponentOps` answers for a dead entity
+  instead of asserting - unlike the typed `World` API, because a script holding a
+  stale handle is ordinary. See
+  [0022](../decisions/0022-component-registry.md).
 - **A stale `Entity` is detected, not honoured.** `Get` returns `nullptr` for a
   dead handle; `AddComponent` and friends assert.
 - **A signature excludes sparse components** - it is not the full component set.
@@ -167,10 +223,17 @@ Since 2026-09-01: typed resources on `World`, a transform hierarchy with lazy
 world-matrix resolution, and cascading destruction through a `World` destroy
 hook.
 
+Since then: a component registry with erased operations and named field access,
+script-declared component types, and runtime queries - the ECS-side groundwork
+for scripting ([0022](../decisions/0022-component-registry.md),
+[0023](../decisions/0023-runtime-component-types.md),
+[0024](../decisions/0024-runtime-queries-stay-behind-friendship.md)).
+
 Missing: parallelism, dependency ordering, change detection, component lifecycle
-hooks, serialisation (the stable hash exists, nothing uses it), a runtime
-component registry, and debugging tools. `SystemPhase::Render` is unused - the
-ECS-to-renderer bridge is a pair of calls in `App::Run`.
+hooks, serialisation (the stable hash and the field tables exist, nothing uses
+them), row migration when a script component's layout changes, and debugging
+tools. `SystemPhase::Render` is unused - the ECS-to-renderer bridge is a pair of
+calls in `App::Run`.
 
 ## Tests
 
@@ -186,6 +249,8 @@ ECS-to-renderer bridge is a pair of calls in `App::Run`.
 | `Transform.tests.cpp` | TRS composition and the memcpy traits |
 | `TransformHierarchy.tests.cpp` | Linking, walking, cascade destroy, staleness |
 | `System.tests.cpp` | Phase ordering, lifecycle, spawn visibility |
+| `ComponentRegistry.tests.cpp` | Erased ops, field thunks, script-declared components |
+| `RuntimeQuery.tests.cpp` | Runtime terms, filters, cache refresh, mixed components |
 | `Paths.tests.cpp` | Executable-relative path resolution |
 
 Logging and asserts are untested - every other test exercises them, and their
@@ -193,6 +258,9 @@ failure mode is loud.
 
 ## Open questions
 
-- 128 component types is arbitrary. Nothing is near it.
+- 256 component types is arbitrary. Nothing is near it, but scripts declaring
+  their own is the first thing that could get there.
+- Changing a script component's field list needs the world restarted. Migrating
+  live rows field-by-field by name is the obvious fix and is not written.
 - Whether systems should be forbidden from calling `World::AddComponent`
   directly, rather than it being convention.
