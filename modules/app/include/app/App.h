@@ -106,5 +106,6 @@ namespace mts
         bool mAssetLoadFailed = false;
         bool mInitialized = false;
         bool mImGuiInitialized = false;
+        bool mShowStyleEditor = false;
     };
 }

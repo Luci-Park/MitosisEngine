@@ -190,6 +190,23 @@ namespace mts
             if (mDesc.mShowImGuiDemo)
                 ImGui::ShowDemoWindow();
 
+            if (ImGui::BeginMainMenuBar())
+            {
+                if (ImGui::BeginMenu("Debug"))
+                {
+                    ImGui::MenuItem("Style Editor", nullptr, &mShowStyleEditor);
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMainMenuBar();
+            }
+
+            if (mShowStyleEditor)
+            {
+                if (ImGui::Begin("Style Editor", &mShowStyleEditor))
+                    ImGui::ShowStyleEditor();
+                ImGui::End();
+            }
+
             ImGui::Render();
 
             CollectDrawInstances();
