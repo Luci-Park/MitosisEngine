@@ -10,7 +10,6 @@
 #include "core/ecs/ComponentRegistry.h"
 
 #include "core/ecs/components/Transform.h"
-#include "core/ecs/components/TriangleRenderer.h"
 #include "core/ecs/components/WorldTransform.h"
 #include "core/log/Assert.h"
 
@@ -314,6 +313,5 @@ namespace mts
 
         registry.Register<Transform>(kTransformFields);
         registry.Register<WorldTransform>(kWorldTransformFields);
-        registry.Register<TriangleRenderer>();
     }
 }

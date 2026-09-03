@@ -7,7 +7,6 @@
  *
  */
 #include "renderer/VulkanRenderer.h"
-#include "renderer/Shapes.h"
 #include "vulkan/VulkanSurface.h"
 #include <core/log/Log.h>
 #include <core/log/Assert.h>
@@ -54,10 +53,13 @@ namespace mts
                                    &outBuffer, &outAllocation, outInfo) == VK_SUCCESS;
         }
 
-        // 64 bytes: inside the 128-byte guaranteed minimum for push constants.
+        // 64 + 16 = 80 bytes: inside the 128-byte guaranteed minimum for push
+        // constants. A second mat4 (view-projection, rung 4) will not fit
+        // beside this - that is why rung 4 premultiplies on the CPU instead.
         struct PushData
         {
             glm::mat4 transform;
+            glm::vec4 tint;
         };
         VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -358,12 +360,6 @@ namespace mts
             return false;
 
         if (!CreateGraphicsPipeline())
-            return false;
-
-        // test quad
-        const MeshData quad = MakeQuad();
-        mDefaultMesh = CreateMesh(quad.vertices, quad.indices);
-        if (mDefaultMesh.IsNull())
             return false;
 
         NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MitosisEngine device");
@@ -1248,7 +1244,7 @@ namespace mts
         }
         mRenderComplete.clear();
     }
-    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances)
+    void VulkanRenderer::RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const DrawItem> items)
     {
         // get image ready
         ImageBarrier(cmd, mSwapchainImages[imageIndex],
@@ -1306,9 +1302,17 @@ namespace mts
             .extent = mSwapchainExtent};
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-        const GpuMesh *const mesh = FindMesh(mDefaultMesh);
-        if (mesh != nullptr)
+        // One draw per item, each keyed by its own mesh handle: an item whose
+        // mesh does not resolve (not yet loaded, or a stale handle) costs
+        // that one item, not the frame - see FindMesh. No dedup across items
+        // that share a mesh; sorting the list to skip redundant binds is a
+        // later optimisation, invisible at the object counts here.
+        for (const DrawItem &item : items)
         {
+            const GpuMesh *const mesh = FindMesh(item.mesh);
+            if (mesh == nullptr)
+                continue;
+
             const VkDeviceSize vertexOffset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->mVertexBuffer, &vertexOffset);
 
@@ -1317,20 +1321,12 @@ namespace mts
             // would mean two index paths for no measurable gain.
             vkCmdBindIndexBuffer(cmd, mesh->mIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-            // One draw per instance rather than instanced rendering: the
-            // transform arrives as a push constant, and there is no
-            // per-instance buffer yet. Still one mesh for every instance -
-            // the bind moves inside this loop once MeshRenderer carries its
-            // own handle.
-            for (const glm::mat4 &transform : instances)
-            {
-                const PushData pushData{.transform = transform};
+            const PushData pushData{.transform = item.model, .tint = item.tint};
 
-                vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                                   0, sizeof(PushData), &pushData);
+            vkCmdPushConstants(cmd, mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                               0, sizeof(PushData), &pushData);
 
-                vkCmdDrawIndexed(cmd, mesh->mIndexCount, 1, 0, 0, 0);
-            }
+            vkCmdDrawIndexed(cmd, mesh->mIndexCount, 1, 0, 0, 0);
         }
 
         if (mValidationEnabled)
@@ -1347,7 +1343,7 @@ namespace mts
                      VK_PIPELINE_STAGE_2_NONE, 0);
     }
 
-    void VulkanRenderer::DrawFrame(std::span<const glm::mat4> instances)
+    void VulkanRenderer::DrawFrame(std::span<const DrawItem> items)
     {
         if (mWindow->Width() == 0 || mWindow->Height() == 0)
             return;
@@ -1407,7 +1403,7 @@ namespace mts
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
         vkBeginCommandBuffer(cmd, &beginInfo);
-        RecordCommands(cmd, imageIndex, instances);
+        RecordCommands(cmd, imageIndex, items);
         vkEndCommandBuffer(cmd);
 
         const VkSemaphoreSubmitInfo waitSem{

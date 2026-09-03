@@ -14,6 +14,7 @@
 #include <volk.h>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 #include <cstdint>
 #include <span>
@@ -31,6 +32,16 @@ namespace mts
         bool enableValidation;
     };
 
+    /// One draw call's worth of data, built by RenderSystem from a
+    /// WorldTransform + MeshRenderer pair. Plain data crossing the ECS/renderer
+    /// boundary - the renderer never sees a World or an Entity.
+    struct DrawItem
+    {
+        MeshHandle mesh;
+        glm::mat4 model{1.0f};
+        glm::vec4 tint{1.0f, 1.0f, 1.0f, 1.0f};
+    };
+
     class VulkanRenderer
     {
     public:
@@ -42,7 +53,7 @@ namespace mts
         MeshHandle CreateMesh(std::span<const Vertex> vertices,
                               std::span<const uint32_t> indices);
 
-        void DrawFrame(std::span<const glm::mat4> instances);
+        void DrawFrame(std::span<const DrawItem> items);
 
         void Shutdown();
 
@@ -66,7 +77,7 @@ namespace mts
         void DestroyMeshes();
         const GpuMesh *FindMesh(MeshHandle handle) const;
         void NameObject(VkObjectType type, uint64_t handle, const char *name);
-        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const glm::mat4> instances);
+        void RecordCommands(VkCommandBuffer cmd, uint32_t imageIndex, std::span<const DrawItem> items);
 
     private:
         constexpr static uint32_t VulkanVersion{VK_API_VERSION_1_3};
@@ -119,10 +130,6 @@ namespace mts
         /// Indices are stable: nothing is ever erased from this vector, which
         /// is what makes MeshHandle::mIndex a plain subscript.
         std::vector<GpuMesh> mMeshes;
-
-        /// Rung 1 only. Every entity draws this until MeshRenderer carries its
-        /// own handle, at which point this member disappears.
-        MeshHandle mDefaultMesh;
 
         uint32_t mFrameIndex = 0;
         bool mNeedRecreate = false;
