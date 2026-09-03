@@ -38,8 +38,7 @@ builds/             build trees, gitignored
 - `core` depends on nothing in the engine; everything may depend on it.
 - No module reaches into another's `src/`. `include/<module>/` is the API.
 - `app` is the only module that knows all the others.
-- `renderer` never sees `window` - it takes an `ISurfaceProvider`
-  ([0013](decisions/0013-surface-provider.md)).
+- `renderer` never sees `window` - it takes an `ISurfaceProvider`.
 - Third-party libraries link `PRIVATE` unless one of their types is in a public
   header (`spdlog` is private to `core`; `volk` is public in `renderer`).
 
@@ -54,18 +53,15 @@ No engine dependencies. Links `spdlog` privately.
 - `platform/Surface.h` - `NativeWindowHandle`, `ISurfaceProvider`.
 
 Entities are `{index, generation}` handles, the generation guarding against ABA.
-Components are POD ([0006](decisions/0006-pod-components.md)) in one of two
-storages ([0005](decisions/0005-archetype-plus-sparse.md)): archetype tables by
-default, sparse sets for churny components via `MTS_COMPONENT_SPARSE(T)`.
+Components are POD, in one of two storages: archetype tables by default, sparse
+sets for churny components via `MTS_COMPONENT_SPARSE(T)`.
 `Signature` is a 256-bit bitset over sequence-numbered types and keys the
 archetype map. `Query<Ts...>` caches matching archetypes, re-resolving when the
 world's archetype generation changes; filters are `With`, `Without`, `Or`.
 
-Structural changes go through `CommandBuffer`
-([0007](decisions/0007-deferred-structural-change.md)); `CreateEntity` stays
-immediate. `SystemScheduler` runs systems by phase - `PreUpdate`, `Update`,
-`PostUpdate`, reserved `Render` - flushing at each boundary
-([0008](decisions/0008-phase-ordering.md)).
+Structural changes go through `CommandBuffer`; `CreateEntity` stays immediate.
+`SystemScheduler` runs systems by phase - `PreUpdate`, `Update`, `PostUpdate`,
+reserved `Render` - flushing at each boundary.
 
 *Current state:* single-threaded. No dependency graph, change detection or
 component lifecycle hooks. `Render` phase unused.
@@ -85,10 +81,9 @@ device, VMA allocator, swapchain, per-frame pools and buffers, pipeline, vertex
 buffer, and frame pacing on a timeline semaphore with `kFramesInFlight = 2`.
 
 Requires Vulkan 1.3 with `dynamicRendering`, `synchronization2`,
-`timelineSemaphore`, `shaderDrawParameters`; devices missing any are rejected
-([0012](decisions/0012-vulkan-1-3-baseline.md)). No render passes or
-framebuffers. `volk` is compiled from source here so the platform defines are
-ours; VMA fetches its pointers through it.
+`timelineSemaphore`, `shaderDrawParameters`; devices missing any are rejected.
+No render passes or framebuffers. `volk` is compiled from source here so the
+platform defines are ours; VMA fetches its pointers through it.
 
 *Current state:* one hard-coded triangle, swapchain recreation on resize,
 RenderDoc object naming under validation. No material, mesh, camera, descriptor
@@ -97,7 +92,7 @@ or render-graph layer. `Renderer.h` is an empty placeholder and `App` uses
 
 ## assets
 
-Offline pipeline ([0010](decisions/0010-cooked-assets.md)).
+Offline pipeline: assets are cooked at build time, never at runtime.
 
 - `AssetId` - FNV-1a 64 of the repository-relative source path, so ids match on
   every machine. Cook roots must never be absolute.
@@ -119,10 +114,9 @@ and nothing reads cooked assets beyond the cache.
 
 `App` owns the window, renderer, `World`, `CommandBuffer`, `SystemScheduler`, and
 lazily the manifest and cache. `Initialize`/`Run`/`Shutdown`, with `dt` clamped by
-`AppDesc::mMaxDeltaSeconds`. Fixed members, no subsystem registry
-([0009](decisions/0009-app-composition-root.md)). `Assets()` returns `nullptr`
-when there is no manifest, so a missing one costs a caller an asset, not the
-process.
+`AppDesc::mMaxDeltaSeconds`. Fixed members, no subsystem registry. `Assets()`
+returns `nullptr` when there is no manifest, so a missing one costs a caller an
+asset, not the process.
 
 ## Build system
 
@@ -141,9 +135,8 @@ process.
 3. No renderer abstraction.
 4. No typed assets.
 5. No scene or serialization layer, though `TypeId::hash` exists for it.
-6. No scripting. Games are meant to be Lua and data
-   ([0018](decisions/0018-game-definition.md)); that needs a `script` module, a
-   name to `TypeId` component registry, query access from Lua, config and script
-   asset types, and a runtime executable - none of which exist.
+6. No scripting. Games are meant to be Lua and data; that needs a `script`
+   module, a name to `TypeId` component registry, query access from Lua, config
+   and script asset types, and a runtime executable - none of which exist.
 7. Linux sources, but no Linux preset.
 8. No CI.

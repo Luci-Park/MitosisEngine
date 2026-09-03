@@ -16,8 +16,7 @@ no Linux preset.
 
 ## 1. vcpkg, once per machine
 
-vcpkg is shared across projects, not vendored
-([0001](decisions/0001-vcpkg-manifest-mode.md)).
+vcpkg is shared across projects, not vendored.
 
 ```
 git clone https://github.com/microsoft/vcpkg C:/dev/vcpkg
@@ -35,8 +34,7 @@ so later ones are fast.
 ## 2. Vulkan SDK
 
 Its installer sets `VULKAN_SDK`. The build finds `slangc` under
-`$VULKAN_SDK/Bin`, else `PATH`, else fails - no glslc fallback
-([0011](decisions/0011-slang-shaders.md)).
+`$VULKAN_SDK/Bin`, else `PATH`, else fails - no glslc fallback.
 
 ## 3. Optional: your name in generated files
 

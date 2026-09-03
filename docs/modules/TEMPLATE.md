@@ -51,4 +51,4 @@ Where they are, what they cover, what is deliberately untested and why.
 
 ## Open questions
 
-Undecided things. Link an open [decision](../decisions/README.md) if there is one.
+Undecided things, and what would settle them.

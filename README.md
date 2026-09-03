@@ -6,7 +6,7 @@ through presets and VSCode tasks.
 
 Each game is its own directory under `games/`, defined by configs, assets and Lua
 scripts rather than by C++ - one shared runtime loads them, so making a game needs
-no rebuild ([decision 0018](docs/decisions/0018-game-definition.md)).
+no rebuild.
 
 # Document Structure
 
@@ -16,7 +16,6 @@ no rebuild ([decision 0018](docs/decisions/0018-game-definition.md)).
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | What the engine is today, and how it fits together |
 | [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | How to write code that fits in |
 | [docs/EXTENDING.md](docs/EXTENDING.md) | Adding a module, component, system, shader or asset |
-| [docs/decisions/](docs/decisions/README.md) | Why it is the way it is |
 | [docs/README.md](docs/README.md) | The full documentation index, and where your own docs go |
 
 The rest of this file is the short version.
@@ -62,13 +61,12 @@ games/                one directory per game - planned, none exist yet
 tools/                AssetCooker, new_module.ps1, new_file.ps1
 templates/            what the scaffolding scripts stamp out
 assets/               source assets, cooked into the build tree
-docs/                 setup, architecture, conventions, decisions
+docs/                 setup, architecture, conventions, module docs
 builds/               build trees, gitignored
 logs/                 engine.log, gitignored
 ```
 
-Module details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), game rules in
-[decision 0018](docs/decisions/0018-game-definition.md).
+Module details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 # Getting the Source
 

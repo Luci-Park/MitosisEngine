@@ -1,7 +1,6 @@
 # Extending the engine
 
-Rules referenced here are in [CONVENTIONS.md](CONVENTIONS.md); reasoning is in
-[decisions/](decisions/README.md).
+Rules referenced here are in [CONVENTIONS.md](CONVENTIONS.md).
 
 ## Add a module
 
@@ -200,7 +199,7 @@ recook instead of a silent mismatch.
 
 Add it to `vcpkg.json` (configure re-runs automatically), `find_package(...
 CONFIG REQUIRED)` in the module that needs it, link `PRIVATE` unless a type
-appears in a public header. Public or cross-platform means a decision record.
+appears in a public header.
 
 ## Add a platform
 

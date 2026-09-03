@@ -27,8 +27,8 @@ and how they relate, invariants a caller must not break, anything surprising in
 the implementation and why, current limits, what the tests cover.
 
 **Does not:** API reference copied from headers (it goes stale in a month),
-cross-module reasoning (that is a [decision](../decisions/README.md)), task
-instructions (those are in [EXTENDING.md](../EXTENDING.md)).
+cross-module reasoning (that goes in [ARCHITECTURE.md](../ARCHITECTURE.md)),
+task instructions (those are in [EXTENDING.md](../EXTENDING.md)).
 
 ## Keeping it honest
 
