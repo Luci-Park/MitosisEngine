@@ -134,5 +134,6 @@ namespace mts
         ImGuiStyle &style = ImGui::GetStyle();
         style = gBaseStyle;
         style.ScaleAllSizes(scale);
+        style.FontScaleDpi = scale;
     }
 }
