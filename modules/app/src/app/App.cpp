@@ -7,6 +7,7 @@
 #include <core/log/Log.h>
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
+#include <scene/SceneIO.h>
 
 #include <algorithm>
 #include <chrono>
@@ -70,6 +71,36 @@ namespace mts
         // already current for this frame - see RenderSystem's own comment.
         mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
 
+        mScene = mts::NewScene("untitled");
+
+        return true;
+    }
+
+    void App::NewScene(std::string name)
+    {
+        UnloadScene(mWorld, mScene);
+        mScene = mts::NewScene(std::move(name));
+    }
+
+    bool App::SaveScene()
+    {
+        return mts::SaveScene(mWorld, mDesc.mSceneDir, mScene);
+    }
+
+    bool App::LoadScene()
+    {
+        // Checked here, not left to LoadScene: this must not touch mWorld or
+        // mScene at all when there is nothing to load, so a Load click with
+        // mSceneDir pointing nowhere leaves the current scene exactly as it
+        // was rather than replacing it with an empty one.
+        if (!std::filesystem::exists(mDesc.mSceneDir / "scene.json"))
+        {
+            MTS_LOG_ERROR("App::LoadScene: no scene.json in '{}'", mDesc.mSceneDir.string());
+            return false;
+        }
+
+        UnloadScene(mWorld, mScene);
+        mScene = mts::LoadScene(mWorld, mDesc.mSceneDir);
         return true;
     }
 
@@ -126,7 +157,22 @@ namespace mts
             mEditor.BeginFrame();
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
-                mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo);
+            {
+                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo))
+                {
+                case SceneMenuAction::New:
+                    NewScene();
+                    break;
+                case SceneMenuAction::Save:
+                    SaveScene();
+                    break;
+                case SceneMenuAction::Load:
+                    LoadScene();
+                    break;
+                case SceneMenuAction::None:
+                    break;
+                }
+            }
 
             // RenderSystem calls VulkanRenderer::DrawFrame from inside
             // Update (SystemPhase::Render), so this frame's draw data has to

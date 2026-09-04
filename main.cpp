@@ -4,6 +4,7 @@
 #include <renderer/Shapes.h>
 #include <renderer/components/Camera.h>
 #include <renderer/components/MeshRenderer.h>
+#include <scene/SceneAsset.h>
 
 #include <glm/gtc/quaternion.hpp>
 
@@ -34,21 +35,22 @@ namespace
     void BuildScene(mts::App &app)
     {
         mts::World &world = app.GetWorld();
+        mts::LoadedScene &scene = app.Scene();
 
         const mts::MeshData cube = mts::MakeCube();
         const mts::MeshHandle cubeMesh = app.Renderer().CreateMesh(cube.vertices, cube.indices);
 
-        const mts::Entity cubeEntity = world.CreateEntity();
+        const mts::Entity cubeEntity = mts::CreateSceneEntity(world, scene);
         mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
         world.AddComponent<mts::MeshRenderer>(cubeEntity, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f)});
 
         const mts::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mts::MaterialDesc{.shaderName = "unlit"});
 
-        const mts::Entity unlitCube = world.CreateEntity();
+        const mts::Entity unlitCube = mts::CreateSceneEntity(world, scene);
         mts::AddTransform(world, unlitCube, mts::Transform{glm::vec3(1.8f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.5f)});
         world.AddComponent<mts::MeshRenderer>(unlitCube, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f), unlitMaterial});
 
-        const mts::Entity camera = world.CreateEntity();
+        const mts::Entity camera = mts::CreateSceneEntity(world, scene);
         mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
         world.AddComponent<mts::Camera>(camera, mts::Camera{});
 
@@ -72,8 +74,6 @@ int main()
         return -1;
     }
 
-    // After Initialize so the world exists, before Run because the scheduler
-    // refuses new systems once started.
     BuildScene(app);
 
     app.Run();

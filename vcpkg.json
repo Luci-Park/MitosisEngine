@@ -9,7 +9,8 @@
         "vulkan",
         "volk",
         "vulkan-memory-allocator",
-        "catch2"
+        "catch2",
+        "nlohmann-json"
     ],
     "$comment": "builtin-baseline = SHA of vcpkg"
 }

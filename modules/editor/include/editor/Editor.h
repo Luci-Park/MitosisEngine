@@ -18,6 +18,14 @@ struct ImDrawData;
 
 namespace mts
 {
+    enum class SceneMenuAction
+    {
+        None,
+        New,
+        Save,
+        Load,
+    };
+
     class Editor
     {
     public:
@@ -44,11 +52,9 @@ namespace mts
         /// any other ImGui-facing call (including DrawLayout).
         void BeginFrame();
 
-        /// Builds the dockspace, the default Hierarchy/Inspector/Output
-        /// split, the Debug menu, and (if requested) the demo/style
-        /// editors - the Slate editor shell. Pass enableLayout = false to
-        /// keep ImGui running (e.g. a caller's own UI) without this shell.
-        void DrawLayout(bool enableLayout, bool showDemoWindow);
+        /// build editor panels for each frame
+        /// returns SceneMenuActions done this frame
+        SceneMenuAction DrawLayout(bool enableLayout, bool showDemoWindow);
 
         /// Ends this frame's ImGui state and returns its draw data, which
         /// the caller hands to VulkanRenderer::SetImGuiDrawData. Always

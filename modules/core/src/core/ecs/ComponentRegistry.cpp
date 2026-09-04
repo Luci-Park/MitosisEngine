@@ -263,6 +263,16 @@ namespace mts
         mRuntimeFields.push_back(std::move(descs));
         mDefaultValues.emplace_back(size); // value-initialised: a script component defaults to zeroes
 
+        // ...except EntityRef, whose "unset" value is kNullEntity, not zero
+        // bytes. Entity's null sentinel is mIndex == UINT32_MAX (Entity.h), so
+        // a zeroed field reads back as a handle to slot 0 generation 0 - a
+        // reference that looks live instead of one that looks unset.
+        for (const FieldDesc &desc : mRuntimeFields.back())
+        {
+            if (desc.mKind == FieldKind::EntityRef)
+                std::memcpy(mDefaultValues.back().data() + desc.mOffset, &kNullEntity, sizeof(Entity));
+        }
+
         ComponentOps ops{};
         ops.mType = TypeId{seq, hash, Intern(name)};
         ops.mSize = size;
