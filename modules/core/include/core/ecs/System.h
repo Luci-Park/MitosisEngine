@@ -21,8 +21,7 @@ namespace mts
         PreUpdate,
         Update,
         PostUpdate,
-        Render, ///< reserved; the renderer is still driven directly by App
-        kCount
+        Render,
     };
 
     /// Everything a system is handed for one tick.
@@ -30,8 +29,8 @@ namespace mts
     {
         World &world;
         CommandBuffer &commands;
-        float dt = 0.0f;      ///< seconds since the previous frame
-        double elapsed = 0.0; ///< seconds since the first frame
+        float dt = 0.0f;      // seconds since the previous frame
+        double elapsed = 0.0; // seconds since the first frame
         uint64_t frame = 0;
     };
 
