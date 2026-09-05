@@ -16,6 +16,7 @@
 #include <editor/Editor.h>
 #include <renderer/VulkanRenderer.h>
 #include <script/ScriptHost.h>
+#include <script/ScriptReloadWatcher.h>
 #include <window/Window.h>
 
 #include <cstdint>
@@ -55,6 +56,7 @@ namespace mts
         World &GetWorld() { return mWorld; }
         SystemScheduler &Systems() { return mScheduler; }
         ScriptHost &Scripts() { return mScriptHost; }
+        ScriptReloadWatcher &ScriptReload() { return mScriptReloadWatcher; }
 
         /// Temporary seam: CreateMesh has nowhere else to be called from until
         /// an asset-facing mesh service exists. A caller building a scene
@@ -86,6 +88,7 @@ namespace mts
         World mWorld;
         SystemScheduler mScheduler;
         ScriptHost mScriptHost;
+        ScriptReloadWatcher mScriptReloadWatcher{mScriptHost};
 
         AppDesc mDesc;
         double mElapsed = 0.0;

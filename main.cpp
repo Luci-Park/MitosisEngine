@@ -1,4 +1,7 @@
 #include <app/App.h>
+#include <assets/AssetBlob.h>
+#include <assets/AssetCache.h>
+#include <assets/AssetId.h>
 #include <core/ecs/TransformHierarchy.h>
 #include <core/log/Log.h>
 #include <renderer/Shapes.h>
@@ -8,8 +11,36 @@
 
 #include <glm/gtc/quaternion.hpp>
 
+#include <string>
+#include <string_view>
+
 namespace
 {
+    /// Loads a `.lua` asset by its cooked path and registers it with the
+    /// script host under `scriptName`, then hands it to the reload watcher
+    /// so an edit followed by a rebuild is picked up without restarting.
+    /// False when assets aren't available or the file failed to load or
+    /// parse - logged by AssetCache/ScriptHost already, so the caller just
+    /// decides whether to attach the script.
+    bool LoadScriptAsset(mts::App &app, std::string_view assetPath, std::string_view scriptName)
+    {
+        mts::AssetCache *cache = app.Assets();
+        if (cache == nullptr)
+            return false;
+
+        const mts::AssetId id = mts::MakeAssetId(assetPath);
+        const mts::AssetBlobView *blob = cache->Load(id);
+        if (blob == nullptr)
+            return false;
+
+        const std::string_view source(reinterpret_cast<const char *>(blob->content.data()), blob->content.size());
+        if (!app.Scripts().LoadScriptSource(scriptName, source))
+            return false;
+
+        app.ScriptReload().Track(std::string(scriptName), id);
+        return true;
+    }
+
     void BuildScene(mts::App &app)
     {
         mts::World &world = app.GetWorld();
@@ -21,22 +52,15 @@ namespace
         mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
         world.AddComponent<mts::MeshRenderer>(cubeEntity, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f)});
 
-        app.Scripts().LoadScriptSource("spin", R"lua(
-            local Spin = {}
-            local angle = 0.0
-            local speed = 1.0
-
-            function Spin.OnUpdate(world, entity, dt)
-                angle = angle + speed * dt
-                local half = angle * 0.5
-                world:set(entity, "Transform", "rotation", { w = math.cos(half), x = 0.0, y = math.sin(half), z = 0.0 })
-            end
-
-            return Spin
-        )lua");
-
-        const int32_t spinInstance = app.Scripts().CreateInstance("spin");
-        world.AddComponent<mts::ScriptRef>(cubeEntity, mts::ScriptRef{.instanceRef = spinInstance});
+        if (LoadScriptAsset(app, "assets/scripts/spin.lua", "spin"))
+        {
+            const int32_t spinInstance = app.Scripts().CreateInstance("spin");
+            world.AddComponent<mts::ScriptRef>(cubeEntity, mts::ScriptRef{.instanceRef = spinInstance});
+        }
+        else
+        {
+            MTS_LOG_ERROR("BuildScene: could not load assets/scripts/spin.lua - cube will not spin");
+        }
 
         const mts::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mts::MaterialDesc{.shaderName = "unlit"});
 

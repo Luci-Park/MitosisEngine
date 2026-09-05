@@ -7,12 +7,14 @@ target_include_directories(engine_script PRIVATE ${LUA_INCLUDE_DIR})
 
 target_link_libraries(engine_script
     PUBLIC  mts::core
-    PRIVATE sol2::sol2
+    PRIVATE mts::assets
+            sol2::sol2
             ${LUA_LIBRARIES}
 )
 
 target_sources(engine_script PRIVATE
     src/script/ScriptHost.cpp
+    src/script/ScriptReloadWatcher.cpp
     src/script/ScriptSystem.cpp
     src/script/bindings/EntityBindings.cpp
     src/script/bindings/WorldBindings.cpp

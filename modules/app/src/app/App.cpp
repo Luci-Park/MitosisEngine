@@ -142,6 +142,8 @@ namespace mts
             mRenderer.SetImGuiDrawData(mEditor.EndFrame());
             mRenderer.SetSceneViewport(mEditor.SceneViewportRect());
 
+            mScriptReloadWatcher.Poll(Assets(), dt);
+
             SystemContext context = MakeContext(dt);
             mScheduler.Update(context);
 
