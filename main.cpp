@@ -33,8 +33,7 @@ namespace
         if (blob == nullptr)
             return false;
 
-        const std::string_view source(reinterpret_cast<const char *>(blob->content.data()), blob->content.size());
-        if (!app.Scripts().LoadScriptSource(scriptName, source))
+        if (!app.Scripts().LoadScriptSource(scriptName, mts::AsStringView(*blob)))
             return false;
 
         app.ScriptReload().Track(std::string(scriptName), id);
@@ -74,27 +73,26 @@ namespace
 
         app.Scripts().LoadScriptSource("stage4_demo", R"lua(
             local Stage4Demo = {}
-            local stage = 0
 
-            function Stage4Demo.OnStart(world, entity)
+            function Stage4Demo.OnStart(self, world, entity)
                 local a = world:spawn()
-                Stage4Demo.entityA = a
+                self.entityA = a
                 print("has(a, Transform) before add (expect false):", world:has(a, "Transform"))
                 world:add(a, "Transform", { position = { x = 1, y = 0, z = 0 } })
                 print("has(a, Transform) right after add, same call (expect false - deferred):", world:has(a, "Transform"))
 
                 local b = world:spawn()
-                Stage4Demo.entityB = b
+                self.entityB = b
                 world:add(b, "Transform", { position = { x = 2, y = 0, z = 0 } })
                 world:declare("MissionFlag", { { name = "triggered", kind = "bool" } })
                 world:add(b, "MissionFlag", { triggered = true })
                 print("get(b, MissionFlag) right after add, same call (expect nil):", world:get(b, "MissionFlag"))
             end
 
-            function Stage4Demo.OnUpdate(world, entity, dt)
-                stage = stage + 1
-                local a = Stage4Demo.entityA
-                local b = Stage4Demo.entityB
+            function Stage4Demo.OnUpdate(self, world, entity, dt)
+                self.stage = (self.stage or 0) + 1
+                local a = self.entityA
+                local b = self.entityB
 
                 -- stage 1 is the *same* PreUpdate pass as OnStart (a system
                 -- calls OnStart then OnUpdate back to back, before its own
@@ -102,7 +100,7 @@ namespace
                 -- are still pending here too. stage 2 is the next frame's
                 -- OnUpdate, the first call after that PreUpdate boundary
                 -- actually flushed.
-                if stage == 2 then
+                if self.stage == 2 then
                     print("has(a, Transform) after OnStart's flush (expect true):", world:has(a, "Transform"))
                     print("MissionFlag.triggered on b (expect true):", world:get(b, "MissionFlag").triggered)
 
@@ -117,7 +115,7 @@ namespace
 
                     world:destroy(a)
                     print("has(a, Transform) right after destroy, same call (expect true - deferred):", world:has(a, "Transform"))
-                elseif stage == 3 then
+                elseif self.stage == 3 then
                     print("has(b, Transform) after remove's flush (expect false):", world:has(b, "Transform"))
                     print("has(a, Transform) after destroy's flush (expect false):", world:has(a, "Transform"))
                 end

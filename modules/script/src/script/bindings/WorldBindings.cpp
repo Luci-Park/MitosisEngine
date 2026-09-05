@@ -11,8 +11,10 @@
 #include <sol/sol.hpp>
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace mts
@@ -140,9 +142,9 @@ namespace mts
             }
             case FieldKind::Int:
             {
-                if (!value.is<int32_t>())
+                if (!value.is<double>())
                     return false;
-                scratch.asInt = value.as<int32_t>();
+                scratch.asInt = static_cast<int32_t>(value.as<double>());
                 return true;
             }
             case FieldKind::Float:
@@ -205,6 +207,18 @@ namespace mts
             }
             }
             return false;
+        }
+
+        struct RuntimeQueryCache
+        {
+            std::unordered_map<std::string, std::unique_ptr<RuntimeQuery>> queries;
+        };
+
+        RuntimeQueryCache &GetOrCreateQueryCache(World &world)
+        {
+            if (RuntimeQueryCache *cache = world.TryResource<RuntimeQueryCache>())
+                return *cache;
+            return world.EmplaceResource<RuntimeQueryCache>();
         }
 
         std::optional<FieldKind> ParseFieldKind(std::string_view kind)
@@ -373,7 +387,7 @@ namespace mts
             const sol::protected_function callback = callbackObj;
 
             std::vector<const ComponentOps *> termOps;
-            std::vector<TypeId> terms;
+            std::string cacheKey;
             for (std::size_t i = 0; i + 1 < args.size(); ++i)
             {
                 const sol::object nameObj = args[i];
@@ -383,17 +397,32 @@ namespace mts
                     return;
                 }
 
-                const ComponentOps *ops = ComponentRegistry::Instance().Find(nameObj.as<std::string>());
+                const std::string name = nameObj.as<std::string>();
+                const ComponentOps *ops = ComponentRegistry::Instance().Find(name);
                 if (ops == nullptr)
                 {
-                    MTS_LOG_ERROR("script: world:each unknown component '{}'", nameObj.as<std::string>());
+                    MTS_LOG_ERROR("script: world:each unknown component '{}'", name);
                     return;
                 }
                 termOps.push_back(ops);
-                terms.push_back(ops->mType);
+
+                if (!cacheKey.empty())
+                    cacheKey += '\x1f';
+                cacheKey += name;
             }
 
-            RuntimeQuery query(world, terms);
+            RuntimeQueryCache &cache = GetOrCreateQueryCache(world);
+            auto cacheIt = cache.queries.find(cacheKey);
+            if (cacheIt == cache.queries.end())
+            {
+                std::vector<TypeId> terms;
+                terms.reserve(termOps.size());
+                for (const ComponentOps *ops : termOps)
+                    terms.push_back(ops->mType);
+                cacheIt = cache.queries.emplace(cacheKey, std::make_unique<RuntimeQuery>(world, terms)).first;
+            }
+
+            RuntimeQuery &query = *cacheIt->second;
             query.ForEach(
                 [&](Entity entity, std::span<void *const> row)
                 {

@@ -61,9 +61,7 @@ namespace mts
                 continue;
             }
 
-            const std::string_view source(reinterpret_cast<const char *>(blob->content.data()),
-                                          blob->content.size());
-            if (mHost.ReloadScriptSource(name, source))
+            if (mHost.ReloadScriptSource(name, AsStringView(*blob)))
                 MTS_LOG_INFO("script: hot-reloaded '{}'", name);
         }
     }

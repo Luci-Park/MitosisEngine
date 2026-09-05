@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -38,4 +39,9 @@ namespace mts
                                            std::span<const std::byte> content);
 
     std::optional<AssetBlobView> ParseAssetBlob(std::span<const std::byte> raw);
+
+    inline std::string_view AsStringView(const AssetBlobView &blob)
+    {
+        return {reinterpret_cast<const char *>(blob.content.data()), blob.content.size()};
+    }
 }

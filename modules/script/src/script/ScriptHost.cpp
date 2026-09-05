@@ -44,6 +44,12 @@ namespace mts
             RegisterWorldBindings(mLua);
         }
 
+        struct ScriptInstance
+        {
+            std::string scriptName;
+            sol::table data;
+        };
+
         int32_t CreateInstance(std::string_view scriptName)
         {
             const auto it = mLoadedScripts.find(std::string(scriptName));
@@ -54,7 +60,7 @@ namespace mts
             }
 
             const int32_t ref = mNextInstanceRef++;
-            mInstances.emplace(ref, it->second.as<sol::table>());
+            mInstances.emplace(ref, ScriptInstance{std::string(scriptName), mLua.create_table()});
             return ref;
         }
 
@@ -70,12 +76,16 @@ namespace mts
             if (it == mInstances.end())
                 return; // destroyed or never created - routine, not an error
 
-            const sol::object callback = it->second[callbackName];
+            const auto scriptIt = mLoadedScripts.find(it->second.scriptName);
+            if (scriptIt == mLoadedScripts.end() || !scriptIt->second.is<sol::table>())
+                return; // unloaded out from under this instance - routine, not an error
+
+            const sol::object callback = scriptIt->second.as<sol::table>()[callbackName];
             if (!callback.is<sol::protected_function>())
                 return;
 
             const sol::protected_function fn = callback;
-            const sol::protected_function_result result = fn(std::forward<Args>(args)...);
+            const sol::protected_function_result result = fn(it->second.data, std::forward<Args>(args)...);
             if (!result.valid())
             {
                 const sol::error err = result;
@@ -85,7 +95,7 @@ namespace mts
 
         sol::state mLua;
         std::unordered_map<std::string, sol::object> mLoadedScripts;
-        std::unordered_map<int32_t, sol::table> mInstances;
+        std::unordered_map<int32_t, ScriptInstance> mInstances;
         int32_t mNextInstanceRef = 0;
     };
 
