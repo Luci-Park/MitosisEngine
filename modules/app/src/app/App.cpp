@@ -62,6 +62,8 @@ namespace mts
         RegisterCoreComponents();
         RegisterRendererComponents();
 
+        mScriptHost.LoadScriptSource("boot", "print('hello from lua')");
+
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
 

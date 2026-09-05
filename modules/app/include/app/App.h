@@ -15,6 +15,7 @@
 #include <assets/AssetManifest.h>
 #include <editor/Editor.h>
 #include <renderer/VulkanRenderer.h>
+#include <script/ScriptHost.h>
 #include <window/Window.h>
 
 #include <cstdint>
@@ -83,6 +84,7 @@ namespace mts
 
         World mWorld;
         SystemScheduler mScheduler;
+        ScriptHost mScriptHost;
 
         AppDesc mDesc;
         double mElapsed = 0.0;

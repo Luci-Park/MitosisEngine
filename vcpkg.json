@@ -9,6 +9,8 @@
         "vulkan",
         "volk",
         "vulkan-memory-allocator",
+        "lua",
+        "sol2",
         "catch2"
     ],
     "$comment": "builtin-baseline = SHA of vcpkg"
