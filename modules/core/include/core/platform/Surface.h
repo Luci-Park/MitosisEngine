@@ -43,6 +43,17 @@ namespace mts
         void *window = nullptr;
     };
 
+    // Minimal rect type for data crossing the window boundary without
+    // pulling in a specific graphics API's headers (window links no
+    // Vulkan headers - see VkRect2D usage in the editor/renderer layer).
+    struct PixelRect
+    {
+        int32_t x = 0;
+        int32_t y = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
+    };
+
     // What a renderer needs from a window, and nothing else - no event pump.
     // Window (in the window module) implements this on top of its own interface.
     class ISurfaceProvider

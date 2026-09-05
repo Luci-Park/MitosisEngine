@@ -9,10 +9,12 @@
  */
 #pragma once
 
+#include <core/platform/Surface.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
 #include <string>
+#include <vector>
 
 struct ImDrawData;
 
@@ -66,9 +68,13 @@ namespace mts
         bool IsInitialized() const { return mInitialized; }
 
     private:
+        void DrawTitleBar();
+
         bool mInitialized = false;
         bool mShowStyleEditor = false;
         std::string mImGuiIniPath;
         VkRect2D mSceneViewportRect{};
+        Window *mWindow = nullptr;
+        std::vector<PixelRect> mTitleBarInteractiveRects;
     };
 }

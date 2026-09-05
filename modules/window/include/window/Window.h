@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 
 namespace mts
 {
@@ -22,6 +23,7 @@ namespace mts
         const char *mTitle = "MitosisEngine";
         bool mResizable = true;
         bool mMaximized = false;
+        bool mCustomTitleBar = false;
     };
 
     class Window : public ISurfaceProvider
@@ -39,6 +41,21 @@ namespace mts
 
         /// 1.0 at 96 DPI, scaling up with the monitor's content scale.
         virtual float ContentScale() const { return 1.0f; }
+
+        // Shared source of truth between the UI layer's title bar strip and
+        // the platform hit-test math - both must agree exactly on where the
+        // strip ends.
+        static constexpr float kTitleBarHeightDip = 32.0f;
+
+        virtual bool HasCustomTitleBar() const { return false; }
+        virtual const char *Title() const { return ""; }
+
+        virtual void SetTitleBarInteractiveRects(std::span<const PixelRect> rects) {}
+
+        virtual void Minimize() {}
+        virtual void ToggleMaximize() {}
+        virtual bool IsMaximized() const { return false; }
+        virtual void RequestClose() {}
 
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 

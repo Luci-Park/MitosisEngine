@@ -27,6 +27,7 @@ namespace mts
         windowDesc.mHeight = desc.mHeight;
         windowDesc.mTitle = desc.mTitle;
         windowDesc.mMaximized = true;
+        windowDesc.mCustomTitleBar = desc.mEnableEditorLayout;
 
         mWindow = Window::Create(windowDesc);
         if (!mWindow)

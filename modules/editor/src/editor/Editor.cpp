@@ -76,6 +76,7 @@ namespace mts
             return false;
         }
 
+        mWindow = &window;
         mInitialized = true;
         return true;
     }
@@ -88,6 +89,7 @@ namespace mts
         renderer.ShutdownImGuiVulkanBackend();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
+        mWindow = nullptr;
         mInitialized = false;
     }
 
@@ -98,10 +100,70 @@ namespace mts
         ImGui::NewFrame();
     }
 
+    void Editor::DrawTitleBar()
+    {
+        ImGuiViewport *viewport = ImGui::GetMainViewport();
+        const float scale = mWindow->ContentScale();
+        const float barHeight = Window::kTitleBarHeightDip * scale;
+
+        if (!ImGui::BeginViewportSideBar("##TitleBar", viewport, ImGuiDir_Up, barHeight,
+                                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings))
+        {
+            ImGui::End();
+            return;
+        }
+
+        ImGui::SetCursorPosY((barHeight - ImGui::GetTextLineHeight()) * 0.5f);
+        ImGui::TextUnformatted(mWindow->Title());
+
+        mTitleBarInteractiveRects.clear();
+        const float buttonWidth = barHeight * 0.9f;
+        const float buttonHeight = barHeight * 0.65f;
+        const float buttonY = (barHeight - buttonHeight) * 0.5f;
+        const float rowWidth = buttonWidth * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+        ImGui::SameLine(ImGui::GetWindowWidth() - rowWidth);
+
+        ImGui::SetWindowFontScale(0.65f);
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+        const auto controlButton = [&](const char *icon)
+        {
+            ImGui::PushID(icon);
+            ImGui::SetCursorPosY(buttonY);
+            const bool clicked = ImGui::Button(icon, ImVec2(buttonWidth, buttonHeight));
+            const ImVec2 rMin = ImGui::GetItemRectMin();
+            const ImVec2 rMax = ImGui::GetItemRectMax();
+            mTitleBarInteractiveRects.push_back(PixelRect{
+                static_cast<int32_t>(rMin.x), static_cast<int32_t>(rMin.y),
+                static_cast<uint32_t>(rMax.x - rMin.x), static_cast<uint32_t>(rMax.y - rMin.y)});
+            ImGui::PopID();
+            ImGui::SameLine();
+            return clicked;
+        };
+
+        if (controlButton(ICON_FA_WINDOW_MINIMIZE))
+            mWindow->Minimize();
+        if (controlButton(mWindow->IsMaximized() ? ICON_FA_WINDOW_RESTORE : ICON_FA_WINDOW_MAXIMIZE))
+            mWindow->ToggleMaximize();
+        if (controlButton(ICON_FA_XMARK))
+            mWindow->RequestClose();
+
+        ImGui::PopStyleColor();
+        ImGui::SetWindowFontScale(1.0f);
+
+        mWindow->SetTitleBarInteractiveRects(mTitleBarInteractiveRects);
+
+        ImGui::End();
+    }
+
     void Editor::DrawLayout(bool enableLayout)
     {
         if (enableLayout)
         {
+            if (mWindow->HasCustomTitleBar())
+                DrawTitleBar();
+
             const ImGuiID dockspaceId = ImGui::DockSpaceOverViewport(
                 0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
@@ -128,10 +190,6 @@ namespace mts
                 ImGui::End();
             }
 
-            // ImGuiDockNodeFlags_PassthruCentralNode leaves the dockspace's
-            // center undocked, so the 3D scene shows through there rather
-            // than in any named window - that central node's rect, not a
-            // window titled "Scene", is what the scene pass must clip to.
             if (const ImGuiDockNode *centralNode = ImGui::DockBuilderGetCentralNode(dockspaceId);
                 centralNode != nullptr)
             {
@@ -160,8 +218,6 @@ namespace mts
         }
         else
         {
-            // No dockspace to derive a viewport from - fall back to the
-            // full swapchain, same as before a layout is ever drawn.
             mSceneViewportRect = VkRect2D{};
         }
     }

@@ -53,6 +53,11 @@ namespace mts
         MTS_CHECK(mHandle != nullptr, "glfwCreateWindow failed");
         ++g_windowCount;
 
+        mTitle = desc.mTitle;
+        mHasCustomTitleBar = desc.mCustomTitleBar;
+        if (mHasCustomTitleBar)
+            InstallCustomTitleBar();
+
         int fbWidth = 0;
         int fbHeight = 0;
         glfwGetFramebufferSize(mHandle, &fbWidth, &fbHeight);
@@ -70,6 +75,9 @@ namespace mts
     {
         if (mHandle != nullptr)
         {
+            if (mHasCustomTitleBar)
+                UninstallCustomTitleBar();
+
             glfwDestroyWindow(mHandle);
             mHandle = nullptr;
             --g_windowCount;
@@ -97,6 +105,29 @@ namespace mts
         float yscale = 1.0f;
         glfwGetWindowContentScale(mHandle, &xscale, &yscale);
         return xscale;
+    }
+
+    void GLFWWindow::Minimize()
+    {
+        glfwIconifyWindow(mHandle);
+    }
+
+    void GLFWWindow::ToggleMaximize()
+    {
+        if (glfwGetWindowAttrib(mHandle, GLFW_MAXIMIZED) == GLFW_TRUE)
+            glfwRestoreWindow(mHandle);
+        else
+            glfwMaximizeWindow(mHandle);
+    }
+
+    bool GLFWWindow::IsMaximized() const
+    {
+        return glfwGetWindowAttrib(mHandle, GLFW_MAXIMIZED) == GLFW_TRUE;
+    }
+
+    void GLFWWindow::RequestClose()
+    {
+        glfwSetWindowShouldClose(mHandle, GLFW_TRUE);
     }
 
     void GLFWWindow::OnFramebufferSize(GLFWwindow *handle, int width, int height)
