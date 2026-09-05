@@ -47,6 +47,64 @@ namespace
         const mts::Entity camera = world.CreateEntity();
         mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
         world.AddComponent<mts::Camera>(camera, mts::Camera{});
+
+        app.Scripts().LoadScriptSource("stage4_demo", R"lua(
+            local Stage4Demo = {}
+            local stage = 0
+
+            function Stage4Demo.OnStart(world, entity)
+                local a = world:spawn()
+                Stage4Demo.entityA = a
+                print("has(a, Transform) before add (expect false):", world:has(a, "Transform"))
+                world:add(a, "Transform", { position = { x = 1, y = 0, z = 0 } })
+                print("has(a, Transform) right after add, same call (expect false - deferred):", world:has(a, "Transform"))
+
+                local b = world:spawn()
+                Stage4Demo.entityB = b
+                world:add(b, "Transform", { position = { x = 2, y = 0, z = 0 } })
+                world:declare("MissionFlag", { { name = "triggered", kind = "bool" } })
+                world:add(b, "MissionFlag", { triggered = true })
+                print("get(b, MissionFlag) right after add, same call (expect nil):", world:get(b, "MissionFlag"))
+            end
+
+            function Stage4Demo.OnUpdate(world, entity, dt)
+                stage = stage + 1
+                local a = Stage4Demo.entityA
+                local b = Stage4Demo.entityB
+
+                -- stage 1 is the *same* PreUpdate pass as OnStart (a system
+                -- calls OnStart then OnUpdate back to back, before its own
+                -- phase has finished, let alone flushed) - so OnStart's adds
+                -- are still pending here too. stage 2 is the next frame's
+                -- OnUpdate, the first call after that PreUpdate boundary
+                -- actually flushed.
+                if stage == 2 then
+                    print("has(a, Transform) after OnStart's flush (expect true):", world:has(a, "Transform"))
+                    print("MissionFlag.triggered on b (expect true):", world:get(b, "MissionFlag").triggered)
+
+                    local sawA = false
+                    world:each("Transform", function(e)
+                        if e == a then sawA = true end
+                    end)
+                    print("world:each saw a (expect true):", sawA)
+
+                    world:remove(b, "Transform")
+                    print("has(b, Transform) right after remove, same call (expect true - deferred):", world:has(b, "Transform"))
+
+                    world:destroy(a)
+                    print("has(a, Transform) right after destroy, same call (expect true - deferred):", world:has(a, "Transform"))
+                elseif stage == 3 then
+                    print("has(b, Transform) after remove's flush (expect false):", world:has(b, "Transform"))
+                    print("has(a, Transform) after destroy's flush (expect false):", world:has(a, "Transform"))
+                end
+            end
+
+            return Stage4Demo
+        )lua");
+
+        const mts::Entity demoEntity = world.CreateEntity();
+        const int32_t demoInstance = app.Scripts().CreateInstance("stage4_demo");
+        world.AddComponent<mts::ScriptRef>(demoEntity, mts::ScriptRef{.instanceRef = demoInstance});
     }
 }
 

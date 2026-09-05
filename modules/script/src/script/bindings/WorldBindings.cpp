@@ -1,12 +1,19 @@
 #include "WorldBindings.h"
 
 #include <core/ecs/ComponentRegistry.h>
+#include <core/ecs/DeferredAccess.h>
+#include <core/ecs/RuntimeQuery.h>
 #include <core/ecs/World.h>
 #include <core/log/Log.h>
 
 #include <glm/gtc/type_ptr.hpp>
 
 #include <sol/sol.hpp>
+
+#include <algorithm>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace mts
 {
@@ -200,6 +207,29 @@ namespace mts
             return false;
         }
 
+        std::optional<FieldKind> ParseFieldKind(std::string_view kind)
+        {
+            if (kind == "bool")
+                return FieldKind::Bool;
+            if (kind == "int")
+                return FieldKind::Int;
+            if (kind == "float")
+                return FieldKind::Float;
+            if (kind == "vec3")
+                return FieldKind::Vec3;
+            if (kind == "vec4")
+                return FieldKind::Vec4;
+            if (kind == "quat")
+                return FieldKind::Quat;
+            if (kind == "mat4")
+                return FieldKind::Mat4;
+            if (kind == "entity")
+                return FieldKind::EntityRef;
+            if (kind == "handle")
+                return FieldKind::Handle;
+            return std::nullopt;
+        }
+
         bool WorldHas(World &world, Entity entity, std::string_view componentName)
         {
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
@@ -268,6 +298,196 @@ namespace mts
             }
             return true;
         }
+
+        Entity WorldSpawn(World &world)
+        {
+            return world.CreateEntity();
+        }
+
+        bool WorldDestroy(World &world, Entity entity)
+        {
+            return DestroyEntityOrDefer(world, entity);
+        }
+
+        bool WorldAdd(World &world, Entity entity, std::string_view componentName,
+                      sol::optional<sol::table> maybeFields)
+        {
+            const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
+            if (ops == nullptr)
+            {
+                MTS_LOG_ERROR("script: world:add unknown component '{}'", componentName);
+                return false;
+            }
+
+            std::vector<std::byte> buffer(ops->mDefaultValue.begin(), ops->mDefaultValue.end());
+
+            if (maybeFields)
+            {
+                for (const FieldDesc &field : ops->mFields)
+                {
+                    const sol::object value = (*maybeFields)[field.mName];
+                    if (!value.valid())
+                        continue;
+
+                    FieldScratch scratch;
+                    if (!LuaValueToField(field, value, scratch))
+                    {
+                        MTS_LOG_ERROR("script: world:add '{}.{}' - value has wrong shape for a {}", componentName,
+                                      field.mName, FieldKindName(field.mKind));
+                        continue;
+                    }
+                    field.Write(buffer.data(), &scratch);
+                }
+            }
+
+            return AddComponentOrDefer(world, entity, *ops, buffer.data());
+        }
+
+        bool WorldRemove(World &world, Entity entity, std::string_view componentName)
+        {
+            const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
+            if (ops == nullptr)
+            {
+                MTS_LOG_ERROR("script: world:remove unknown component '{}'", componentName);
+                return false;
+            }
+            return RemoveComponentOrDefer(world, entity, *ops);
+        }
+
+        void WorldEach(World &world, sol::this_state state, sol::variadic_args args)
+        {
+            sol::state_view lua(state);
+
+            if (args.size() < 2)
+            {
+                MTS_LOG_ERROR("script: world:each needs at least one component name and a callback");
+                return;
+            }
+
+            const sol::object callbackObj = args[args.size() - 1];
+            if (!callbackObj.is<sol::protected_function>())
+            {
+                MTS_LOG_ERROR("script: world:each's last argument must be a function");
+                return;
+            }
+            const sol::protected_function callback = callbackObj;
+
+            std::vector<const ComponentOps *> termOps;
+            std::vector<TypeId> terms;
+            for (std::size_t i = 0; i + 1 < args.size(); ++i)
+            {
+                const sol::object nameObj = args[i];
+                if (!nameObj.is<std::string>())
+                {
+                    MTS_LOG_ERROR("script: world:each - component name #{} is not a string", i + 1);
+                    return;
+                }
+
+                const ComponentOps *ops = ComponentRegistry::Instance().Find(nameObj.as<std::string>());
+                if (ops == nullptr)
+                {
+                    MTS_LOG_ERROR("script: world:each unknown component '{}'", nameObj.as<std::string>());
+                    return;
+                }
+                termOps.push_back(ops);
+                terms.push_back(ops->mType);
+            }
+
+            RuntimeQuery query(world, terms);
+            query.ForEach(
+                [&](Entity entity, std::span<void *const> row)
+                {
+                    std::vector<sol::object> callArgs;
+                    callArgs.reserve(row.size() + 1);
+                    callArgs.push_back(sol::make_object(lua, entity));
+                    for (std::size_t i = 0; i < row.size(); ++i)
+                    {
+                        sol::table t = lua.create_table();
+                        for (const FieldDesc &field : termOps[i]->mFields)
+                            t[field.mName] = FieldToLua(lua, field, row[i]);
+                        callArgs.push_back(t);
+                    }
+
+                    const sol::protected_function_result result = callback(sol::as_args(callArgs));
+                    if (!result.valid())
+                    {
+                        const sol::error err = result;
+                        MTS_LOG_ERROR("script: world:each callback failed: {}", err.what());
+                    }
+                });
+        }
+
+        bool WorldDeclare(World &, std::string_view componentName, const sol::table &fieldsSpec)
+        {
+            if (componentName.empty())
+            {
+                MTS_LOG_ERROR("script: world:declare - component name is empty");
+                return false;
+            }
+
+            std::vector<RuntimeFieldDecl> decls;
+            std::vector<std::string> nameStorage;
+            decls.reserve(fieldsSpec.size());
+            nameStorage.reserve(fieldsSpec.size());
+
+            for (const auto &kv : fieldsSpec)
+            {
+                if (!kv.second.is<sol::table>())
+                {
+                    MTS_LOG_ERROR("script: world:declare '{}' - each field must be a table", componentName);
+                    return false;
+                }
+                const sol::table entry = kv.second.as<sol::table>();
+                const std::string name = entry.get_or<std::string>("name", "");
+                const std::string kindStr = entry.get_or<std::string>("kind", "");
+                const std::optional<FieldKind> kind = ParseFieldKind(kindStr);
+
+                if (name.empty() || !kind)
+                {
+                    MTS_LOG_ERROR("script: world:declare '{}' - bad field entry (name='{}', kind='{}')",
+                                  componentName, name, kindStr);
+                    return false;
+                }
+                for (const std::string &seen : nameStorage)
+                {
+                    if (seen == name)
+                    {
+                        MTS_LOG_ERROR("script: world:declare '{}' declares field '{}' twice", componentName, name);
+                        return false;
+                    }
+                }
+
+                nameStorage.push_back(name);
+                decls.push_back(RuntimeFieldDecl{std::string_view(nameStorage.back()), *kind});
+            }
+
+            if (const ComponentOps *existing = ComponentRegistry::Instance().Find(componentName))
+            {
+                if (!existing->mRuntime)
+                {
+                    MTS_LOG_ERROR("script: world:declare '{}' - already a native C++ component", componentName);
+                    return false;
+                }
+
+                const bool sameLayout =
+                    existing->mFields.size() == decls.size() &&
+                    std::equal(existing->mFields.begin(), existing->mFields.end(), decls.begin(),
+                               [](const FieldDesc &a, const RuntimeFieldDecl &b)
+                               { return a.mName == b.mName && a.mKind == b.mKind; });
+
+                if (!sameLayout)
+                {
+                    MTS_LOG_ERROR("script: world:declare '{}' - already declared with a different field list; "
+                                  "restart to change a component's fields",
+                                  componentName);
+                    return false;
+                }
+                // Identical layout: RegisterRuntime's hot-reload path below is a no-op.
+            }
+
+            ComponentRegistry::Instance().RegisterRuntime(componentName, decls);
+            return true;
+        }
     }
 
     void RegisterWorldBindings(sol::state &lua)
@@ -275,6 +495,12 @@ namespace mts
         lua.new_usertype<World>("World",
                                  "has", &WorldHas,
                                  "get", &WorldGet,
-                                 "set", &WorldSet);
+                                 "set", &WorldSet,
+                                 "spawn", &WorldSpawn,
+                                 "destroy", &WorldDestroy,
+                                 "add", &WorldAdd,
+                                 "remove", &WorldRemove,
+                                 "each", &WorldEach,
+                                 "declare", &WorldDeclare);
     }
 }
