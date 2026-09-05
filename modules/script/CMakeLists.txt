@@ -1,15 +1,19 @@
 engine_add_module(script)
 
-find_package(Lua REQUIRED)
 find_package(sol2 CONFIG REQUIRED)
 
-target_include_directories(engine_script PRIVATE ${LUA_INCLUDE_DIR})
+# luajit has no CMake config package - just a .pc file - so it's discovered
+# through pkg-config instead of find_package(). sol2 auto-detects LuaJIT via
+# LUAJIT_VERSION in its own headers; nothing else here needs to know which
+# Lua flavor is underneath.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LuaJIT REQUIRED IMPORTED_TARGET luajit)
 
 target_link_libraries(engine_script
     PUBLIC  mts::core
     PRIVATE mts::assets
             sol2::sol2
-            ${LUA_LIBRARIES}
+            PkgConfig::LuaJIT
 )
 
 target_sources(engine_script PRIVATE

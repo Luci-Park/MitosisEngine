@@ -9,7 +9,11 @@
         "vulkan",
         "volk",
         "vulkan-memory-allocator",
-        "lua",
+        "luajit",
+        {
+            "name": "pkgconf",
+            "host": true
+        },
         "sol2",
         "catch2"
     ],
