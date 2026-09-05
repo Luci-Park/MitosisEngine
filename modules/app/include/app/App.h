@@ -54,6 +54,7 @@ namespace mts
 
         World &GetWorld() { return mWorld; }
         SystemScheduler &Systems() { return mScheduler; }
+        ScriptHost &Scripts() { return mScriptHost; }
 
         /// Temporary seam: CreateMesh has nowhere else to be called from until
         /// an asset-facing mesh service exists. A caller building a scene

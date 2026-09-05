@@ -42,6 +42,13 @@ namespace
         mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
         world.AddComponent<mts::MeshRenderer>(cubeEntity, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f)});
 
+        app.Scripts().RunWithWorld("stage2_demo", R"lua(
+            print("has Transform:", world:has(entity, "Transform"))
+            print("has NotAThing:", world:has(entity, "NotAThing"))
+            local t = world:get(entity, "Transform")
+            print(string.format("Transform.position = (%.2f, %.2f, %.2f)", t.position.x, t.position.y, t.position.z))
+        )lua", world, cubeEntity);
+
         const mts::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mts::MaterialDesc{.shaderName = "unlit"});
 
         const mts::Entity unlitCube = world.CreateEntity();

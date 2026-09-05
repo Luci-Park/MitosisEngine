@@ -1,9 +1,14 @@
 #include <script/ScriptHost.h>
 
+#include "bindings/EntityBindings.h"
+#include "bindings/WorldBindings.h"
+
+#include <core/ecs/World.h>
 #include <core/log/Log.h>
 
 #include <sol/sol.hpp>
 
+#include <functional>
 #include <string>
 #include <unordered_map>
 
@@ -34,6 +39,9 @@ namespace mts
                 }
                 MTS_LOG_INFO("[lua] {}", line);
             });
+
+            RegisterEntityBindings(mLua);
+            RegisterWorldBindings(mLua);
         }
 
         sol::state mLua;
@@ -60,6 +68,13 @@ namespace mts
 
         mImpl->mLoadedScripts[std::string(name)] = result.get<sol::object>();
         return true;
+    }
+
+    bool ScriptHost::RunWithWorld(std::string_view name, std::string_view source, World &world, Entity entity)
+    {
+        mImpl->mLua["world"] = std::ref(world);
+        mImpl->mLua["entity"] = entity;
+        return LoadScriptSource(name, source);
     }
 
     bool ScriptHost::ReloadScriptSource(std::string_view name, std::string_view source)
