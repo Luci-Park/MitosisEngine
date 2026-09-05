@@ -31,12 +31,6 @@ namespace mts
         bool ReloadScriptSource(std::string_view name, std::string_view source) override;
         void UnloadScript(std::string_view name) override;
 
-        /// Binds `world`/`entity` as Lua globals, then runs `source`. Bring-up
-        /// seam for exercising world:has/world:get before ScriptRef exists to
-        /// drive CallOnStart/CallOnUpdate for real - not part of IScriptHost,
-        /// since it has nothing to do once that exists.
-        bool RunWithWorld(std::string_view name, std::string_view source, World &world, Entity entity);
-
         int32_t CreateInstance(std::string_view scriptName) override;
         void DestroyInstance(int32_t instanceRef) override;
 

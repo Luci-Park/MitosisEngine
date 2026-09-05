@@ -44,8 +44,49 @@ namespace mts
             RegisterWorldBindings(mLua);
         }
 
+        int32_t CreateInstance(std::string_view scriptName)
+        {
+            const auto it = mLoadedScripts.find(std::string(scriptName));
+            if (it == mLoadedScripts.end() || !it->second.is<sol::table>())
+            {
+                MTS_LOG_ERROR("script: CreateInstance: '{}' is not a loaded script table", scriptName);
+                return -1;
+            }
+
+            const int32_t ref = mNextInstanceRef++;
+            mInstances.emplace(ref, it->second.as<sol::table>());
+            return ref;
+        }
+
+        void DestroyInstance(int32_t instanceRef)
+        {
+            mInstances.erase(instanceRef);
+        }
+
+        template <typename... Args>
+        void CallCallback(int32_t instanceRef, const char *callbackName, Args &&...args)
+        {
+            const auto it = mInstances.find(instanceRef);
+            if (it == mInstances.end())
+                return; // destroyed or never created - routine, not an error
+
+            const sol::object callback = it->second[callbackName];
+            if (!callback.is<sol::protected_function>())
+                return;
+
+            const sol::protected_function fn = callback;
+            const sol::protected_function_result result = fn(std::forward<Args>(args)...);
+            if (!result.valid())
+            {
+                const sol::error err = result;
+                MTS_LOG_ERROR("script: {} failed: {}", callbackName, err.what());
+            }
+        }
+
         sol::state mLua;
         std::unordered_map<std::string, sol::object> mLoadedScripts;
+        std::unordered_map<int32_t, sol::table> mInstances;
+        int32_t mNextInstanceRef = 0;
     };
 
     ScriptHost::ScriptHost() : mImpl(std::make_unique<ScriptHostImpl>())
@@ -70,13 +111,6 @@ namespace mts
         return true;
     }
 
-    bool ScriptHost::RunWithWorld(std::string_view name, std::string_view source, World &world, Entity entity)
-    {
-        mImpl->mLua["world"] = std::ref(world);
-        mImpl->mLua["entity"] = entity;
-        return LoadScriptSource(name, source);
-    }
-
     bool ScriptHost::ReloadScriptSource(std::string_view name, std::string_view source)
     {
         return LoadScriptSource(name, source);
@@ -87,25 +121,28 @@ namespace mts
         mImpl->mLoadedScripts.erase(std::string(name));
     }
 
-    int32_t ScriptHost::CreateInstance(std::string_view /*scriptName*/)
+    int32_t ScriptHost::CreateInstance(std::string_view scriptName)
     {
-        // Per-entity instances start in the next stage, once ScriptRef exists.
-        return -1;
+        return mImpl->CreateInstance(scriptName);
     }
 
-    void ScriptHost::DestroyInstance(int32_t /*instanceRef*/)
+    void ScriptHost::DestroyInstance(int32_t instanceRef)
     {
+        mImpl->DestroyInstance(instanceRef);
     }
 
-    void ScriptHost::CallOnStart(World &, CommandBuffer &, Entity, int32_t)
+    void ScriptHost::CallOnStart(World &world, CommandBuffer &, Entity entity, int32_t instanceRef)
     {
+        mImpl->CallCallback(instanceRef, "OnStart", std::ref(world), entity);
     }
 
-    void ScriptHost::CallOnUpdate(World &, CommandBuffer &, Entity, int32_t, float)
+    void ScriptHost::CallOnUpdate(World &world, CommandBuffer &, Entity entity, int32_t instanceRef, float dt)
     {
+        mImpl->CallCallback(instanceRef, "OnUpdate", std::ref(world), entity, dt);
     }
 
-    void ScriptHost::CallOnStop(World &, CommandBuffer &, Entity, int32_t)
+    void ScriptHost::CallOnStop(World &world, CommandBuffer &, Entity entity, int32_t instanceRef)
     {
+        mImpl->CallCallback(instanceRef, "OnStop", std::ref(world), entity);
     }
 }

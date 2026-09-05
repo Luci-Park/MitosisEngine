@@ -13,6 +13,7 @@ target_link_libraries(engine_script
 
 target_sources(engine_script PRIVATE
     src/script/ScriptHost.cpp
+    src/script/ScriptSystem.cpp
     src/script/bindings/EntityBindings.cpp
     src/script/bindings/WorldBindings.cpp
 )

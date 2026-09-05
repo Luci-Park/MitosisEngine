@@ -20,6 +20,23 @@ namespace mts
             uint32_t generation = 0;
         };
 
+        union FieldScratch
+        {
+            bool asBool;
+            int32_t asInt;
+            float asFloat;
+            glm::vec3 asVec3;
+            glm::vec4 asVec4;
+            glm::quat asQuat;
+            glm::mat4 asMat4;
+            Entity asEntity;
+            RawHandle asHandle;
+
+            FieldScratch() : asMat4()
+            {
+            }
+        };
+
         sol::object FieldToLua(sol::state_view lua, const FieldDesc &field, const void *component)
         {
             switch (field.mKind)
@@ -103,6 +120,86 @@ namespace mts
             return sol::nil;
         }
 
+        bool LuaValueToField(const FieldDesc &field, const sol::object &value, FieldScratch &scratch)
+        {
+            switch (field.mKind)
+            {
+            case FieldKind::Bool:
+            {
+                if (!value.is<bool>())
+                    return false;
+                scratch.asBool = value.as<bool>();
+                return true;
+            }
+            case FieldKind::Int:
+            {
+                if (!value.is<int32_t>())
+                    return false;
+                scratch.asInt = value.as<int32_t>();
+                return true;
+            }
+            case FieldKind::Float:
+            {
+                if (!value.is<float>())
+                    return false;
+                scratch.asFloat = value.as<float>();
+                return true;
+            }
+            case FieldKind::Vec3:
+            {
+                if (!value.is<sol::table>())
+                    return false;
+                const sol::table t = value.as<sol::table>();
+                scratch.asVec3 = glm::vec3(t.get_or("x", 0.0f), t.get_or("y", 0.0f), t.get_or("z", 0.0f));
+                return true;
+            }
+            case FieldKind::Vec4:
+            {
+                if (!value.is<sol::table>())
+                    return false;
+                const sol::table t = value.as<sol::table>();
+                scratch.asVec4 = glm::vec4(t.get_or("x", 0.0f), t.get_or("y", 0.0f), t.get_or("z", 0.0f),
+                                            t.get_or("w", 0.0f));
+                return true;
+            }
+            case FieldKind::Quat:
+            {
+                if (!value.is<sol::table>())
+                    return false;
+                const sol::table t = value.as<sol::table>();
+                scratch.asQuat = glm::quat(t.get_or("w", 1.0f), t.get_or("x", 0.0f), t.get_or("y", 0.0f),
+                                            t.get_or("z", 0.0f));
+                return true;
+            }
+            case FieldKind::Mat4:
+            {
+                if (!value.is<sol::table>())
+                    return false;
+                const sol::table t = value.as<sol::table>();
+                float *m = glm::value_ptr(scratch.asMat4);
+                for (int i = 0; i < 16; ++i)
+                    m[i] = t.get_or(i + 1, 0.0f);
+                return true;
+            }
+            case FieldKind::EntityRef:
+            {
+                if (!value.is<Entity>())
+                    return false;
+                scratch.asEntity = value.as<Entity>();
+                return true;
+            }
+            case FieldKind::Handle:
+            {
+                if (!value.is<sol::table>())
+                    return false;
+                const sol::table t = value.as<sol::table>();
+                scratch.asHandle = RawHandle{t.get_or("index", 0u), t.get_or("generation", 0u)};
+                return true;
+            }
+            }
+            return false;
+        }
+
         bool WorldHas(World &world, Entity entity, std::string_view componentName)
         {
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
@@ -134,12 +231,50 @@ namespace mts
                 out[field.mName] = FieldToLua(lua, field, component);
             return out;
         }
+
+        bool WorldSet(World &world, Entity entity, std::string_view componentName, std::string_view fieldName,
+                      const sol::object &value)
+        {
+            const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
+            if (ops == nullptr)
+            {
+                MTS_LOG_ERROR("script: world:set unknown component '{}'", componentName);
+                return false;
+            }
+
+            void *component = ops->Get(world, entity);
+            if (component == nullptr)
+                return false; // dead entity or missing component - routine, not an error
+
+            const FieldDesc *field = ops->FindField(fieldName);
+            if (field == nullptr)
+            {
+                MTS_LOG_ERROR("script: world:set unknown field '{}' on component '{}'", fieldName, componentName);
+                return false;
+            }
+
+            FieldScratch scratch;
+            if (!LuaValueToField(*field, value, scratch))
+            {
+                MTS_LOG_ERROR("script: world:set '{}.{}' - value has wrong shape for a {}", componentName, fieldName,
+                              FieldKindName(field->mKind));
+                return false;
+            }
+
+            if (!field->Write(component, &scratch))
+            {
+                MTS_LOG_ERROR("script: world:set '{}.{}' is read-only", componentName, fieldName);
+                return false;
+            }
+            return true;
+        }
     }
 
     void RegisterWorldBindings(sol::state &lua)
     {
         lua.new_usertype<World>("World",
                                  "has", &WorldHas,
-                                 "get", &WorldGet);
+                                 "get", &WorldGet,
+                                 "set", &WorldSet);
     }
 }

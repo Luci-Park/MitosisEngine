@@ -7,6 +7,7 @@
 #include <core/log/Log.h>
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
+#include <script/ScriptSystem.h>
 
 #include <algorithm>
 #include <chrono>
@@ -62,10 +63,13 @@ namespace mts
         RegisterCoreComponents();
         RegisterRendererComponents();
 
-        mScriptHost.LoadScriptSource("boot", "print('hello from lua')");
-
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
+
+        // Scripts read this frame's settled state (last frame's PostUpdate/
+        // Render already ran) and anything they spawn or mutate is visible to
+        // this frame's later phases as soon as PreUpdate's boundary flushes.
+        mScheduler.Add<ScriptSystem>(SystemPhase::PreUpdate, mScriptHost);
 
         // should be before any other system in PostUpdate
         mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);

@@ -4,33 +4,12 @@
 #include <renderer/Shapes.h>
 #include <renderer/components/Camera.h>
 #include <renderer/components/MeshRenderer.h>
+#include <script/components/ScriptRef.h>
 
 #include <glm/gtc/quaternion.hpp>
 
 namespace
 {
-    class SpinSystem final : public mts::ISystem
-    {
-    public:
-        SpinSystem(mts::Entity target, float radiansPerSecond)
-            : mTarget(target), mSpeed(radiansPerSecond)
-        {
-        }
-
-        void OnUpdate(mts::SystemContext &context) override
-        {
-            mts::Transform *transform = context.world.Get<mts::Transform>(mTarget);
-            if (transform == nullptr)
-                return;
-
-            transform->Rotate(glm::angleAxis(mSpeed * context.dt, glm::vec3(0.0f, 1.0f, 0.0f)));
-        }
-
-    private:
-        mts::Entity mTarget;
-        float mSpeed;
-    };
-
     void BuildScene(mts::App &app)
     {
         mts::World &world = app.GetWorld();
@@ -42,12 +21,22 @@ namespace
         mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
         world.AddComponent<mts::MeshRenderer>(cubeEntity, mts::MeshRenderer{cubeMesh, glm::vec4(1.0f)});
 
-        app.Scripts().RunWithWorld("stage2_demo", R"lua(
-            print("has Transform:", world:has(entity, "Transform"))
-            print("has NotAThing:", world:has(entity, "NotAThing"))
-            local t = world:get(entity, "Transform")
-            print(string.format("Transform.position = (%.2f, %.2f, %.2f)", t.position.x, t.position.y, t.position.z))
-        )lua", world, cubeEntity);
+        app.Scripts().LoadScriptSource("spin", R"lua(
+            local Spin = {}
+            local angle = 0.0
+            local speed = 1.0
+
+            function Spin.OnUpdate(world, entity, dt)
+                angle = angle + speed * dt
+                local half = angle * 0.5
+                world:set(entity, "Transform", "rotation", { w = math.cos(half), x = 0.0, y = math.sin(half), z = 0.0 })
+            end
+
+            return Spin
+        )lua");
+
+        const int32_t spinInstance = app.Scripts().CreateInstance("spin");
+        world.AddComponent<mts::ScriptRef>(cubeEntity, mts::ScriptRef{.instanceRef = spinInstance});
 
         const mts::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mts::MaterialDesc{.shaderName = "unlit"});
 
@@ -58,8 +47,6 @@ namespace
         const mts::Entity camera = world.CreateEntity();
         mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
         world.AddComponent<mts::Camera>(camera, mts::Camera{});
-
-        app.Systems().Add<SpinSystem>(mts::SystemPhase::Update, cubeEntity, 1.0f);
     }
 }
 
