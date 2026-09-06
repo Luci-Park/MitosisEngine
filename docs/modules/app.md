@@ -1,7 +1,7 @@
 # app
 
 - **Maintainer:** Sumin Park
-- **Depends on:** `mts::core`, `mts::window`, `mts::renderer`, `mts::assets`, all public
+- **Depends on:** `mir::core`, `mir::window`, `mir::renderer`, `mir::assets`, all public
 - **Public API:** `modules/app/include/app/`
 - **Last reviewed:** 2026-09-01
 
@@ -81,22 +81,22 @@ may follow.
 `main.cpp`, in full:
 
 ```cpp
-mts::InitLog();                 // outside App: early failures must still log
+mir::InitLog();                 // outside App: early failures must still log
 
-mts::App app;
+mir::App app;
 
-mts::AppDesc desc{};
-desc.mTitle = "MitosisEngine - Window Test";
+mir::AppDesc desc{};
+desc.mTitle = "MjolnirEngine - Window Test";
 
 if (!app.Initialize(desc))
 {
-    mts::FlushLog();
+    mir::FlushLog();
     return -1;
 }
 
 app.Run();
 app.Shutdown();                 // idempotent; the destructor would do it too
-mts::FlushLog();
+mir::FlushLog();
 ```
 
 Systems are registered on `app.Systems()` between `Initialize` and `Run`,
@@ -136,7 +136,7 @@ components created through `app.GetWorld()`.
   and a nonzero `dt` there would be a lie.
 - `mFrame` increments after the draw, so the first tick runs as frame 0.
 - The `if (!mWindow)` branch after `Window::Create` is currently unreachable -
-  the GLFW backend aborts through `MTS_CHECK` instead of returning null (see
+  the GLFW backend aborts through `MIR_CHECK` instead of returning null (see
   [window.md](window.md)).
 - `mDesc` is kept after `Initialize` only for `mMaxDeltaSeconds`; the rest is
   consumed at startup.

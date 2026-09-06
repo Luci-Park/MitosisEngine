@@ -10,8 +10,8 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(LuaJIT REQUIRED IMPORTED_TARGET luajit)
 
 target_link_libraries(engine_script
-    PUBLIC  mts::core
-    PRIVATE mts::assets
+    PUBLIC  mir::core
+    PRIVATE mir::assets
             sol2::sol2
             PkgConfig::LuaJIT
 )

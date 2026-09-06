@@ -8,7 +8,7 @@
  */
 #pragma once
 
-namespace mts
+namespace mir
 {
     /// Mirrors core::RegisterCoreComponents, one level up: core cannot name
     /// MeshRenderer, so the renderer registers its own components instead of

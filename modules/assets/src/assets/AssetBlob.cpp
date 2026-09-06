@@ -5,7 +5,7 @@
 
 #include <cstring>
 
-namespace mts
+namespace mir
 {
     std::vector<std::byte> BuildAssetBlob(uint32_t typeTag, uint32_t contentVersion,
                                            std::span<const std::byte> content)
@@ -28,7 +28,7 @@ namespace mts
     {
         if (raw.size() < sizeof(AssetBlobHeader))
         {
-            MTS_LOG_ERROR("ParseAssetBlob: buffer too small for header ({} bytes)", raw.size());
+            MIR_LOG_ERROR("ParseAssetBlob: buffer too small for header ({} bytes)", raw.size());
             return std::nullopt;
         }
 
@@ -37,13 +37,13 @@ namespace mts
 
         if (header.magic != kAssetBlobMagic)
         {
-            MTS_LOG_ERROR("ParseAssetBlob: bad magic {:#x}", header.magic);
+            MIR_LOG_ERROR("ParseAssetBlob: bad magic {:#x}", header.magic);
             return std::nullopt;
         }
 
         if (header.formatVersion != kAssetBlobFormatVersion)
         {
-            MTS_LOG_ERROR("ParseAssetBlob: unsupported format version {}, expected {}",
+            MIR_LOG_ERROR("ParseAssetBlob: unsupported format version {}, expected {}",
                           header.formatVersion, kAssetBlobFormatVersion);
             return std::nullopt;
         }
@@ -51,14 +51,14 @@ namespace mts
         const std::span<const std::byte> content = raw.subspan(sizeof(header));
         if (content.size() != header.contentSize)
         {
-            MTS_LOG_ERROR("ParseAssetBlob: content size mismatch, header says {}, buffer has {}",
+            MIR_LOG_ERROR("ParseAssetBlob: content size mismatch, header says {}, buffer has {}",
                           header.contentSize, content.size());
             return std::nullopt;
         }
 
         if (Fnv1a64(content) != header.contentHash)
         {
-            MTS_LOG_ERROR("ParseAssetBlob: content hash mismatch, blob is corrupt or stale");
+            MIR_LOG_ERROR("ParseAssetBlob: content hash mismatch, blob is corrupt or stale");
             return std::nullopt;
         }
 

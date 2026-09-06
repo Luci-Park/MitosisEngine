@@ -14,7 +14,7 @@
 #include <unistd.h>
 #endif
 
-namespace mts
+namespace mir
 {
     namespace
     {

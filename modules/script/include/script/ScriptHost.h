@@ -12,7 +12,7 @@
 
 #include <memory>
 
-namespace mts
+namespace mir
 {
     struct ScriptHostImpl;
 

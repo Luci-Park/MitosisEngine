@@ -11,7 +11,7 @@
 
 #include "core/log/Assert.h"
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -23,7 +23,7 @@ namespace mts
         {
             CommandBuffer *commands = FrameCommandBuffer(world);
 
-            MTS_ASSERT(commands != nullptr,
+            MIR_ASSERT(commands != nullptr,
                        "DeferredAccess: a structural change was requested during a query walk, but no "
                        "FrameCommands resource is installed. Emplace one pointing at the frame's "
                        "CommandBuffer during setup.");

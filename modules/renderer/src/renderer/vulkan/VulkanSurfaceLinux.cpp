@@ -13,7 +13,7 @@
 struct wl_display;
 struct wl_surface;
 
-namespace mts::vk
+namespace mir::vk
 {
     const char *PlatformSurfaceExtension(WindowBackend backend)
     {
@@ -53,13 +53,13 @@ namespace mts::vk
         }
         else
         {
-            MTS_LOG_ERROR("Unsupported window backend for Vulkan surface creation");
+            MIR_LOG_ERROR("Unsupported window backend for Vulkan surface creation");
             return VK_NULL_HANDLE;
         }
 
         if (result != VK_SUCCESS)
         {
-            MTS_LOG_ERROR("Vulkan surface creation failed");
+            MIR_LOG_ERROR("Vulkan surface creation failed");
             return VK_NULL_HANDLE;
         }
         return surface;

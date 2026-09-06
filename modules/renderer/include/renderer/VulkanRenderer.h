@@ -27,7 +27,7 @@ VK_DEFINE_HANDLE(VmaAllocation)
 
 struct ImDrawData;
 
-namespace mts
+namespace mir
 {
     struct RendererDesc
     {

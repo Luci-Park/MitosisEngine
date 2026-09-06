@@ -33,11 +33,11 @@
 #include <system_error>
 #include <thread>
 
-namespace mts
+namespace mir
 {
     namespace
     {
-        constexpr wchar_t kClassName[] = L"MtsSplashWindow";
+        constexpr wchar_t kClassName[] = L"MirSplashWindow";
 
         constexpr UINT kUpdateMessage = WM_APP + 1;
 
@@ -211,7 +211,7 @@ namespace mts
                 HBITMAP bmp = LoadArtworkBitmap(BrandingPath(kArtworkFile),
                                                  SplashScreen::kWidth, SplashScreen::kHeight - kStripHeight);
                 if (bmp == nullptr)
-                    MTS_LOG_WARN("Splash: could not load branding artwork, using placeholder fill");
+                    MIR_LOG_WARN("Splash: could not load branding artwork, using placeholder fill");
                 return bmp;
             }();
 
@@ -439,7 +439,7 @@ namespace mts
 
     void SplashScreen::SetProgress(const char *status, float progress)
     {
-        MTS_ASSERT(status != nullptr, "SplashScreen::SetProgress: status must not be null");
+        MIR_ASSERT(status != nullptr, "SplashScreen::SetProgress: status must not be null");
 
         if (mImpl == nullptr)
             return;

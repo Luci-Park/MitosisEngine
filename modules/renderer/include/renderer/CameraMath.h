@@ -11,7 +11,7 @@
 
 #include <glm/mat4x4.hpp>
 
-namespace mts
+namespace mir
 {
     glm::mat4 MakeViewProjection(const glm::mat4 &cameraWorld,
                                  float fovYDegrees, float nearZ, float farZ,

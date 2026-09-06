@@ -1,7 +1,7 @@
 # <module>
 
 - **Maintainer:**
-- **Depends on:** `mts::` modules and third-party libraries
+- **Depends on:** `mir::` modules and third-party libraries
 - **Public API:** `modules/<module>/include/<module>/`
 - **Last reviewed:** YYYY-MM-DD
 

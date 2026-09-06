@@ -19,7 +19,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     /**
      * `world:each("Transform", "Velocity")` - the same walk Query<Ts...> does,

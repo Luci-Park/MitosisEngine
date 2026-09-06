@@ -3,7 +3,7 @@
 # Must come before project(): CMAKE_TOOLCHAIN_FILE is only honoured there.
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/VcpkgToolchain.cmake)
 
-project(Mitosis
+project(Mjolnir
     VERSION 0.1.0
     DESCRIPTION "A modular 3D engine"
     # C is needed for volk.c
@@ -69,10 +69,10 @@ engine_copy_branding(HelloWorld SOURCE_DIR branding)
 find_package(nlohmann_json CONFIG REQUIRED)
 
 target_link_libraries(HelloWorld PRIVATE
-    mts::app
-    mts::assets
-    mts::core
-    mts::scene
-    mts::script
+    mir::app
+    mir::assets
+    mir::core
+    mir::scene
+    mir::script
     nlohmann_json::nlohmann_json
 )

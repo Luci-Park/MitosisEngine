@@ -13,7 +13,7 @@
 #define GLFW_EXPOSE_NATIVE_WAYLAND
 #include <GLFW/glfw3native.h>
 
-namespace mts
+namespace mir
 {
     void EnsureDpiAware() {}
 

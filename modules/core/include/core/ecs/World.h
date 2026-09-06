@@ -28,7 +28,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     class World;
 
@@ -192,7 +192,7 @@ namespace mts
         // reset record, remove from both storages, remove from pool
         void DestroyEntity(Entity entity)
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::DestroyEntity: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::DestroyEntity: entity is not alive");
             AssertNoStructuralChange("DestroyEntity");
 
             // Hooks run first, while this entity's components are still
@@ -244,7 +244,7 @@ namespace mts
         // Get table of entity
         const Archetype *ArchetypeOf(Entity entity) const
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::ArchetypeOf: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::ArchetypeOf: entity is not alive");
             return mRecords[entity.mIndex].archetype;
         }
 
@@ -257,7 +257,7 @@ namespace mts
         template <typename T>
         bool Has(Entity entity) const
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::Has: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::Has: entity is not alive");
 
             if constexpr (kIsSparseComponent<T>)
             {
@@ -311,9 +311,9 @@ namespace mts
         template <typename T>
         T &AddComponent(Entity entity, const T &value)
         {
-            MTS_ASSERT_COMPONENT(T);
-            MTS_ASSERT(mPool.IsAlive(entity), "World::AddComponent: entity is not alive");
-            MTS_ASSERT(!Has<T>(entity), "World::AddComponent: entity already has this component");
+            MIR_ASSERT_COMPONENT(T);
+            MIR_ASSERT(mPool.IsAlive(entity), "World::AddComponent: entity is not alive");
+            MIR_ASSERT(!Has<T>(entity), "World::AddComponent: entity already has this component");
             AssertNoStructuralChange("AddComponent");
 
             if constexpr (kIsSparseComponent<T>)
@@ -331,8 +331,8 @@ namespace mts
         template <typename T>
         void RemoveComponent(Entity entity)
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::RemoveComponent: entity is not alive");
-            MTS_ASSERT(Has<T>(entity), "World::RemoveComponent: entity does not have this component");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::RemoveComponent: entity is not alive");
+            MIR_ASSERT(Has<T>(entity), "World::RemoveComponent: entity does not have this component");
             AssertNoStructuralChange("RemoveComponent");
 
             if constexpr (kIsSparseComponent<T>)
@@ -396,17 +396,17 @@ namespace mts
         /// diagnosable error, so ComponentRegistry is the intended caller.
         void *AddRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
         {
-            // MTS_CHECK, unlike the read paths: this one corrupts rather than
+            // MIR_CHECK, unlike the read paths: this one corrupts rather than
             // misreports, and does so silently - the shadowed sparse value goes
             // on being returned to every typed reader.
-            MTS_CHECK(!IsSparseComponentSeq(type.seq),
+            MIR_CHECK(!IsSparseComponentSeq(type.seq),
                       "World::AddRaw: \"{}\" is a sparse component. The erased path is table-only, and a "
                       "table row here would shadow the sparse one. Go through ComponentRegistry, which "
                       "knows the StorageKind.",
                       type.name);
 
-            MTS_ASSERT(mPool.IsAlive(entity), "World::AddRaw: entity is not alive");
-            MTS_ASSERT(!HasRaw(entity, type), "World::AddRaw: entity already has {}", type.name);
+            MIR_ASSERT(mPool.IsAlive(entity), "World::AddRaw: entity is not alive");
+            MIR_ASSERT(!HasRaw(entity, type), "World::AddRaw: entity already has {}", type.name);
             AssertNoStructuralChange("AddRaw");
 
             return AddTableComponentRaw(entity, type, size, align, value);
@@ -414,13 +414,13 @@ namespace mts
 
         void RemoveRaw(Entity entity, TypeId type)
         {
-            MTS_CHECK(!IsSparseComponentSeq(type.seq),
+            MIR_CHECK(!IsSparseComponentSeq(type.seq),
                       "World::RemoveRaw: \"{}\" is a sparse component. The erased path is table-only. Go "
                       "through ComponentRegistry, which knows the StorageKind.",
                       type.name);
 
-            MTS_ASSERT(mPool.IsAlive(entity), "World::RemoveRaw: entity is not alive");
-            MTS_ASSERT(HasRaw(entity, type), "World::RemoveRaw: entity does not have {}", type.name);
+            MIR_ASSERT(mPool.IsAlive(entity), "World::RemoveRaw: entity is not alive");
+            MIR_ASSERT(HasRaw(entity, type), "World::RemoveRaw: entity does not have {}", type.name);
             AssertNoStructuralChange("RemoveRaw");
 
             RemoveTableComponentRaw(entity, type);
@@ -487,10 +487,10 @@ namespace mts
         {
             T *value = TryResource<T>();
 
-            // MTS_CHECK, not MTS_ASSERT: this returns a reference, so a missing
+            // MIR_CHECK, not MIR_ASSERT: this returns a reference, so a missing
             // resource in a release build would be a null dereference rather
             // than a diagnosable stop.
-            MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
+            MIR_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
             return *value;
         }
 
@@ -498,7 +498,7 @@ namespace mts
         const T &Resource() const
         {
             const T *value = TryResource<T>();
-            MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
+            MIR_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
             return *value;
         }
 
@@ -548,7 +548,7 @@ namespace mts
 
         void EndQueryIteration()
         {
-            MTS_ASSERT(mQueryIterationDepth > 0, "World::EndQueryIteration: not iterating");
+            MIR_ASSERT(mQueryIterationDepth > 0, "World::EndQueryIteration: not iterating");
             --mQueryIterationDepth;
         }
 
@@ -569,7 +569,7 @@ namespace mts
          */
         static void AssertNotSparse([[maybe_unused]] const char *what, [[maybe_unused]] TypeId type)
         {
-            MTS_ASSERT(!IsSparseComponentSeq(type.seq),
+            MIR_ASSERT(!IsSparseComponentSeq(type.seq),
                        "World::{}: \"{}\" is a sparse component, which the erased path cannot reach - it "
                        "would report the component absent. Go through ComponentRegistry, which knows the "
                        "StorageKind.",
@@ -578,7 +578,7 @@ namespace mts
 
         void AssertNoStructuralChange([[maybe_unused]] const char *what) const
         {
-            MTS_ASSERT(mQueryIterationDepth == 0,
+            MIR_ASSERT(mQueryIterationDepth == 0,
                        "World::{}: structural change while a Query is iterating. Record it into a "
                        "CommandBuffer instead - see World::IsIterating",
                        what);

@@ -11,7 +11,7 @@
 #include <system_error>
 #include <utility>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -57,12 +57,12 @@ namespace mts
             const AssetBlobView *blob = cache->Load(tracked.id);
             if (blob == nullptr)
             {
-                MTS_LOG_ERROR("script: hot-reload: failed to re-load '{}' after it changed on disk", name);
+                MIR_LOG_ERROR("script: hot-reload: failed to re-load '{}' after it changed on disk", name);
                 continue;
             }
 
             if (mHost.ReloadScriptSource(name, AsStringView(*blob)))
-                MTS_LOG_INFO("script: hot-reloaded '{}'", name);
+                MIR_LOG_INFO("script: hot-reloaded '{}'", name);
         }
     }
 }

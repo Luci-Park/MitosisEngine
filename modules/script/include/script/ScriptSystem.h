@@ -5,7 +5,7 @@
 #include <core/ecs/Query.h>
 #include <core/ecs/System.h>
 
-namespace mts
+namespace mir
 {
     class IScriptHost;
 

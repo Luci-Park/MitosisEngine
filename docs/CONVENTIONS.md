@@ -24,16 +24,16 @@ Headers use `#pragma once`.
 
 | Kind | Form | Example |
 |---|---|---|
-| Namespace | lowercase, all in `mts` | `mts::detail` |
+| Namespace | lowercase, all in `mir` | `mir::detail` |
 | Type | `PascalCase` | `AssetCache` |
 | Interface | `I` prefix | `ISystem` |
 | Function, method | `PascalCase` | `CreateEntity` |
 | Local, parameter | `camelCase` | `imageIndex` |
 | Member | `mPascalCase` | `mSwapchain` |
 | Constant, `constexpr` | `k` prefix | `kFramesInFlight` |
-| Macro | `MTS_SCREAMING_CASE` | `MTS_ASSERT` |
+| Macro | `MIR_SCREAMING_CASE` | `MIR_ASSERT` |
 | CMake function | `engine_snake_case` | `engine_add_module` |
-| CMake target | `engine_<module>`, alias `mts::<module>` | `engine_core` |
+| CMake target | `engine_<module>`, alias `mir::<module>` | `engine_core` |
 | File | `PascalCase.h`/`.cpp`, matching its main type | `VulkanRenderer.cpp` |
 
 Members are `mPascalCase` engine-wide, `*Desc` fields included. The exception is
@@ -46,9 +46,9 @@ The rename is applied but not committed.
 
 ## ECS
 
-- Components are POD. `MTS_ASSERT_COMPONENT(T)` next to the declaration.
+- Components are POD. `MIR_ASSERT_COMPONENT(T)` next to the declaration.
 - Component names must be globally unique - `TypeIdOf` hashes the bare name.
-- `MTS_COMPONENT_SPARSE(T)` for churny components, outside any namespace, same
+- `MIR_COMPONENT_SPARSE(T)` for churny components, outside any namespace, same
   header as the component.
 - Never add, remove or destroy while iterating. Use the `CommandBuffer`.
 - Systems cache queries in `OnStart`.
@@ -65,8 +65,8 @@ The rename is applied but not committed.
 
 ## Errors
 
-- `MTS_ASSERT`/`MTS_VARIFY` - programmer error, out in Release (`MTS_VARIFY`
-  still evaluates its condition). `MTS_CHECK` - must abort even in Release.
+- `MIR_ASSERT`/`MIR_VARIFY` - programmer error, out in Release (`MIR_VARIFY`
+  still evaluates its condition). `MIR_CHECK` - must abort even in Release.
 - Recoverable failure returns `false`, `nullptr` or `std::optional` and logs once.
   Init paths return `bool`; the caller decides if it is fatal.
 - No exceptions in engine code. No `iostream` outside `tools/`.

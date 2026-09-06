@@ -19,7 +19,7 @@
 
 #include <mutex>
 
-namespace mts
+namespace mir
 {
     void EnsureDpiAware()
     {
@@ -36,7 +36,7 @@ namespace mts
 
     namespace
     {
-        constexpr wchar_t kTitleBarPropName[] = L"MtsTitleBarHook";
+        constexpr wchar_t kTitleBarPropName[] = L"MirTitleBarHook";
 
         struct TitleBarHookState
         {

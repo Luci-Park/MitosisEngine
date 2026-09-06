@@ -15,12 +15,12 @@
 #include <cstdint>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     template <typename T>
     class SparseSetStorage
     {
-        MTS_ASSERT_COMPONENT(T);
+        MIR_ASSERT_COMPONENT(T);
 
     public:
         void Add(Entity entity, const T &value);
@@ -44,7 +44,7 @@ namespace mts
         if (idx >= mSparse.size())
             mSparse.resize(idx + 1, Entity::kNullIndex);
 
-        MTS_ASSERT(mSparse[idx] == Entity::kNullIndex, "SparseSetStorage::Add: entity already has this component");
+        MIR_ASSERT(mSparse[idx] == Entity::kNullIndex, "SparseSetStorage::Add: entity already has this component");
 
         mSparse[idx] = static_cast<uint32_t>(mDense.size());
         mDense.push_back(value);
@@ -55,7 +55,7 @@ namespace mts
     void SparseSetStorage<T>::Remove(Entity entity)
     {
         const uint32_t idx = entity.mIndex;
-        MTS_ASSERT(idx < mSparse.size() && mSparse[idx] != Entity::kNullIndex,
+        MIR_ASSERT(idx < mSparse.size() && mSparse[idx] != Entity::kNullIndex,
                    "SparseSetStorage::Remove: entity has no component to remove");
 
         const uint32_t slot = mSparse[idx];

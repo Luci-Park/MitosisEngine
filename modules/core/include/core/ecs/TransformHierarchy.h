@@ -21,7 +21,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     /**
      * World matrix of `entity`, refreshing it and every stale ancestor first.

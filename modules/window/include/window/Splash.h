@@ -10,13 +10,13 @@
 
 #include <memory>
 
-namespace mts
+namespace mir
 {
     struct SplashImpl;
 
     struct SplashDesc
     {
-        const char *mEngineName = "MitosisEngine";
+        const char *mEngineName = "MjolnirEngine";
         const char *mVersion = "";
         const char *mCopyright = "";
         const char *mStatus = "Loading...";

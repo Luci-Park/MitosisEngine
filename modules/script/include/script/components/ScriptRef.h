@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace mts
+namespace mir
 {
     struct ScriptRef
     {
@@ -21,7 +21,7 @@ namespace mts
         char scriptName[kFieldStringCapacity] = {};
     };
 
-    MTS_ASSERT_COMPONENT(ScriptRef);
+    MIR_ASSERT_COMPONENT(ScriptRef);
 
     /// Fields for scripts, inspectors, and scene serialization. instanceRef and
     /// started are deliberately left out - they're this run's live state, not

@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     /**
      * Runs registered systems once per frame, phase by phase, flushing the
@@ -46,7 +46,7 @@ namespace mts
         S &Add(SystemPhase phase, Args &&...args)
         {
             static_assert(std::is_base_of_v<ISystem, S>, "SystemScheduler::Add: S must derive from ISystem");
-            MTS_ASSERT(!mStarted, "SystemScheduler::Add: systems must be registered before Start");
+            MIR_ASSERT(!mStarted, "SystemScheduler::Add: systems must be registered before Start");
 
             auto system = std::make_unique<S>(std::forward<Args>(args)...);
             S &ref = *system;
@@ -56,7 +56,7 @@ namespace mts
 
         void Start(SystemContext &context)
         {
-            MTS_ASSERT(!mStarted, "SystemScheduler::Start: already started");
+            MIR_ASSERT(!mStarted, "SystemScheduler::Start: already started");
             mStarted = true;
 
             for (std::size_t phase = 0; phase < kPhaseCount; ++phase)
@@ -71,7 +71,7 @@ namespace mts
         // will call all systems in all phases in order
         void Update(SystemContext &context)
         {
-            MTS_ASSERT(mStarted, "SystemScheduler::Update: Start was never called");
+            MIR_ASSERT(mStarted, "SystemScheduler::Update: Start was never called");
 
             for (std::size_t phase = 0; phase < kPhaseCount; ++phase)
             {
@@ -104,7 +104,7 @@ namespace mts
         /// and OnStop is their only chance to release anything.
         void Reset()
         {
-            MTS_ASSERT(!mStarted, "SystemScheduler::Reset: Stop must run before Reset");
+            MIR_ASSERT(!mStarted, "SystemScheduler::Reset: Stop must run before Reset");
 
             for (std::size_t phase = 0; phase < kPhaseCount; ++phase)
                 mPhases[phase].clear();

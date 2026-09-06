@@ -70,7 +70,7 @@ finds or creates that archetype, and moves the row - a `memcpy` per column, whic
 is why components are POD. Removing swaps the last row into the hole and fixes up
 the moved entity's record.
 
-**Sparse set (opt in).** `MTS_COMPONENT_SPARSE(T)`. `World` keeps one type-erased
+**Sparse set (opt in).** `MIR_COMPONENT_SPARSE(T)`. `World` keeps one type-erased
 storage per such type, outside the archetype system, cleared on destroy.
 
 #### Resources

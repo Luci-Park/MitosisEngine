@@ -12,24 +12,24 @@
 
 TEST_CASE("ExecutableDir points at a real directory", "[paths]")
 {
-    REQUIRE(std::filesystem::exists(mts::ExecutableDir()));
-    REQUIRE(std::filesystem::is_directory(mts::ExecutableDir()));
+    REQUIRE(std::filesystem::exists(mir::ExecutableDir()));
+    REQUIRE(std::filesystem::is_directory(mir::ExecutableDir()));
 }
 
 TEST_CASE("ShaderPath appends shaders/<name> under the executable directory", "[paths]")
 {
-    const auto path = mts::ShaderPath("triangle.spv");
-    REQUIRE(path == mts::ExecutableDir() / "shaders" / "triangle.spv");
+    const auto path = mir::ShaderPath("triangle.spv");
+    REQUIRE(path == mir::ExecutableDir() / "shaders" / "triangle.spv");
 }
 
 TEST_CASE("FontPath appends fonts/<name> under the executable directory", "[paths]")
 {
-    const auto path = mts::FontPath("Inter.ttf");
-    REQUIRE(path == mts::ExecutableDir() / "fonts" / "Inter.ttf");
+    const auto path = mir::FontPath("Inter.ttf");
+    REQUIRE(path == mir::ExecutableDir() / "fonts" / "Inter.ttf");
 }
 
 TEST_CASE("CookedAssetsDir points at cooked/ under the executable directory", "[paths]")
 {
-    const auto path = mts::CookedAssetsDir();
-    REQUIRE(path == mts::ExecutableDir() / "cooked");
+    const auto path = mir::CookedAssetsDir();
+    REQUIRE(path == mir::ExecutableDir() / "cooked");
 }

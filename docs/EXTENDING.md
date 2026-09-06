@@ -11,11 +11,11 @@ has an API others use and dependencies of its own.
    `powershell -NoProfile -File tools/new_module.ps1 -Name input`
 2. It creates `modules/<name>/` with `include/`, `src/` and an
    `engine_add_module(<name>)` CMakeLists, registers the subdirectory, and links
-   `mts::<name>` into `HelloWorld`.
+   `mir::<name>` into `HelloWorld`.
 3. Declare dependencies:
 
 ```cmake
-target_link_libraries(engine_input PUBLIC mts::core)
+target_link_libraries(engine_input PUBLIC mir::core)
 
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(engine_input PRIVATE glfw)
@@ -39,10 +39,10 @@ target_sources(engine_<name> PRIVATE src/<name>/Thing.cpp)
 ```
 
 4. In the root `CMakeLists.txt`: `add_subdirectory(modules/<name>)`, and
-   `mts::<name>` in the executable's `target_link_libraries`.
+   `mir::<name>` in the executable's `target_link_libraries`.
 
 Inside its own CMakeLists a module is `engine_<name>`; everywhere else it is the
-alias `mts::<name>`.
+alias `mir::<name>`.
 
 ## Add a file
 
@@ -69,18 +69,18 @@ header-only files in `core/ecs` work because the tests include them.
 #include <core/ecs/ComponentAsserts.h>
 #include <core/ecs/StorageInfo.h>
 
-namespace mts
+namespace mir
 {
     struct Position
     {
         float x = 0.0f;
         float y = 0.0f;
     };
-    MTS_ASSERT_COMPONENT(Position);
+    MIR_ASSERT_COMPONENT(Position);
 }
 
 // Only for components added and removed often. Outside any namespace.
-MTS_COMPONENT_SPARSE(mts::Position);
+MIR_COMPONENT_SPARSE(mir::Position);
 ```
 
 The name must be globally unique across namespaces - `TypeIdOf` hashes the bare
@@ -160,7 +160,7 @@ engine_add_shaders(HelloWorld
 ```
 
 One `.spv` per entry point, `<source>.<entry>.spv`, copied next to the
-executable. Load with `mts::ShaderPath("...")`, which resolves against the
+executable. Load with `mir::ShaderPath("...")`, which resolves against the
 executable, not the working directory. Flags are fixed - SPIR-V 1.5, column-major
 matrices, entry-point names preserved, `-g -O0` for RenderDoc.
 

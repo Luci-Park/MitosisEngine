@@ -4,7 +4,7 @@
 
 #include <core/ecs/ComponentRegistry.h>
 
-namespace mts
+namespace mir
 {
     void RegisterScriptComponents()
     {

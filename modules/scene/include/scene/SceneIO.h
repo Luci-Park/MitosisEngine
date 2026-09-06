@@ -13,7 +13,7 @@
 #include <filesystem>
 #include <string>
 
-namespace mts
+namespace mir
 {
     class World;
 
@@ -48,7 +48,7 @@ namespace mts
      *     for pass 3, not written yet: their StableId target may not have an
      *     Entity until every entity in the file exists.
      *  2. Parent - resolve each entity's parent StableId through the map
-     *     pass 1 built, via mts::SetParent. Safe after every AddCopy in pass
+     *     pass 1 built, via mir::SetParent. Safe after every AddCopy in pass
      *     1: hierarchy is a World resource (0020), so this never moves an
      *     entity between archetypes.
      *  3. EntityRef patch - resolve every recorded EntityRef field's stored

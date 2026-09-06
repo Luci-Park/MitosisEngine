@@ -12,7 +12,7 @@ namespace
     {
         static std::atomic<int> counter{0};
         return std::filesystem::temp_directory_path() /
-               ("mitosis_assetfileio_test_" + std::to_string(counter.fetch_add(1)));
+               ("mjolnir_assetfileio_test_" + std::to_string(counter.fetch_add(1)));
     }
 
     std::vector<std::byte> MakeContent(std::string_view text)
@@ -28,9 +28,9 @@ TEST_CASE("WriteFileBytes and ReadFileBytes round trip", "[assets][fileio]")
     const std::filesystem::path path = MakeScratchFile();
     const std::vector<std::byte> content = MakeContent("round trip payload");
 
-    REQUIRE(mts::WriteFileBytes(path, content));
+    REQUIRE(mir::WriteFileBytes(path, content));
 
-    const std::optional<std::vector<std::byte>> read = mts::ReadFileBytes(path);
+    const std::optional<std::vector<std::byte>> read = mir::ReadFileBytes(path);
     REQUIRE(read.has_value());
     REQUIRE(read->size() == content.size());
     CHECK(std::memcmp(read->data(), content.data(), content.size()) == 0);
@@ -42,9 +42,9 @@ TEST_CASE("WriteFileBytes and ReadFileBytes round trip empty content", "[assets]
 {
     const std::filesystem::path path = MakeScratchFile();
 
-    REQUIRE(mts::WriteFileBytes(path, {}));
+    REQUIRE(mir::WriteFileBytes(path, {}));
 
-    const std::optional<std::vector<std::byte>> read = mts::ReadFileBytes(path);
+    const std::optional<std::vector<std::byte>> read = mir::ReadFileBytes(path);
     REQUIRE(read.has_value());
     CHECK(read->empty());
 
@@ -54,21 +54,21 @@ TEST_CASE("WriteFileBytes and ReadFileBytes round trip empty content", "[assets]
 TEST_CASE("ReadFileBytes returns nullopt for a missing file", "[assets][fileio]")
 {
     const std::filesystem::path path = MakeScratchFile();
-    CHECK_FALSE(mts::ReadFileBytes(path).has_value());
+    CHECK_FALSE(mir::ReadFileBytes(path).has_value());
 }
 
 TEST_CASE("WriteFileBytes returns false when the directory does not exist", "[assets][fileio]")
 {
     const std::filesystem::path path = MakeScratchFile() / "no_such_dir" / "file.blob";
-    CHECK_FALSE(mts::WriteFileBytes(path, MakeContent("data")));
+    CHECK_FALSE(mir::WriteFileBytes(path, MakeContent("data")));
 }
 
 TEST_CASE("ReadFilePrefix returns exactly the requested bytes", "[assets][fileio]")
 {
     const std::filesystem::path path = MakeScratchFile();
-    REQUIRE(mts::WriteFileBytes(path, MakeContent("HEADERbody body body")));
+    REQUIRE(mir::WriteFileBytes(path, MakeContent("HEADERbody body body")));
 
-    const std::optional<std::vector<std::byte>> prefix = mts::ReadFilePrefix(path, 6);
+    const std::optional<std::vector<std::byte>> prefix = mir::ReadFilePrefix(path, 6);
     REQUIRE(prefix.has_value());
     REQUIRE(prefix->size() == 6);
     CHECK(std::memcmp(prefix->data(), "HEADER", 6) == 0);
@@ -79,14 +79,14 @@ TEST_CASE("ReadFilePrefix returns exactly the requested bytes", "[assets][fileio
 TEST_CASE("ReadFilePrefix fails when the file is shorter than requested", "[assets][fileio]")
 {
     const std::filesystem::path path = MakeScratchFile();
-    REQUIRE(mts::WriteFileBytes(path, MakeContent("tiny")));
+    REQUIRE(mir::WriteFileBytes(path, MakeContent("tiny")));
 
-    CHECK_FALSE(mts::ReadFilePrefix(path, 64).has_value());
+    CHECK_FALSE(mir::ReadFilePrefix(path, 64).has_value());
 
     std::filesystem::remove(path);
 }
 
 TEST_CASE("ReadFilePrefix returns nullopt for a missing file", "[assets][fileio]")
 {
-    CHECK_FALSE(mts::ReadFilePrefix(MakeScratchFile(), 4).has_value());
+    CHECK_FALSE(mir::ReadFilePrefix(MakeScratchFile(), 4).has_value());
 }

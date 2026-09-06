@@ -6,7 +6,7 @@
 
 #include <exception>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -19,7 +19,7 @@ namespace mts
             }
             catch (const std::exception &e)
             {
-                MTS_LOG_ERROR("script: entity {} threw in {}: {}", entity.mIndex, callback, e.what());
+                MIR_LOG_ERROR("script: entity {} threw in {}: {}", entity.mIndex, callback, e.what());
             }
         }
     }

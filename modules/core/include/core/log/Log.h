@@ -14,7 +14,7 @@
 #include <string_view>
 #include <source_location>
 
-namespace mts
+namespace mir
 {
     enum class LogLevel
     {
@@ -49,64 +49,64 @@ namespace mts
     }
 }
 
-#define MTS_LOG_LEVEL_TRACE 0
-#define MTS_LOG_LEVEL_DEBUG 1
-#define MTS_LOG_LEVEL_INFO 2
-#define MTS_LOG_LEVEL_WARN 3
-#define MTS_LOG_LEVEL_ERROR 4
-#define MTS_LOG_LEVEL_CRITICAL 5
-#define MTS_LOG_LEVEL_OFF 6
+#define MIR_LOG_LEVEL_TRACE 0
+#define MIR_LOG_LEVEL_DEBUG 1
+#define MIR_LOG_LEVEL_INFO 2
+#define MIR_LOG_LEVEL_WARN 3
+#define MIR_LOG_LEVEL_ERROR 4
+#define MIR_LOG_LEVEL_CRITICAL 5
+#define MIR_LOG_LEVEL_OFF 6
 
 // Compile-time floor. Anything below this is stripped entirely.
-#ifndef MTS_ACTIVE_LOG_LEVEL
+#ifndef MIR_ACTIVE_LOG_LEVEL
 #ifdef NDEBUG
-#define MTS_ACTIVE_LOG_LEVEL MTS_LOG_LEVEL_INFO
+#define MIR_ACTIVE_LOG_LEVEL MIR_LOG_LEVEL_INFO
 #else
-#define MTS_ACTIVE_LOG_LEVEL MTS_LOG_LEVEL_TRACE
+#define MIR_ACTIVE_LOG_LEVEL MIR_LOG_LEVEL_TRACE
 #endif
 #endif
 
-#define MTS_LOG_IMPL(level, ...)                                        \
+#define MIR_LOG_IMPL(level, ...)                                        \
     do                                                                  \
     {                                                                   \
-        if (::mts::detail::ShouldLog(level))                            \
+        if (::mir::detail::ShouldLog(level))                            \
         {                                                               \
-            ::mts::detail::Log(level, ::std::format(__VA_ARGS__));      \
+            ::mir::detail::Log(level, ::std::format(__VA_ARGS__));      \
         }                                                               \
     } while (0)
 
-#if MTS_ACTIVE_LOG_LEVEL <= MTS_LOG_LEVEL_TRACE
-#define MTS_LOG_TRACE(...) MTS_LOG_IMPL(::mts::LogLevel::Trace, __VA_ARGS__)
+#if MIR_ACTIVE_LOG_LEVEL <= MIR_LOG_LEVEL_TRACE
+#define MIR_LOG_TRACE(...) MIR_LOG_IMPL(::mir::LogLevel::Trace, __VA_ARGS__)
 #else
-#define MTS_LOG_TRACE(...) ((void)0)
+#define MIR_LOG_TRACE(...) ((void)0)
 #endif
 
-#if MTS_ACTIVE_LOG_LEVEL <= MTS_LOG_LEVEL_DEBUG
-#define MTS_LOG_DEBUG(...) MTS_LOG_IMPL(::mts::LogLevel::Debug, __VA_ARGS__)
+#if MIR_ACTIVE_LOG_LEVEL <= MIR_LOG_LEVEL_DEBUG
+#define MIR_LOG_DEBUG(...) MIR_LOG_IMPL(::mir::LogLevel::Debug, __VA_ARGS__)
 #else
-#define MTS_LOG_DEBUG(...) ((void)0)
+#define MIR_LOG_DEBUG(...) ((void)0)
 #endif
 
-#if MTS_ACTIVE_LOG_LEVEL <= MTS_LOG_LEVEL_INFO
-#define MTS_LOG_INFO(...) MTS_LOG_IMPL(::mts::LogLevel::Info, __VA_ARGS__)
+#if MIR_ACTIVE_LOG_LEVEL <= MIR_LOG_LEVEL_INFO
+#define MIR_LOG_INFO(...) MIR_LOG_IMPL(::mir::LogLevel::Info, __VA_ARGS__)
 #else
-#define MTS_LOG_INFO(...) ((void)0)
+#define MIR_LOG_INFO(...) ((void)0)
 #endif
 
-#if MTS_ACTIVE_LOG_LEVEL <= MTS_LOG_LEVEL_WARN
-#define MTS_LOG_WARN(...) MTS_LOG_IMPL(::mts::LogLevel::Warn, __VA_ARGS__)
+#if MIR_ACTIVE_LOG_LEVEL <= MIR_LOG_LEVEL_WARN
+#define MIR_LOG_WARN(...) MIR_LOG_IMPL(::mir::LogLevel::Warn, __VA_ARGS__)
 #else
-#define MTS_LOG_WARN(...) ((void)0)
+#define MIR_LOG_WARN(...) ((void)0)
 #endif
 
-#if MTS_ACTIVE_LOG_LEVEL <= MTS_LOG_LEVEL_ERROR
-#define MTS_LOG_ERROR(...) MTS_LOG_IMPL(::mts::LogLevel::Error, __VA_ARGS__)
+#if MIR_ACTIVE_LOG_LEVEL <= MIR_LOG_LEVEL_ERROR
+#define MIR_LOG_ERROR(...) MIR_LOG_IMPL(::mir::LogLevel::Error, __VA_ARGS__)
 #else
-#define MTS_LOG_ERROR(...) ((void)0)
+#define MIR_LOG_ERROR(...) ((void)0)
 #endif
 
-#if MTS_ACTIVE_LOG_LEVEL <= MTS_LOG_LEVEL_CRITICAL
-#define MTS_LOG_CRITICAL(...) MTS_LOG_IMPL(::mts::LogLevel::Critical, __VA_ARGS__)
+#if MIR_ACTIVE_LOG_LEVEL <= MIR_LOG_LEVEL_CRITICAL
+#define MIR_LOG_CRITICAL(...) MIR_LOG_IMPL(::mir::LogLevel::Critical, __VA_ARGS__)
 #else
-#define MTS_LOG_CRITICAL(...) ((void)0)
+#define MIR_LOG_CRITICAL(...) ((void)0)
 #endif

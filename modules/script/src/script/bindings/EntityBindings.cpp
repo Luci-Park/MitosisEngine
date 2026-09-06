@@ -4,7 +4,7 @@
 
 #include <sol/sol.hpp>
 
-namespace mts
+namespace mir
 {
     void RegisterEntityBindings(sol::state &lua)
     {

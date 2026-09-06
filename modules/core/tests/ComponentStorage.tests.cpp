@@ -18,11 +18,11 @@ namespace
         float y;
     };
 
-    using Storage = mts::SparseSetStorage<Position>;
+    using Storage = mir::SparseSetStorage<Position>;
 
-    mts::Entity MakeEntity(uint32_t index, uint32_t generation = 0)
+    mir::Entity MakeEntity(uint32_t index, uint32_t generation = 0)
     {
-        return mts::Entity{index, generation};
+        return mir::Entity{index, generation};
     }
 }
 
@@ -36,7 +36,7 @@ TEST_CASE("SparseSetStorage starts empty", "[ecs][storage]")
 TEST_CASE("SparseSetStorage Add makes the component visible", "[ecs][storage]")
 {
     Storage storage;
-    const mts::Entity entity = MakeEntity(3);
+    const mir::Entity entity = MakeEntity(3);
 
     storage.Add(entity, Position{1.0f, 2.0f});
 
@@ -49,7 +49,7 @@ TEST_CASE("SparseSetStorage Add makes the component visible", "[ecs][storage]")
 TEST_CASE("SparseSetStorage Remove clears the component", "[ecs][storage]")
 {
     Storage storage;
-    const mts::Entity entity = MakeEntity(3);
+    const mir::Entity entity = MakeEntity(3);
 
     storage.Add(entity, Position{1.0f, 2.0f});
     storage.Remove(entity);
@@ -61,9 +61,9 @@ TEST_CASE("SparseSetStorage Remove clears the component", "[ecs][storage]")
 TEST_CASE("SparseSetStorage keeps unrelated entities independent", "[ecs][storage]")
 {
     Storage storage;
-    const mts::Entity a = MakeEntity(1);
-    const mts::Entity b = MakeEntity(2);
-    const mts::Entity c = MakeEntity(3);
+    const mir::Entity a = MakeEntity(1);
+    const mir::Entity b = MakeEntity(2);
+    const mir::Entity c = MakeEntity(3);
 
     storage.Add(a, Position{1.0f, 1.0f});
     storage.Add(b, Position{2.0f, 2.0f});
@@ -84,7 +84,7 @@ TEST_CASE("SparseSetStorage keeps unrelated entities independent", "[ecs][storag
 TEST_CASE("SparseSetStorage Add after Remove reuses the entity index", "[ecs][storage]")
 {
     Storage storage;
-    const mts::Entity entity = MakeEntity(5);
+    const mir::Entity entity = MakeEntity(5);
 
     storage.Add(entity, Position{1.0f, 1.0f});
     storage.Remove(entity);

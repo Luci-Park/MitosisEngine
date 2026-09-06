@@ -8,7 +8,7 @@
  */
 #include "renderer/Renderer.h"
 
-namespace mts 
+namespace mir 
 {
 
 }

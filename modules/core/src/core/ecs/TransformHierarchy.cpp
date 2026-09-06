@@ -15,7 +15,7 @@
 #include "core/log/Assert.h"
 #include "core/log/Log.h"
 
-namespace mts
+namespace mir
 {
     namespace detail
     {
@@ -50,7 +50,7 @@ namespace mts
             static void Invalidate(WorldTransform &target) { target.mDirty = true; }
         };
 
-        // HierarchyIndex keeps its mutators private so that mts::SetParent is
+        // HierarchyIndex keeps its mutators private so that mir::SetParent is
         // the only route in - it is what pairs a structural change with the
         // WorldTransform invalidation. This is that route's key.
         struct HierarchyMutator
@@ -119,7 +119,7 @@ namespace mts
                 // Remove takes them out again, so a dead one here would mean
                 // the graph and the world had already diverged. A cascade
                 // arriving from another direction is the one benign case.
-                MTS_ASSERT(world.IsAlive(child), "OnEntityDestroyed: dead entity left in the scene graph");
+                MIR_ASSERT(world.IsAlive(child), "OnEntityDestroyed: dead entity left in the scene graph");
 
                 if (world.IsAlive(child))
                     world.DestroyEntity(child);
@@ -179,7 +179,7 @@ namespace mts
 
         for (Entity cursor = entity; !cursor.IsNull(); cursor = LiveParentOf(world, index, cursor))
         {
-            MTS_ASSERT(depth < kMaxHierarchyDepth,
+            MIR_ASSERT(depth < kMaxHierarchyDepth,
                        "ResolveWorld: hierarchy deeper than {} - the graph should have refused this",
                        kMaxHierarchyDepth);
 
@@ -242,21 +242,21 @@ namespace mts
         // untestable in the configuration where asserts are live.
         if (!world.IsAlive(child))
         {
-            MTS_LOG_WARN("SetParent: child is not alive");
+            MIR_LOG_WARN("SetParent: child is not alive");
             return false;
         }
 
         // Aliveness is the world's business; cycles and depth are the graph's.
         if (!parent.IsNull() && !world.IsAlive(parent))
         {
-            MTS_LOG_WARN("SetParent: parent is not alive");
+            MIR_LOG_WARN("SetParent: parent is not alive");
             return false;
         }
 
         HierarchyIndex &index = InstallHierarchy(world);
         if (!detail::HierarchyMutator::SetParent(index, child, parent))
         {
-            MTS_LOG_WARN("SetParent: refused - self-parenting, a cycle, or deeper than "
+            MIR_LOG_WARN("SetParent: refused - self-parenting, a cycle, or deeper than "
                          "kMaxHierarchyDepth ({})",
                          kMaxHierarchyDepth);
             return false;

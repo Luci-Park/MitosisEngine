@@ -19,14 +19,14 @@
 
 namespace
 {
-    using mts::ComponentOps;
-    using mts::ComponentRegistry;
-    using mts::Entity;
-    using mts::FieldKind;
-    using mts::RuntimeFieldDecl;
-    using mts::RuntimeQuery;
-    using mts::TypeId;
-    using mts::World;
+    using mir::ComponentOps;
+    using mir::ComponentRegistry;
+    using mir::Entity;
+    using mir::FieldKind;
+    using mir::RuntimeFieldDecl;
+    using mir::RuntimeQuery;
+    using mir::TypeId;
+    using mir::World;
 
     struct RqPosition
     {
