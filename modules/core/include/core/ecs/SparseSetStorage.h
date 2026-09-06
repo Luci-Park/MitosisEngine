@@ -23,7 +23,6 @@ namespace mts
         MTS_ASSERT_COMPONENT(T);
 
     public:
-        // (skeleton for now, filled in next chunks)
         void Add(Entity entity, const T &value);
         void Remove(Entity entity);
         bool Has(Entity entity) const;

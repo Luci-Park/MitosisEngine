@@ -11,6 +11,7 @@
 #include <sol/sol.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
@@ -40,6 +41,7 @@ namespace mts
             glm::mat4 asMat4;
             Entity asEntity;
             RawHandle asHandle;
+            char asString[kFieldStringCapacity];
 
             FieldScratch() : asMat4()
             {
@@ -125,6 +127,12 @@ namespace mts
                 out["generation"] = value.generation;
                 return out;
             }
+            case FieldKind::String:
+            {
+                char buffer[kFieldStringCapacity];
+                field.Read(component, buffer);
+                return sol::make_object(lua, std::string(buffer));
+            }
             }
             return sol::nil;
         }
@@ -203,6 +211,16 @@ namespace mts
                     return false;
                 const sol::table t = value.as<sol::table>();
                 scratch.asHandle = RawHandle{t.get_or("index", 0u), t.get_or("generation", 0u)};
+                return true;
+            }
+            case FieldKind::String:
+            {
+                if (!value.is<std::string>())
+                    return false;
+                const std::string s = value.as<std::string>();
+                const std::size_t n = std::min(s.size(), sizeof(scratch.asString) - 1);
+                std::memcpy(scratch.asString, s.data(), n);
+                scratch.asString[n] = '\0';
                 return true;
             }
             }

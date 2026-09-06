@@ -157,8 +157,10 @@ namespace mts
         ImGui::End();
     }
 
-    void Editor::DrawLayout(bool enableLayout)
+    SceneMenuAction Editor::DrawLayout(bool enableLayout, bool showDemoWindow)
     {
+        SceneMenuAction sceneAction = SceneMenuAction::None;
+
         if (enableLayout)
         {
             if (mWindow->HasCustomTitleBar())
@@ -201,6 +203,16 @@ namespace mts
 
             if (ImGui::BeginMainMenuBar())
             {
+                if (ImGui::BeginMenu("File"))
+                {
+                    if (ImGui::MenuItem("New Scene"))
+                        sceneAction = SceneMenuAction::New;
+                    if (ImGui::MenuItem("Save Scene"))
+                        sceneAction = SceneMenuAction::Save;
+                    if (ImGui::MenuItem("Load Scene"))
+                        sceneAction = SceneMenuAction::Load;
+                    ImGui::EndMenu();
+                }
                 if (ImGui::BeginMenu("Debug"))
                 {
                     ImGui::MenuItem("Style Editor", nullptr, &mShowStyleEditor);
@@ -220,6 +232,11 @@ namespace mts
         {
             mSceneViewportRect = VkRect2D{};
         }
+
+        if (showDemoWindow)
+            ImGui::ShowDemoWindow();
+
+        return sceneAction;
     }
 
     ImDrawData *Editor::EndFrame()

@@ -22,10 +22,10 @@ namespace mts
     struct TypeId
     {
         uint32_t seq;          // id for runtime indexing
-        uint32_t hash;         // id for serialization(FNV-1a of trimmed name)
-        std::string_view name; // for logs/editor
+        uint32_t hash;         // FNV-1a of name for serialization
+        std::string_view name; // debug string
 
-        // if hash + name equal, seq is guaranteed
+        // no need to check seq
         constexpr bool operator==(const TypeId &other) const
         {
             return hash == other.hash && name == other.name;
@@ -49,6 +49,10 @@ namespace mts
         return counter.fetch_add(1, std::memory_order_relaxed);
     }
 
+// Get name from compiler -> Trim it
+// strips struct/class/enum keywords, collapses spaces,
+// then also derives unqualified name (BareNameOffset strips leading Namespace::)
+#pragma region Building Hash
     namespace detail
     {
         // get name from compiler; format different per compiler
@@ -207,7 +211,10 @@ namespace mts
     {
         return detail::TypeNameOf<T>::kValue;
     }
+#pragma endregion
 
+    // seq : atomic counter
+    // hash + name : compiler
     template <typename T>
     TypeId TypeIdOf()
     {
