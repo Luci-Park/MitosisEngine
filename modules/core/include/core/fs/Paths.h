@@ -17,6 +17,7 @@ namespace mts
 
     std::filesystem::path ShaderPath(std::string_view name);
     std::filesystem::path FontPath(std::string_view name);
+    std::filesystem::path BrandingPath(std::string_view name);
 
     std::filesystem::path CookedAssetsDir();
 }

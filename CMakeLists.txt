@@ -24,6 +24,7 @@ include(cmake/EngineModule.cmake)
 include(cmake/Shaders.cmake)
 include(cmake/Assets.cmake)
 include(cmake/Fonts.cmake)
+include(cmake/Branding.cmake)
 
 option(BUILD_TESTING "Build unit tests (per module, run via ctest)" ON)
 if(BUILD_TESTING)
@@ -63,6 +64,7 @@ engine_cook_assets(HelloWorld
     OUT_DIR ${CMAKE_BINARY_DIR}/cooked_assets)
 
 engine_copy_fonts(HelloWorld SOURCE_DIR fonts)
+engine_copy_branding(HelloWorld SOURCE_DIR branding)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 

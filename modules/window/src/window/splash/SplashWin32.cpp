@@ -8,7 +8,9 @@
  */
 #include "window/Splash.h"
 
+#include "core/fs/Paths.h"
 #include "core/log/Assert.h"
+#include "core/log/Log.h"
 
 // This file uses the -W Win32 APIs throughout (CreateWindowExW,
 // RegisterClassExW, ...); without UNICODE, resource macros like IDC_ARROW
@@ -20,6 +22,8 @@
 #define _UNICODE
 #endif
 #include <windows.h>
+
+#include <wincodec.h>
 
 #include <algorithm>
 #include <future>
@@ -76,6 +80,102 @@ namespace mts
             return wide;
         }
 
+        struct ComGuard
+        {
+            HRESULT hr = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+            ~ComGuard()
+            {
+                if (SUCCEEDED(hr))
+                    ::CoUninitialize();
+            }
+        };
+
+        HBITMAP LoadArtworkBitmap(const std::filesystem::path &path, int targetWidth, int targetHeight)
+        {
+            IWICImagingFactory *factory = nullptr;
+            if (FAILED(::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                           IID_PPV_ARGS(&factory))))
+                return nullptr;
+
+            IWICBitmapDecoder *decoder = nullptr;
+            const HRESULT decodeHr = factory->CreateDecoderFromFilename(
+                path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder);
+            if (FAILED(decodeHr))
+            {
+                factory->Release();
+                return nullptr;
+            }
+
+            IWICBitmapFrameDecode *frame = nullptr;
+            const HRESULT frameHr = decoder->GetFrame(0, &frame);
+            decoder->Release();
+            if (FAILED(frameHr))
+            {
+                factory->Release();
+                return nullptr;
+            }
+
+            IWICBitmapScaler *scaler = nullptr;
+            HRESULT hr = factory->CreateBitmapScaler(&scaler);
+            if (SUCCEEDED(hr))
+                hr = scaler->Initialize(frame, targetWidth, targetHeight, WICBitmapInterpolationModeFant);
+            frame->Release();
+            if (FAILED(hr))
+            {
+                if (scaler != nullptr)
+                    scaler->Release();
+                factory->Release();
+                return nullptr;
+            }
+
+            IWICFormatConverter *converter = nullptr;
+            hr = factory->CreateFormatConverter(&converter);
+            if (SUCCEEDED(hr))
+            {
+                hr = converter->Initialize(scaler, GUID_WICPixelFormat32bppBGR,
+                                            WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+            }
+            scaler->Release();
+            factory->Release();
+            if (FAILED(hr))
+            {
+                if (converter != nullptr)
+                    converter->Release();
+                return nullptr;
+            }
+
+            BITMAPINFO bmi{};
+            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth = targetWidth;
+            bmi.bmiHeader.biHeight = -targetHeight; // top-down, matches WIC's row order
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+
+            void *bits = nullptr;
+            HBITMAP bitmap = ::CreateDIBSection(nullptr, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
+            if (bitmap == nullptr || bits == nullptr)
+            {
+                converter->Release();
+                if (bitmap != nullptr)
+                    ::DeleteObject(bitmap);
+                return nullptr;
+            }
+
+            const UINT stride = static_cast<UINT>(targetWidth) * 4;
+            const HRESULT copyHr = converter->CopyPixels(
+                nullptr, stride, stride * static_cast<UINT>(targetHeight), static_cast<BYTE *>(bits));
+            converter->Release();
+
+            if (FAILED(copyHr))
+            {
+                ::DeleteObject(bitmap);
+                return nullptr;
+            }
+
+            return bitmap;
+        }
+
         void DrawSplash(HWND hwnd, HDC dc, const PaintState &state)
         {
             RECT client{};
@@ -93,9 +193,28 @@ namespace mts
                 14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+            static HBITMAP artBitmap = [] {
+                HBITMAP bmp = LoadArtworkBitmap(BrandingPath("wanderer-splash-screen.jpg"),
+                                                 SplashScreen::kWidth, SplashScreen::kHeight - kStripHeight);
+                if (bmp == nullptr)
+                    MTS_LOG_WARN("Splash: could not load branding artwork, using placeholder fill");
+                return bmp;
+            }();
 
             RECT artRect{0, 0, client.right, client.bottom - kStripHeight};
-            ::FillRect(dc, &artRect, artBrush);
+            if (artBitmap != nullptr)
+            {
+                HDC memDc = ::CreateCompatibleDC(dc);
+                HGDIOBJ prevBitmap = ::SelectObject(memDc, artBitmap);
+                ::BitBlt(dc, artRect.left, artRect.top, artRect.right - artRect.left,
+                         artRect.bottom - artRect.top, memDc, 0, 0, SRCCOPY);
+                ::SelectObject(memDc, prevBitmap);
+                ::DeleteDC(memDc);
+            }
+            else
+            {
+                ::FillRect(dc, &artRect, artBrush);
+            }
 
             RECT stripRect{0, artRect.bottom, client.right, client.bottom};
             ::FillRect(dc, &stripRect, stripBrush);
@@ -196,6 +315,8 @@ namespace mts
 
         void SplashThreadMain(SplashImpl *impl, SplashDesc desc, std::promise<HWND> ready)
         {
+            ComGuard comGuard;
+
             RegisterSplashClassOnce();
 
             const int screenW = ::GetSystemMetrics(SM_CXSCREEN);
