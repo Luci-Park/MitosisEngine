@@ -57,6 +57,8 @@ namespace mts
         virtual bool IsMaximized() const { return false; }
         virtual void RequestClose() {}
 
+        virtual void Show() {}
+
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 
     protected:

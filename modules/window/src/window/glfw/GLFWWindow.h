@@ -45,6 +45,7 @@ namespace mts
         void ToggleMaximize() override;
         bool IsMaximized() const override;
         void RequestClose() override;
+        void Show() override;
 
         // Read by the Win32-only title bar WndProc hook to answer
         // WM_NCHITTEST; meaningless elsewhere.

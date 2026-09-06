@@ -98,6 +98,9 @@ namespace mts
         mScene = mts::NewScene("untitled");
 
         splash.SetProgress("Ready", 1.0f);
+
+        mWindow->Show();
+
         return true;
     }
 

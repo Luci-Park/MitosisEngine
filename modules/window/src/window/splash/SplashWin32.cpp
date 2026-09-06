@@ -173,6 +173,7 @@ namespace mts
                 wc.hInstance = ::GetModuleHandleW(nullptr);
                 wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
                 wc.lpszClassName = kClassName;
+                wc.hbrBackground = ::CreateSolidBrush(RGB(18, 18, 22));
                 ::RegisterClassExW(&wc);
             });
         }
@@ -196,12 +197,20 @@ namespace mts
                 return;
             }
 
+            PaintState initialState{desc.mEngineName, desc.mVersion, desc.mCopyright, desc.mStatus, desc.mProgress};
             {
                 std::lock_guard<std::mutex> lock(impl->mMutex);
-                impl->mState = PaintState{desc.mEngineName, desc.mVersion, desc.mCopyright, desc.mStatus, desc.mProgress};
+                impl->mState = initialState;
             }
 
             ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(impl));
+
+            if (HDC dc = ::GetDC(hwnd))
+            {
+                DrawSplash(hwnd, dc, initialState);
+                ::ReleaseDC(hwnd, dc);
+            }
+
             ::ShowWindow(hwnd, SW_SHOW);
             ::UpdateWindow(hwnd);
 

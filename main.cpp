@@ -1,3 +1,10 @@
+#if defined(_WIN32)
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00 // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 (Windows 10)
+#endif
+#include <windows.h>
+#endif
+
 #include <app/App.h>
 #include <assets/AssetBlob.h>
 #include <assets/AssetCache.h>
@@ -258,6 +265,10 @@ namespace
 
 int main()
 {
+#if defined(_WIN32)
+    ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+#endif
+
     // Logging lives outside App so early construction failures are still visible.
     mts::InitLog();
 
