@@ -39,7 +39,7 @@ namespace mts
 
         virtual void *NativeHandleForImGui() const { return nullptr; }
 
-        /// 1.0 at 96 DPI, scaling up with the monitor's content scale.
+        // 1.0 at 96 DPI, scaling up with the monitor's content scale.
         virtual float ContentScale() const { return 1.0f; }
 
         // Shared source of truth between the UI layer's title bar strip and

@@ -38,11 +38,11 @@ namespace mts
      */
     glm::mat4 ResolveWorld(World &world, Entity entity);
 
-    /// Adds Transform and its WorldTransform cache, optionally parented.
-    /// Adding a bare Transform still works - it just resolves uncached.
-    ///
-    /// Idempotent: calling it again overwrites the Transform and re-links, so
-    /// it is safe on an entity already in the graph.
+    // Adds Transform and its WorldTransform cache, optionally parented.
+    // Adding a bare Transform still works - it just resolves uncached.
+    //
+    // Idempotent: calling it again overwrites the Transform and re-links, so
+    // it is safe on an entity already in the graph.
     Transform &AddTransform(World &world,
                             Entity entity,
                             const Transform &transform = Transform{},
@@ -61,10 +61,10 @@ namespace mts
      */
     bool SetParent(World &world, Entity child, Entity parent);
 
-    /// Parent of `entity`, or null. Reads the graph without creating it.
+    // Parent of `entity`, or null. Reads the graph without creating it.
     Entity ParentOf(const World &world, Entity entity);
 
-    /// True if `ancestor` is `entity` or any transitive parent of it.
+    // True if `ancestor` is `entity` or any transitive parent of it.
     bool IsAncestorOf(const World &world, Entity ancestor, Entity entity);
 
     /**

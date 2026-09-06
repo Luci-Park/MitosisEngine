@@ -45,11 +45,6 @@ namespace
     {
     };
 
-    struct RegistrySparse
-    {
-        int tick = 0;
-    };
-
     inline constexpr FieldDesc kHealthFields[] = {
         {"hp", FieldKind::Int, 0,
          [](const void *component, void *out)
@@ -63,8 +58,6 @@ namespace
         return ComponentRegistry::Instance().Register<RegistryHealth>(kHealthFields);
     }
 }
-
-MTS_COMPONENT_SPARSE(RegistrySparse);
 
 TEST_CASE("A registered component is reachable by name alone")
 {
@@ -103,7 +96,7 @@ TEST_CASE("Erased ops add, read and remove a C++ component")
 
     REQUIRE(ops.Has(world, entity));
     CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 42);
-    CHECK(static_cast<RegistryHealth *>(ops.Get(world, entity))->hp == 42);
+    CHECK(static_cast<RegistryHealth *>(ops.GetComponent(world, entity))->hp == 42);
 
     ops.Remove(world, entity);
     CHECK_FALSE(ops.Has(world, entity));
@@ -123,7 +116,7 @@ TEST_CASE("Erased ops are total on a stale handle")
     world.DestroyEntity(entity);
 
     CHECK_FALSE(ops.Has(world, entity));
-    CHECK(ops.Get(world, entity) == nullptr);
+    CHECK(ops.GetComponent(world, entity) == nullptr);
     CHECK_NOTHROW(ops.AddCopy(world, entity, &value));
     CHECK_NOTHROW(ops.Remove(world, entity));
 }
@@ -197,30 +190,46 @@ TEST_CASE("A field with no setter refuses the write")
     CHECK(value.Matrix() == glm::mat4{1.0f});
 }
 
-TEST_CASE("Registering a sparse component publishes it to the erased path")
+TEST_CASE("A registered tag reports size 0 and works through the erased ops")
 {
-    // The guard in World::AddRaw aborts, so what is testable is the fact it
-    // reads: a sparse component must be recognisable from its TypeId alone,
-    // because HasRaw cannot tell - a sparse component owns no signature bit.
-    const ComponentOps &sparse = ComponentRegistry::Instance().Register<RegistrySparse>();
-    const ComponentOps &dense = Health();
+    // Size is what every erased caller branches on, so a tag must report 0
+    // rather than the 1 byte C++ gives an empty struct.
+    const ComponentOps &tag = ComponentRegistry::Instance().Register<RegistryTag>();
+    const ComponentOps &withFields = Health();
 
-    REQUIRE(sparse.mStorage == mts::StorageKind::SparseSet);
-    CHECK(mts::IsSparseComponentSeq(sparse.mType.seq));
-    CHECK_FALSE(mts::IsSparseComponentSeq(dense.mType.seq));
+    REQUIRE(tag.mSize == 0);
+    CHECK(tag.mAlign == 0);
+    CHECK(withFields.mSize == sizeof(RegistryHealth));
 
-    // and the typed path it is routed to still works through the erased ops
     World world;
     const Entity entity = world.CreateEntity();
-    const RegistrySparse value{3};
-    sparse.AddCopy(world, entity, &value);
+    tag.AddDefault(world, entity);
 
-    REQUIRE(sparse.Has(world, entity));
-    CHECK(world.GetComponent<RegistrySparse>(entity)->tick == 3);
-    CHECK_FALSE(world.HasRaw(entity, dense.mType)); // dense one really is absent
+    REQUIRE(tag.Has(world, entity));
+    CHECK(world.HasRaw(entity, tag.mType));
 
-    sparse.Remove(world, entity);
-    CHECK_FALSE(sparse.Has(world, entity));
+    // present, but with no bytes to hand back
+    CHECK(tag.GetComponent(world, entity) == nullptr);
+    CHECK(world.GetRaw(entity, tag.mType) == nullptr);
+    CHECK_FALSE(world.HasRaw(entity, withFields.mType));
+
+    tag.Remove(world, entity);
+    CHECK_FALSE(tag.Has(world, entity));
+}
+
+TEST_CASE("A tag added twice through the erased path stays added")
+{
+    const ComponentOps &tag = ComponentRegistry::Instance().Register<RegistryTag>();
+
+    World world;
+    const Entity entity = world.CreateEntity();
+
+    // AddCopy absorbs a duplicate for a component with fields by overwriting;
+    // for a tag there is nothing to overwrite, so it must simply not assert
+    tag.AddDefault(world, entity);
+    tag.AddDefault(world, entity);
+
+    CHECK(tag.Has(world, entity));
 }
 
 TEST_CASE("A script declares a component and the registry lays it out")
@@ -234,7 +243,6 @@ TEST_CASE("A script declares a component and the registry lays it out")
     const ComponentOps &ops = ComponentRegistry::Instance().RegisterRuntime("ScriptMover", fields);
 
     CHECK(ops.mRuntime);
-    CHECK(ops.mStorage == mts::StorageKind::Table);
     REQUIRE(ops.mFields.size() == 3);
 
     // declaration order, each padded up to its own alignment
@@ -260,7 +268,7 @@ TEST_CASE("A script component round-trips through the world")
 
     REQUIRE(ops.Has(world, entity));
 
-    void *component = ops.Get(world, entity);
+    void *component = ops.GetComponent(world, entity);
     REQUIRE(component != nullptr);
 
     // a script component defaults to zeroes
@@ -275,7 +283,7 @@ TEST_CASE("A script component round-trips through the world")
     REQUIRE(ops.FindField("offset")->Write(component, &offset));
 
     // read back through a fresh lookup, so the value really lives in the column
-    void *again = ops.Get(world, entity);
+    void *again = ops.GetComponent(world, entity);
     int32_t readHp = 0;
     glm::vec3 readOffset{};
     ops.FindField("hp")->Read(again, &readHp);
@@ -298,13 +306,13 @@ TEST_CASE("A script component survives an archetype move with its value intact")
     ops.AddDefault(world, entity);
 
     const int32_t hp = 99;
-    REQUIRE(ops.FindField("hp")->Write(ops.Get(world, entity), &hp));
+    REQUIRE(ops.FindField("hp")->Write(ops.GetComponent(world, entity), &hp));
 
     // a second component moves the entity to another table
     world.AddComponent<RegistryHealth>(entity, RegistryHealth{3});
 
     int32_t readBack = 0;
-    ops.FindField("hp")->Read(ops.Get(world, entity), &readBack);
+    ops.FindField("hp")->Read(ops.GetComponent(world, entity), &readBack);
     CHECK(readBack == 99);
 }
 
@@ -323,17 +331,30 @@ TEST_CASE("Re-declaring a script component with the same fields is the hot-reloa
     CHECK(second.mType.seq == seq);
 }
 
-TEST_CASE("A fieldless script component still occupies a byte")
+TEST_CASE("A fieldless script component is a tag")
 {
-    // ComponentColumn::Count divides the byte count by the element size.
+    // No column, so nothing divides by the element size and nothing stores a
+    // byte of padding: an empty field list is how a script marks entities.
     const ComponentOps &ops = ComponentRegistry::Instance().RegisterRuntime("ScriptTag", {});
 
-    CHECK(ops.mSize == 1);
+    CHECK(ops.mSize == 0);
+    CHECK(ops.mAlign == 0);
+    CHECK(ops.mFields.empty());
 
     World world;
     const Entity entity = world.CreateEntity();
     ops.AddDefault(world, entity);
+
+    REQUIRE(ops.Has(world, entity));
+    CHECK(world.HasRaw(entity, ops.mType));
+    CHECK(ops.GetComponent(world, entity) == nullptr);
+
+    // adding it again is absorbed, exactly as it is for a component with fields
+    CHECK_NOTHROW(ops.AddDefault(world, entity));
     CHECK(ops.Has(world, entity));
+
+    ops.Remove(world, entity);
+    CHECK_FALSE(ops.Has(world, entity));
 }
 
 TEST_CASE("The erased CommandBuffer path defers a script component")
@@ -356,7 +377,7 @@ TEST_CASE("The erased CommandBuffer path defers a script component")
     REQUIRE(ops.Has(world, entity));
 
     int32_t readBack = 0;
-    ops.FindField("hp")->Read(ops.Get(world, entity), &readBack);
+    ops.FindField("hp")->Read(ops.GetComponent(world, entity), &readBack);
     CHECK(readBack == 5);
 
     ops.DeferRemove(commands, entity);
@@ -388,7 +409,7 @@ TEST_CASE("Interleaved erased and typed commands both survive one flush")
     CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 9);
 
     int32_t readBack = 0;
-    script.FindField("hp")->Read(script.Get(world, entity), &readBack);
+    script.FindField("hp")->Read(script.GetComponent(world, entity), &readBack);
     CHECK(readBack == 21);
 }
 
@@ -447,4 +468,52 @@ TEST_CASE("The same call mutates immediately outside a walk")
     // a stale handle is answered, not asserted on
     CHECK_FALSE(mts::DestroyEntityOrDefer(world, entity));
     CHECK_FALSE(mts::AddComponentOrDefer(world, entity, ops, &value));
+}
+
+TEST_CASE("The erased CommandBuffer path defers a tag without clobbering the buffer")
+{
+    const ComponentOps &tag = ComponentRegistry::Instance().RegisterRuntime("ScriptDeferredTag", {});
+
+    constexpr RuntimeFieldDecl fields[] = {{"hp", FieldKind::Int}};
+    const ComponentOps &valued = ComponentRegistry::Instance().RegisterRuntime("ScriptDeferredBeside", fields);
+
+    REQUIRE(tag.mSize == 0);
+    REQUIRE(tag.mAlign == 0);
+
+    World world;
+    CommandBuffer commands;
+    const Entity entity = world.CreateEntity();
+
+    const int32_t hp = 33;
+    commands.AddRaw(entity, valued.mType, valued.mSize, valued.mAlign, &hp);
+
+    // a tag records align 0, which must not fold the next value offset back to
+    // zero and resize the payload recorded above out of the buffer
+    tag.DeferAdd(commands, entity, tag.mDefaultValue.data());
+    CHECK(commands.Size() == 2);
+
+    commands.Flush(world);
+
+    REQUIRE(tag.Has(world, entity));
+    REQUIRE(valued.Has(world, entity));
+    CHECK(tag.GetComponent(world, entity) == nullptr);
+
+    int32_t readBack = 0;
+    valued.FindField("hp")->Read(valued.GetComponent(world, entity), &readBack);
+    CHECK(readBack == 33);
+}
+
+TEST_CASE("A tag deferred twice in one flush through the erased path is not a duplicate add")
+{
+    const ComponentOps &tag = ComponentRegistry::Instance().RegisterRuntime("ScriptDeferredTagTwice", {});
+
+    World world;
+    CommandBuffer commands;
+    const Entity entity = world.CreateEntity();
+
+    tag.DeferAdd(commands, entity, tag.mDefaultValue.data());
+    tag.DeferAdd(commands, entity, tag.mDefaultValue.data());
+    commands.Flush(world);
+
+    CHECK(tag.Has(world, entity));
 }

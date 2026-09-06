@@ -99,9 +99,9 @@ namespace mts
             mStarted = false;
         }
 
-        /// Drops every registered system so Add and Start may be used again.
-        /// Stop has to have run first: the systems are about to be destroyed,
-        /// and OnStop is their only chance to release anything.
+        // Drops every registered system so Add and Start may be used again.
+        // Stop has to have run first: the systems are about to be destroyed,
+        // and OnStop is their only chance to release anything.
         void Reset()
         {
             MTS_ASSERT(!mStarted, "SystemScheduler::Reset: Stop must run before Reset");

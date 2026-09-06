@@ -10,6 +10,13 @@
 #pragma once
 #include <type_traits>
 
+namespace mts
+{
+    // component with no fields
+    template <typename T>
+    inline constexpr bool kIsTagComponent = std::is_empty_v<T>;
+}
+
 // add to every component type, will check again in storage
 // forces pod for memcpy
 #define MTS_ASSERT_COMPONENT(T)                                                                       \

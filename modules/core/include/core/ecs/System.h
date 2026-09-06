@@ -15,7 +15,7 @@ namespace mts
     class World;
     class CommandBuffer;
 
-    /// Ordering primitive : each system will execute in the order of assigned phase -> registrated order
+    // Ordering primitive : each system will execute in the order of assigned phase -> registrated order
     enum class SystemPhase : uint8_t
     {
         PreUpdate,
@@ -25,7 +25,7 @@ namespace mts
         kCount
     };
 
-    /// Everything a system is handed for one tick.
+    // Everything a system is handed for one tick.
     struct SystemContext
     {
         World &world;
@@ -35,7 +35,7 @@ namespace mts
         uint64_t frame = 0;
     };
 
-    /// A unit of per-frame work over the World.
+    // A unit of per-frame work over the World.
     class ISystem
     {
     public:
@@ -46,13 +46,13 @@ namespace mts
         ISystem(ISystem &&) = delete;
         ISystem &operator=(ISystem &&) = delete;
 
-        /// Once, before the first OnUpdate. Cache queries here.
+        // Once, before the first OnUpdate. Cache queries here.
         virtual void OnStart(SystemContext &) {}
 
-        /// Called on target phase
+        // Called on target phase
         virtual void OnUpdate(SystemContext &context) = 0;
 
-        /// Once, at teardown. Runs in reverse registration order.
+        // Once, at teardown. Runs in reverse registration order.
         virtual void OnStop(SystemContext &) {}
 
     protected:

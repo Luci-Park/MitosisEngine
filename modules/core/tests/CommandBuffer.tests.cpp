@@ -40,6 +40,10 @@ namespace
     {
         float m[4];
     };
+
+    struct CFrozen
+    {
+    };
 }
 
 using namespace mts;
@@ -208,4 +212,52 @@ TEST_CASE("Interleaved payloads of different alignment survive the flush", "[ecs
         REQUIRE(wide->m[0] == static_cast<float>(i));
         REQUIRE(wide->m[3] == 3.0f);
     }
+}
+
+TEST_CASE("A deferred tag add applies at the flush", "[ecs][commands][tag]")
+{
+    World world;
+    const Entity entity = world.CreateEntity();
+    world.AddComponent(entity, CPosition{1.0f, 2.0f});
+
+    CommandBuffer commands;
+    commands.AddTag<CFrozen>(entity);
+
+    // payload-free, but still deferred: nothing moves until the flush
+    CHECK_FALSE(world.Has<CFrozen>(entity));
+
+    commands.Flush(world);
+
+    CHECK(world.Has<CFrozen>(entity));
+    CHECK(world.GetComponent<CPosition>(entity)->x == 1.0f);
+}
+
+TEST_CASE("A tag deferred twice in one flush is not a duplicate add", "[ecs][commands][tag]")
+{
+    // Two systems marking the same entity in one phase is legitimate. Add
+    // absorbs it by overwriting; AddTag has nothing to overwrite, so it has to
+    // absorb it by noticing the tag is already there.
+    World world;
+    const Entity entity = world.CreateEntity();
+
+    CommandBuffer commands;
+    commands.AddTag<CFrozen>(entity);
+    commands.AddTag<CFrozen>(entity);
+    commands.Flush(world);
+
+    CHECK(world.Has<CFrozen>(entity));
+}
+
+TEST_CASE("A deferred tag remove applies at the flush", "[ecs][commands][tag]")
+{
+    World world;
+    const Entity entity = world.CreateEntity();
+    world.AddTag<CFrozen>(entity);
+
+    CommandBuffer commands;
+    commands.Remove<CFrozen>(entity);
+    CHECK(world.Has<CFrozen>(entity));
+
+    commands.Flush(world);
+    CHECK_FALSE(world.Has<CFrozen>(entity));
 }

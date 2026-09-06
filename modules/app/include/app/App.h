@@ -68,33 +68,33 @@ namespace mts
         ScriptHost &Scripts() { return mScriptHost; }
         ScriptReloadWatcher &ScriptReload() { return mScriptReloadWatcher; }
 
-        /// Temporary seam
+        // Temporary seam
         VulkanRenderer &Renderer() { return mRenderer; }
 
-        /// The asset cache, loading the manifest on first use.
-        /// Returns nullptr when no manifest is available - a build with no cooked
-        /// assets, or an exe moved away from its cooked/ folder - so a missing
-        /// manifest costs the caller an asset, not the whole application.
-        /// The failure is sticky: the manifest is not retried every frame.
+        // The asset cache, loading the manifest on first use.
+        // Returns nullptr when no manifest is available - a build with no cooked
+        // assets, or an exe moved away from its cooked/ folder - so a missing
+        // manifest costs the caller an asset, not the whole application.
+        // The failure is sticky: the manifest is not retried every frame.
         AssetCache *Assets();
 
-        /// The scene currently in the World - always populated after
-        /// Initialize (an empty NewScene, if nothing else). A caller building
-        /// a scene by hand (main.cpp's BuildScene, today) should register
-        /// each entity it creates through CreateSceneEntity(GetWorld(),
-        /// Scene(), ...) so File > Save Scene actually captures it.
+        // The scene currently in the World - always populated after
+        // Initialize (an empty NewScene, if nothing else). A caller building
+        // a scene by hand (main.cpp's BuildScene, today) should register
+        // each entity it creates through CreateSceneEntity(GetWorld(),
+        // Scene(), ...) so File > Save Scene actually captures it.
         LoadedScene &Scene() { return mScene; }
 
-        /// Discards mScene's entities (UnloadScene) and replaces it with an
-        /// empty one. Does not touch mSceneDir - the next Save writes there.
+        // Discards mScene's entities (UnloadScene) and replaces it with an
+        // empty one. Does not touch mSceneDir - the next Save writes there.
         void NewScene(std::string name = "untitled");
 
-        /// Writes Scene() to mSceneDir. False on I/O failure (see SaveScene).
+        // Writes Scene() to mSceneDir. False on I/O failure (see SaveScene).
         bool SaveScene();
 
-        /// Discards mScene's entities and replaces it with mSceneDir's
-        /// contents. False (leaving the prior scene in place) if mSceneDir
-        /// has no scene.json to load.
+        // Discards mScene's entities and replaces it with mSceneDir's
+        // contents. False (leaving the prior scene in place) if mSceneDir
+        // has no scene.json to load.
         bool LoadScene();
 
     private:

@@ -12,6 +12,7 @@
 #include "core/log/Assert.h"
 
 #include <cstdint>
+#include <deque>
 #include <vector>
 
 namespace mts
@@ -24,8 +25,8 @@ namespace mts
         {
             if (!mFreeList.empty())
             {
-                const uint32_t index = mFreeList.back();
-                mFreeList.pop_back();
+                const uint32_t index = mFreeList.front();
+                mFreeList.pop_front();
                 return Entity{index, mGenerations[index]};
             }
 
@@ -52,6 +53,6 @@ namespace mts
 
     private:
         std::vector<uint32_t> mGenerations; // per index, bumped on Destroy
-        std::vector<uint32_t> mFreeList;    // indices ready for reuse
+        std::deque<uint32_t> mFreeList;     // indices ready for reuse
     };
 }

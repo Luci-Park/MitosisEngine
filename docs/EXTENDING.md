@@ -67,7 +67,6 @@ header-only files in `core/ecs` work because the tests include them.
 
 ```cpp
 #include <core/ecs/ComponentAsserts.h>
-#include <core/ecs/StorageInfo.h>
 
 namespace mts
 {
@@ -77,14 +76,26 @@ namespace mts
         float y = 0.0f;
     };
     MTS_ASSERT_COMPONENT(Position);
-}
 
-// Only for components added and removed often. Outside any namespace.
-MTS_COMPONENT_SPARSE(mts::Position);
+    // A component with no fields is a tag: one signature bit and no column.
+    struct Frozen
+    {
+    };
+    MTS_ASSERT_COMPONENT(Frozen);
+}
 ```
 
 The name must be globally unique across namespaces - `TypeIdOf` hashes the bare
 name and a collision asserts in Debug.
+
+A tag is added with `world.AddTag<Frozen>(entity)` and removed with the usual
+`RemoveComponent<Frozen>`. It has nothing to read, so `GetComponent` and a
+`Query<...>` data term both refuse it at compile time - filter on it instead:
+
+```cpp
+world.GetOrCreateQuery<Position>(Without<Frozen>{})
+    .ForEach([](Entity, Position &position) { /* ... */ });
+```
 
 ## Add a system
 

@@ -13,7 +13,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -21,13 +20,6 @@ namespace mts
 {
     namespace detail
     {
-        // binds SparseSetStorage<T>::Has to the erased SparseFilterCheck
-        template <typename T>
-        bool SparseHasThunk(const void *storage, Entity entity)
-        {
-            return static_cast<const SparseSetStorage<T> *>(storage)->Has(entity);
-        }
-
         /**
          * Held for the duration of a table walk, by every walker.
          *
@@ -68,16 +60,14 @@ namespace mts
         class ArchetypeMatcher
         {
         public:
-            /// Every listed bit must be present (With)
+            // Every listed bit must be present (With)
             void RequireAll(const Signature &signature) { mAll |= signature; }
 
-            /// No listed bit may be present (Without)
+            // No listed bit may be present (Without)
             void RequireNone(const Signature &signature) { mNone |= signature; }
 
-            /// (And), (Or)
+            // (And), (Or)
             void RequireAny(const Signature &clause) { mOrClauses.push_back(clause); }
-
-            void AddSparseCheck(const SparseFilterCheck &check) { mSparseChecks.push_back(check); }
 
             bool MatchesSignature(const Signature &signature) const
             {
@@ -96,25 +86,15 @@ namespace mts
                 return true;
             }
 
-            bool PassesSparseChecks(Entity entity) const
-            {
-                for (const SparseFilterCheck &check : mSparseChecks)
-                {
-                    if (check.has(check.storage, entity) != check.wantPresent)
-                        return false;
-                }
-                return true;
-            }
-
             bool NeedsRefresh(const World &world) const { return world.Generation() != mSeenGeneration; }
 
-            /// Forces the next NeedsRefresh to say yes. Needed by any owner
-            /// that may add a term after the first walk - the generation stamp
-            /// tracks the world's archetypes, not this matcher's own masks.
+            // Forces the next NeedsRefresh to say yes. Needed by any owner
+            // that may add a term after the first walk - the generation stamp
+            // tracks the world's archetypes, not this matcher's own masks.
             void Invalidate() { mSeenGeneration = static_cast<std::size_t>(-1); }
 
-            /// Calls `onMatch(Archetype *)` for every matching table, then
-            /// stamps the generation. The caller owns the cache it fills.
+            // Calls `onMatch(Archetype *)` for every matching table, then
+            // stamps the generation. The caller owns the cache it fills.
             template <typename Fn>
             void Refresh(World &world, Fn &&onMatch)
             {
@@ -130,7 +110,6 @@ namespace mts
             Signature mAll;
             Signature mNone;
             std::vector<Signature> mOrClauses; // one per Or term; empty for most queries
-            std::vector<SparseFilterCheck> mSparseChecks;
             std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
         };
     }
@@ -139,6 +118,10 @@ namespace mts
     class Query final : public detail::IQuery
     {
         static_assert(sizeof...(Ts) > 0, "Query: needs at least one component term");
+
+        static_assert((!kIsTagComponent<detail::Bare<Ts>> && ...),
+                      "Query: a tag has no fields, so it cannot be a data term - there would be no "
+                      "reference to hand the callback. Put it in With<> or Without<> instead.");
 
         // number of components
         static constexpr std::size_t kTermCount = sizeof...(Ts);
@@ -175,24 +158,21 @@ namespace mts
             : mWorld(&world)
         {
             // ArchetypeMatcher builds mask once
-            mMatcher.RequireAll(detail::TableSignatureOf<Ts...>());
+            mMatcher.RequireAll(SignatureOf<Ts...>());
 
             (ApplyFilter(filters), ...);
-            ResolveSparseStorages(std::index_sequence_for<Ts...>{});
         }
 
         template <typename... Es>
         void ApplyFilter(With<Es...>)
         {
-            mMatcher.RequireAll(detail::TableSignatureOf<Es...>());
-            (AddSparseFilter<Es>(true), ...);
+            mMatcher.RequireAll(SignatureOf<Es...>());
         }
 
         template <typename... Es>
         void ApplyFilter(Without<Es...>)
         {
-            mMatcher.RequireNone(detail::TableSignatureOf<Es...>());
-            (AddSparseFilter<Es>(false), ...);
+            mMatcher.RequireNone(SignatureOf<Es...>());
         }
 
         template <typename... Es>
@@ -201,22 +181,7 @@ namespace mts
             static_assert(sizeof...(Es) > 0,
                           "Query: Or<> needs at least one component - an empty clause can never be satisfied");
 
-            static_assert((!kIsSparseComponent<detail::Bare<Es>> && ...),
-                          "Query: Or<> members must be dense components - a sparse component has no "
-                          "signature bit, so it cannot take part in an archetype-level or-test");
-
-            mMatcher.RequireAny(detail::TableSignatureOf<Es...>());
-        }
-
-        template <typename E>
-        void AddSparseFilter(bool wantPresent)
-        {
-            if constexpr (kIsSparseComponent<detail::Bare<E>>)
-            {
-                using BareE = detail::Bare<E>;
-                mMatcher.AddSparseCheck(detail::SparseFilterCheck{
-                    &detail::SparseHasThunk<BareE>, &mWorld->SparseStorageFor<BareE>(), wantPresent});
-            }
+            mMatcher.RequireAny(SignatureOf<Es...>());
         }
 #pragma endregion
 
@@ -237,22 +202,7 @@ namespace mts
 
         static Columns ResolveColumns(Archetype *table)
         {
-            return Columns{(kIsSparseComponent<detail::Bare<Ts>>
-                                ? nullptr
-                                : table->FindColumn(TypeIdOf<detail::Bare<Ts>>()))...};
-        }
-
-        template <std::size_t... Is>
-        void ResolveSparseStorages(std::index_sequence<Is...>)
-        {
-            (ResolveSparseStorage<Is, Ts>(), ...);
-        }
-
-        template <std::size_t I, typename T>
-        void ResolveSparseStorage()
-        {
-            if constexpr (kIsSparseComponent<detail::Bare<T>>)
-                std::get<I>(mSparseStorages) = &mWorld->SparseStorageFor<detail::Bare<T>>();
+            return Columns{table->FindColumn(TypeIdOf<detail::Bare<Ts>>())...};
         }
 #pragma endregion
 
@@ -282,31 +232,15 @@ namespace mts
                                     // limit iteration to current entities
                                     const uint32_t rows = table.RowCount();
                                     for (uint32_t row = 0; row < rows && row < table.RowCount(); ++row)
-                                    {
-                                        const Entity entity = table.EntityAt(row);
-
-                                        // check sparse for each row
-                                        if (!((!kIsSparseComponent<detail::Bare<Ts>> ||
-                                               std::get<Is>(mSparseStorages)->Has(entity)) &&
-                                              ...))
-                                            continue;
-
-                                        if (!mMatcher.PassesSparseChecks(entity))
-                                            continue;
-
-                                        fn(entity, ResolveRef<Ts>(columns[Is], std::get<Is>(mSparseStorages),
-                                                                  entity, row)...);
-                                    } });
+                                        fn(table.EntityAt(row), ResolveRef<Ts>(columns[Is], row)...);
+                                });
         }
 
         // Return target components
-        template <typename T, typename Storage>
-        static T &ResolveRef(ComponentColumn *column, Storage storage, Entity entity, uint32_t row)
+        template <typename T>
+        static T &ResolveRef(ComponentColumn *column, uint32_t row)
         {
-            if constexpr (kIsSparseComponent<detail::Bare<T>>)
-                return *storage->GetComponent(entity);
-            else
-                return *static_cast<T *>(column->GetComponent(row));
+            return *static_cast<T *>(column->GetComponent(row));
         }
 #pragma endregion
 
@@ -314,7 +248,6 @@ namespace mts
         detail::ArchetypeMatcher mMatcher;
         std::vector<Match> mMatches;
         uint32_t mIterationDepth = 0;
-        std::tuple<SparseSetStorage<detail::Bare<Ts>> *...> mSparseStorages{};
     };
 
     template <typename... Ts, typename... Filters>

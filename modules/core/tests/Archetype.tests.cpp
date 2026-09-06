@@ -10,6 +10,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <utility>
+
 namespace
 {
     struct Position
@@ -29,18 +31,11 @@ namespace
         int hp;
     };
 
-    // rare marker component: opted out of archetypes so it never splits one
+    // marker component: no fields, so it carries a signature bit and no column
     struct Frozen
     {
-        int turnsLeft;
     };
 }
-
-template <>
-struct mts::ComponentStorageInfo<Frozen>
-{
-    static constexpr mts::StorageKind kValue = mts::StorageKind::SparseSet;
-};
 
 TEST_CASE("World starts with only the empty archetype", "[ecs][archetype]")
 {
@@ -170,7 +165,7 @@ TEST_CASE("World recycles entity indices with a bumped generation", "[ecs][arche
     CHECK_FALSE(world.Has<Health>(second));
 }
 
-TEST_CASE("World keeps sparse components out of the archetype", "[ecs][archetype][sparse]")
+TEST_CASE("World tags an entity without giving the archetype a column", "[ecs][archetype][tag]")
 {
     mts::World world;
 
@@ -180,22 +175,20 @@ TEST_CASE("World keeps sparse components out of the archetype", "[ecs][archetype
     world.AddComponent(b, Position{2.0f, 2.0f});
 
     REQUIRE(world.ArchetypeOf(a) == world.ArchetypeOf(b));
-    const std::size_t archetypeCount = world.ArchetypeCount();
 
-    // the whole point of opting out: a rare component must not fragment
-    // the archetype its holder happens to sit in
-    world.AddComponent(a, Frozen{3});
+    world.AddTag<Frozen>(a);
 
-    CHECK(world.ArchetypeOf(a) == world.ArchetypeOf(b));
-    CHECK(world.ArchetypeCount() == archetypeCount);
+    // a tag is a real signature bit, so it does split the archetype - what it
+    // does not do is add a column, which is where the per-row cost would be
+    CHECK(world.ArchetypeOf(a) != world.ArchetypeOf(b));
+    CHECK(world.ArchetypeOf(a)->Columns().size() == 1);
+    CHECK(world.ArchetypeOf(a)->FindColumn(mts::TypeIdOf<Frozen>()) == nullptr);
 
     REQUIRE(world.Has<Frozen>(a));
     REQUIRE_FALSE(world.Has<Frozen>(b));
-    CHECK(world.GetComponent<Frozen>(a)->turnsLeft == 3);
-    CHECK(world.GetComponent<Frozen>(b) == nullptr);
 }
 
-TEST_CASE("World removes a sparse component without an archetype move", "[ecs][archetype][sparse]")
+TEST_CASE("World keeps other components across a tag add and remove", "[ecs][archetype][tag]")
 {
     mts::World world;
     const mts::Entity entity = world.CreateEntity();
@@ -203,26 +196,53 @@ TEST_CASE("World removes a sparse component without an archetype move", "[ecs][a
     world.AddComponent(entity, Position{1.0f, 2.0f});
     const mts::Archetype *before = world.ArchetypeOf(entity);
 
-    world.AddComponent(entity, Frozen{5});
+    world.AddTag<Frozen>(entity);
+    REQUIRE(world.ArchetypeOf(entity) != before);
+    CHECK(world.GetComponent<Position>(entity)->x == 1.0f);
+
     world.RemoveComponent<Frozen>(entity);
 
+    // back to the table it started in, with its column value intact
     CHECK(world.ArchetypeOf(entity) == before);
     REQUIRE_FALSE(world.Has<Frozen>(entity));
     REQUIRE(world.Has<Position>(entity));
     CHECK(world.GetComponent<Position>(entity)->x == 1.0f);
 }
 
-TEST_CASE("World clears sparse components on destroy", "[ecs][archetype][sparse]")
+TEST_CASE("World clears tags on destroy", "[ecs][archetype][tag]")
 {
     mts::World world;
 
     const mts::Entity first = world.CreateEntity();
-    world.AddComponent(first, Frozen{9});
+    world.AddTag<Frozen>(first);
     world.DestroyEntity(first);
 
-    // the recycled index must not inherit the dead entity's sparse component
+    // the recycled index must not inherit the dead entity's tag
     const mts::Entity second = world.CreateEntity();
     REQUIRE(second.mIndex == first.mIndex);
     CHECK_FALSE(world.Has<Frozen>(second));
-    CHECK(world.GetComponent<Frozen>(second) == nullptr);
+}
+
+TEST_CASE("A tagged row survives a swap-remove", "[ecs][archetype][tag]")
+{
+    mts::World world;
+
+    // three entities in one tagged table, so removing the first swaps the
+    // last into its row - the path that walks every column of a table that
+    // has one fewer column than it has signature bits
+    const mts::Entity a = world.CreateEntity();
+    const mts::Entity b = world.CreateEntity();
+    const mts::Entity c = world.CreateEntity();
+
+    for (const auto &[entity, x] : {std::pair{a, 1.0f}, std::pair{b, 2.0f}, std::pair{c, 3.0f}})
+    {
+        world.AddComponent(entity, Position{x, x});
+        world.AddTag<Frozen>(entity);
+    }
+
+    world.DestroyEntity(a);
+
+    REQUIRE(world.Has<Frozen>(c));
+    CHECK(world.GetComponent<Position>(c)->x == 3.0f);
+    CHECK(world.GetComponent<Position>(b)->x == 2.0f);
 }

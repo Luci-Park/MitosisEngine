@@ -50,7 +50,7 @@ namespace mts
         const glm::quat &Rotation() const { return mRotation; }
         const glm::vec3 &Scale() const { return mScale; }
 
-        /// Bumped on every mutation. Never 0, so 0 can mean "no such transform".
+        // Bumped on every mutation. Never 0, so 0 can mean "no such transform".
         uint32_t Version() const { return mVersion; }
 
         void SetPosition(const glm::vec3 &position)
@@ -77,14 +77,14 @@ namespace mts
             Touch();
         }
 
-        /// Applies `delta` on top of the current rotation, in local space.
+        // Applies `delta` on top of the current rotation, in local space.
         void Rotate(const glm::quat &delta)
         {
             mRotation = glm::normalize(mRotation * delta);
             Touch();
         }
 
-        /// Column-major TRS: translate * rotate * scale, applied right to left.
+        // Column-major TRS: translate * rotate * scale, applied right to left.
         glm::mat4 Matrix() const
         {
             // mat4_cast builds the rotation basis, then each basis column is
@@ -108,7 +108,7 @@ namespace mts
         }
 
         glm::vec3 mPosition{0.0f};
-        glm::quat mRotation{1.0f, 0.0f, 0.0f, 0.0f}; ///< w, x, y, z - identity
+        glm::quat mRotation{1.0f, 0.0f, 0.0f, 0.0f}; // w, x, y, z - identity
         glm::vec3 mScale{1.0f};
         uint32_t mVersion = 1;
     };

@@ -15,7 +15,7 @@
 
 namespace mts
 {
-    /// kNullMaterial = default material
+    // kNullMaterial = default material
     struct MaterialHandle
     {
         static constexpr uint32_t kNullIndex = UINT32_MAX;
@@ -31,7 +31,7 @@ namespace mts
 
     struct MaterialDesc
     {
-        /// Compiled entry points are expected to be named vertexMain/fragmentMain
+        // Compiled entry points are expected to be named vertexMain/fragmentMain
         std::string shaderName = "triangle";
 
         VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT;

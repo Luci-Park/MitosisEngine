@@ -37,8 +37,8 @@ namespace
         std::vector<int> stopped;
     };
 
-    /// Writes its id into the recorder at every lifecycle point, so ordering is
-    /// observable without any world state.
+    // Writes its id into the recorder at every lifecycle point, so ordering is
+    // observable without any world state.
     class TagSystem final : public ISystem
     {
     public:
@@ -53,7 +53,7 @@ namespace
         int mId;
     };
 
-    /// Spawns one entity per tick through the command buffer.
+    // Spawns one entity per tick through the command buffer.
     class SpawnSystem final : public ISystem
     {
     public:
@@ -67,7 +67,7 @@ namespace
         int mNextTag = 0;
     };
 
-    /// Counts what is visible to it at the moment it runs.
+    // Counts what is visible to it at the moment it runs.
     class CountSystem final : public ISystem
     {
     public:

@@ -22,8 +22,8 @@ namespace mts
         struct HierarchyMutator;
     }
 
-    /// Chains deeper than this are refused. Every upward walk is bounded by it,
-    /// so nothing in the engine has to handle an unbounded chain.
+    // Chains deeper than this are refused. Every upward walk is bounded by it,
+    // so nothing in the engine has to handle an unbounded chain.
     inline constexpr uint32_t kMaxHierarchyDepth = 64;
 
     /**
@@ -51,28 +51,28 @@ namespace mts
     class HierarchyIndex
     {
     public:
-        /// Null when `entity` is a root or absent from the graph.
+        // Null when `entity` is a root or absent from the graph.
         Entity ParentOf(Entity entity) const;
 
-        /// Direct children in insertion order, which is stable: unlike the
-        /// intrusive chain this replaced, iteration order is reproducible
-        /// across runs, so serialization and scripting may rely on it.
-        ///
-        /// Invalidated by any mutation of this entity's children.
+        // Direct children in insertion order, which is stable: unlike the
+        // intrusive chain this replaced, iteration order is reproducible
+        // across runs, so serialization and scripting may rely on it.
+        //
+        // Invalidated by any mutation of this entity's children.
         std::span<const Entity> ChildrenOf(Entity entity) const;
 
-        /// True if `ancestor` is `entity` or any transitive parent of it.
+        // True if `ancestor` is `entity` or any transitive parent of it.
         bool IsAncestorOf(Entity ancestor, Entity entity) const;
 
-        /// Levels above `entity`. 0 for a root.
+        // Levels above `entity`. 0 for a root.
         uint32_t DepthOf(Entity entity) const;
 
-        /// Levels below `entity`. 0 for a leaf.
+        // Levels below `entity`. 0 for a leaf.
         uint32_t HeightOf(Entity entity) const;
 
-        /// Entities the graph currently holds a slot for. An entity that was
-        /// linked and then rooted keeps its slot, so this is neither the
-        /// world's entity count nor the count of non-root entities.
+        // Entities the graph currently holds a slot for. An entity that was
+        // linked and then rooted keeps its slot, so this is neither the
+        // world's entity count nor the count of non-root entities.
         std::size_t NodeCount() const;
 
     private:
@@ -91,9 +91,9 @@ namespace mts
          */
         bool SetParent(Entity child, Entity parent);
 
-        /// Detaches `entity` and roots whatever was below it, then forgets it.
-        /// The destroy hook calls this after it has cascaded, so in practice
-        /// there are no children left to orphan.
+        // Detaches `entity` and roots whatever was below it, then forgets it.
+        // The destroy hook calls this after it has cascaded, so in practice
+        // there are no children left to orphan.
         void Remove(Entity entity);
 
         /**
@@ -111,9 +111,9 @@ namespace mts
 
         struct Node
         {
-            /// Null marks the slot unused. Holding the whole handle rather than
-            /// a flag is what makes a recycled index self-invalidating: a stale
-            /// entity compares unequal on generation and reads as absent.
+            // Null marks the slot unused. Holding the whole handle rather than
+            // a flag is what makes a recycled index self-invalidating: a stale
+            // entity compares unequal on generation and reads as absent.
             Entity owner;
 
             Entity parent;
@@ -125,13 +125,13 @@ namespace mts
         Node *Find(Entity entity);
         const Node *Find(Entity entity) const;
 
-        /// The slot for `entity`, creating it if needed.
+        // The slot for `entity`, creating it if needed.
         Node &Obtain(Entity entity);
 
         void Unlink(Entity child, Entity parent);
 
-        /// Dense, indexed by Entity::mIndex, so a lookup is a bounds check and
-        /// a handle compare rather than a hash.
+        // Dense, indexed by Entity::mIndex, so a lookup is a bounds check and
+        // a handle compare rather than a hash.
         std::vector<Node> mNodes;
     };
 }

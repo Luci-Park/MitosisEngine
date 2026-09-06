@@ -39,10 +39,10 @@ namespace mts
     public:
         WorldTransform() = default;
 
-        /// Last computed world matrix. Current only after a resolve.
+        // Last computed world matrix. Current only after a resolve.
         const glm::mat4 &Matrix() const { return mMatrix; }
 
-        /// Bumped whenever mMatrix changes; this is what children stamp against.
+        // Bumped whenever mMatrix changes; this is what children stamp against.
         uint32_t Version() const { return mVersion; }
 
     private:
@@ -50,27 +50,27 @@ namespace mts
 
         glm::mat4 mMatrix{1.0f};
 
-        /// Transform::Version() this matrix was built from.
+        // Transform::Version() this matrix was built from.
         uint32_t mLocalVersion = 0;
 
-        /// Parent's WorldTransform::Version() at build time. 0 = was a root.
+        // Parent's WorldTransform::Version() at build time. 0 = was a root.
         uint32_t mParentVersion = 0;
 
-        /// Never 0, so a child can tell "root" from a real parent version.
+        // Never 0, so a child can tell "root" from a real parent version.
         uint32_t mVersion = 1;
 
-        /// Forces the next resolve to rebuild regardless of the stamps. Set on
-        /// construction and on reparent, where the stamps alone cannot tell
-        /// that anything changed.
+        // Forces the next resolve to rebuild regardless of the stamps. Set on
+        // construction and on reparent, where the stamps alone cannot tell
+        // that anything changed.
         bool mDirty = true;
     };
 
     MTS_ASSERT_COMPONENT(WorldTransform);
 
-    /// Read-only, expressed as a getter with no setter: a game never authors a
-    /// world matrix, it authors a Transform and a parent. Writing here would be
-    /// overwritten by the next resolve anyway, so the absent setter says so
-    /// instead of letting a script discover it.
+    // Read-only, expressed as a getter with no setter: a game never authors a
+    // world matrix, it authors a Transform and a parent. Writing here would be
+    // overwritten by the next resolve anyway, so the absent setter says so
+    // instead of letting a script discover it.
     inline constexpr FieldDesc kWorldTransformFields[] = {
         {"matrix", FieldKind::Mat4, 0,
          [](const void *component, void *out)

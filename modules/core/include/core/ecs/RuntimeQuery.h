@@ -37,10 +37,10 @@ namespace mts
      * wants the caching - a script host that knows which queries its scripts
      * re-run - is in a better position to key it than World is.
      *
-     * Table storage only, and every term must be registered: the constructor
-     * checks both against ComponentRegistry. A sparse term would be accepted
-     * silently and then match nothing, because a sparse component has no
-     * signature bit.
+     * Every term must be registered, which the constructor checks against
+     * ComponentRegistry. A term must also have fields: a tag is one signature
+     * bit with no column, so there is no pointer to hand back for it. Tags are
+     * still perfectly good filters - pass them to With, Without or WithAny.
      */
     class RuntimeQuery
     {
@@ -52,15 +52,15 @@ namespace mts
         RuntimeQuery(RuntimeQuery &&) = delete;
         RuntimeQuery &operator=(RuntimeQuery &&) = delete;
 
-        /// Narrowing filters. Each invalidates the cached match list, so a query
-        /// may be narrowed after it has already run - but never from inside its
-        /// own walk, where dropping the match list would dangle the references
-        /// the callback is holding. Asserted, not merely documented.
+        // Narrowing filters. Each invalidates the cached match list, so a query
+        // may be narrowed after it has already run - but never from inside its
+        // own walk, where dropping the match list would dangle the references
+        // the callback is holding. Asserted, not merely documented.
         RuntimeQuery &With(TypeId type);
         RuntimeQuery &Without(TypeId type);
 
-        /// GetComponent least one of `types` must be present. Clauses AND together, so
-        /// two calls mean (a|b) AND (c|d).
+        // GetComponent least one of `types` must be present. Clauses AND together, so
+        // two calls mean (a|b) AND (c|d).
         RuntimeQuery &WithAny(std::span<const TypeId> types);
 
         std::size_t TermCount() const { return mTerms.size(); }

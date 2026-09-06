@@ -13,6 +13,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -107,7 +108,7 @@ TEST_CASE("A runtime query narrows by With and Without")
     World world;
     const Entity moving = Spawn(world, 1.0f, 1.0f);
     const Entity frozen = Spawn(world, 2.0f, 2.0f);
-    world.AddComponent<RqFrozen>(frozen, RqFrozen{});
+    world.AddTag<RqFrozen>(frozen);
 
     RuntimeQuery query(world, terms);
     query.With(Velocity().mType).Without(Frozen().mType);
@@ -119,6 +120,68 @@ TEST_CASE("A runtime query narrows by With and Without")
     REQUIRE(seen.size() == 1);
     CHECK(seen.front() == moving);
     CHECK(seen.front() != frozen);
+}
+
+TEST_CASE("A runtime query accepts a tag in an or-clause")
+{
+    // A tag is one signature bit, so WithAny tests it at the archetype level
+    // exactly as it tests a component with fields. This is the case a script
+    // hits first - `world:each("Position"):with_any("Frozen", "Velocity")` -
+    // and it needs no per-row work at all.
+    const std::array terms{Position().mType};
+
+    World world;
+
+    const Entity frozen = world.CreateEntity();
+    world.AddComponent<RqPosition>(frozen, RqPosition{1.0f});
+    world.AddTag<RqFrozen>(frozen);
+
+    const Entity moving = Spawn(world, 2.0f, 2.0f);
+
+    const Entity neither = world.CreateEntity();
+    world.AddComponent<RqPosition>(neither, RqPosition{3.0f});
+
+    const std::array clause{Frozen().mType, Velocity().mType};
+
+    RuntimeQuery query(world, terms);
+    query.WithAny(clause);
+
+    std::vector<Entity> seen;
+    query.ForEach([&](Entity entity, std::span<void *const>)
+                  { seen.push_back(entity); });
+
+    REQUIRE(seen.size() == 2);
+    CHECK(std::find(seen.begin(), seen.end(), frozen) != seen.end());
+    CHECK(std::find(seen.begin(), seen.end(), moving) != seen.end());
+    CHECK(std::find(seen.begin(), seen.end(), neither) == seen.end());
+}
+
+TEST_CASE("A runtime query matches a script-declared tag")
+{
+    // An empty field list is how a script marks entities without inventing a
+    // dummy field to carry - the case the table-only carve-out used to refuse.
+    const ComponentOps &tag = ComponentRegistry::Instance().RegisterRuntime("RqScriptMarker", {});
+    REQUIRE(tag.mSize == 0);
+
+    const std::array terms{Position().mType};
+
+    World world;
+    const Entity marked = world.CreateEntity();
+    world.AddComponent<RqPosition>(marked, RqPosition{1.0f});
+    tag.AddDefault(world, marked);
+
+    const Entity plain = world.CreateEntity();
+    world.AddComponent<RqPosition>(plain, RqPosition{2.0f});
+
+    RuntimeQuery query(world, terms);
+    query.With(tag.mType);
+
+    std::vector<Entity> seen;
+    query.ForEach([&](Entity entity, std::span<void *const>)
+                  { seen.push_back(entity); });
+
+    REQUIRE(seen.size() == 1);
+    CHECK(seen.front() == marked);
 }
 
 TEST_CASE("A runtime query picks up an archetype created after its first walk")
@@ -141,7 +204,7 @@ TEST_CASE("A runtime query picks up an archetype created after its first walk")
     // is what makes the cached match list notice
     const Entity tagged = world.CreateEntity();
     world.AddComponent<RqPosition>(tagged, RqPosition{3.0f});
-    world.AddComponent<RqFrozen>(tagged, RqFrozen{});
+    world.AddTag<RqFrozen>(tagged);
 
     CHECK(query.MatchedArchetypeCount() == before + 1);
 
@@ -162,7 +225,7 @@ TEST_CASE("A runtime query matches script-declared components")
     {
         const Entity entity = world.CreateEntity();
         script.AddDefault(world, entity);
-        script.FindField("hp")->Write(script.Get(world, entity), &hp);
+        script.FindField("hp")->Write(script.GetComponent(world, entity), &hp);
     }
 
     // one entity that has only the C++ component, to prove the term narrows
@@ -193,7 +256,7 @@ TEST_CASE("A runtime query mixes a script component with a C++ one")
     script.AddDefault(world, entity);
 
     const float amount = 0.5f;
-    script.FindField("amount")->Write(script.Get(world, entity), &amount);
+    script.FindField("amount")->Write(script.GetComponent(world, entity), &amount);
 
     const std::array terms{Position().mType, script.mType};
     RuntimeQuery query(world, terms);

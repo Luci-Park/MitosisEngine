@@ -35,8 +35,7 @@ engine dependencies.
 | `Signature` | `ecs/Signature.h` | 256-bit component set, the archetype key |
 | `ComponentColumn` | `ecs/ComponentColumn.h` | One type's data in one archetype |
 | `Archetype` | `ecs/Archetype.h` | Rows of entities sharing a signature |
-| `SparseSetStorage<T>` | `ecs/SparseSetStorage.h` | Storage for churny components |
-| `World` | `ecs/World.h` | Owns entities, archetypes, sparse storages, resources |
+| `World` | `ecs/World.h` | Owns entities, archetypes, resources |
 | `HierarchyIndex` | `ecs/HierarchyIndex.h` | The scene graph, held as a resource |
 | `Transform` | `ecs/components/Transform.h` | Authored local TRS, versioned on write |
 | `WorldTransform` | `ecs/components/WorldTransform.h` | Derived world matrix plus staleness stamps |
@@ -64,14 +63,17 @@ collision and names both offenders.
 
 ### Storage
 
-**Table (default).** Entities with the same component set share an `Archetype`
+**One model.** Entities with the same component set share an `Archetype`
 holding one `ComponentColumn` per type. Add or remove computes a new signature,
 finds or creates that archetype, and moves the row - a `memcpy` per column, which
 is why components are POD. Removing swaps the last row into the hole and fixes up
 the moved entity's record.
 
-**Sparse set (opt in).** `MTS_COMPONENT_SPARSE(T)`. `World` keeps one type-erased
-storage per such type, outside the archetype system, cleared on destroy.
+**Tags.** A component with no fields gets a signature bit and no column at all -
+nothing is stored per row, so `AddTag<T>` only moves the entity to the archetype
+carrying that bit. It has no bytes to read, so it filters (`With`, `Without`,
+`Or`) rather than appearing as a query term, and `ComponentOps::mSize` is 0,
+which is how the erased paths recognise one.
 
 #### Resources
 
@@ -91,9 +93,9 @@ invisible to queries and have no per-entity form.
 
 `GetOrCreateQuery<Ts...>(filters...)` returns a cached `Query&` that resolves
 matching archetypes and re-resolves when `World::Generation()` changes. Filters
-are `With`, `Without`, `Or`; each `Or` is its own clause, ORed within. Sparse
-components in the pack are fetched per entity rather than per column. `ForEach`
-passes `(Entity, Ts&...)`, with `const T` arriving as `const T&`.
+are `With`, `Without`, `Or`; each `Or` is its own clause, ORed within, and a tag
+is a member like any other because it has a bit. `ForEach` passes
+`(Entity, Ts&...)`, with `const T` arriving as `const T&`.
 
 `RuntimeQuery` is the same walk for terms that are only `TypeId`s at runtime. It
 shares `detail::ArchetypeMatcher` with `Query`, so the match test and the cache
@@ -187,17 +189,18 @@ private:
   costs nothing. Overflow stops the process in every build, at allocation
   (`ComponentRegistry`) and again on use (`ComponentBitOf`) - the second catches
   a C++ component that was never registered.
-- **The erased `*Raw` API is table-only and says so.** A sparse TypeId is
-  refused, not mishandled: a table row would shadow the sparse store and every
-  typed reader would go on seeing the old value.
+- **The erased `*Raw` API needs no carve-out.** There is one storage model, so
+  every registered TypeId goes down the same path; a tag is `size == 0`, which
+  reads back as `nullptr` from `GetRaw` and answers normally from `HasRaw`.
 - **A component is reachable by name only once registered.** Forgetting is not an
   error, just a name scripts cannot find.
 - **Erased operations are total.** `ComponentOps` answers for a dead entity
   instead of asserting - unlike the typed `World` API, because a script holding a
   stale handle is ordinary.
-- **A stale `Entity` is detected, not honoured.** `Get` returns `nullptr` for a
-  dead handle; `AddComponent` and friends assert.
-- **A signature excludes sparse components** - it is not the full component set.
+- **A stale `Entity` is detected, not honoured.** `GetComponent` returns `nullptr`
+  for a dead handle; `AddComponent` and friends assert.
+- **A signature is the full component set**, tags included - what a tag lacks is
+  a column, not a bit.
 - **Systems register before `Start`.**
 - **`World` is neither copyable nor movable** - archetypes hold pointers back into
   it.
@@ -235,7 +238,6 @@ calls in `App::Run`.
 
 | File | Covers |
 |---|---|
-| `ComponentStorage.tests.cpp` | Columns and sparse set storage |
 | `Archetype.tests.cpp` | Row add/remove, signature transitions |
 | `Query.tests.cpp` | Matching, filters, cache invalidation |
 | `CommandBuffer.tests.cpp` | Recording and flush semantics |

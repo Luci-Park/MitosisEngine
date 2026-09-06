@@ -22,8 +22,8 @@ namespace mts
 {
     namespace
     {
-        /// Mirrors FieldKind::Handle's layout ({index, generation}, 8 bytes) -
-        /// core never names what a Handle points at, so neither does this.
+        // Mirrors FieldKind::Handle's layout ({index, generation}, 8 bytes) -
+        // core never names what a Handle points at, so neither does this.
         struct RawHandle
         {
             uint32_t index = 0;
@@ -422,6 +422,12 @@ namespace mts
                     MTS_LOG_ERROR("script: world:each unknown component '{}'", name);
                     return;
                 }
+                if (ops->mSize == 0)
+                {
+                    MTS_LOG_ERROR("script: world:each - '{}' is a tag and has no value to hand back", name);
+                    return;
+                }
+
                 termOps.push_back(ops);
 
                 if (!cacheKey.empty())

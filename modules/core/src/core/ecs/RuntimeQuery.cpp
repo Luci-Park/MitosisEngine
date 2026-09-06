@@ -17,11 +17,11 @@ namespace mts
 {
     namespace
     {
-        /// Every term has to be a registered table component, checked here
-        /// rather than left to fail quietly: a sparse component owns no
-        /// signature bit, so requiring its bit would match no archetype at all
-        /// and the query would simply return nothing.
-        void CheckQueryable(TypeId type)
+        // Anything named in a query - term or filter - has to be registered,
+        // checked here rather than left to fail quietly: an unregistered name
+        // still has a seq, so its bit would simply match no archetype and the
+        // query would return nothing.
+        const ComponentOps &CheckRegistered(TypeId type)
         {
             const ComponentOps *ops = ComponentRegistry::Instance().FindBySeq(type.seq);
 
@@ -30,17 +30,27 @@ namespace mts
                       "ComponentRegistry, so every term must be registered first.",
                       type.name);
 
-            MTS_CHECK(ops->mStorage == StorageKind::Table,
-                      "RuntimeQuery: \"{}\" is a sparse component. A sparse component has no signature "
-                      "bit, so it cannot be a runtime query term.",
+            return *ops;
+        }
+
+        // A data term additionally has to have bytes to hand back. A tag has
+        // none, and silently yielding a null row pointer would push the
+        // mistake into the script, a frame later and with no name attached.
+        void CheckQueryable(TypeId type)
+        {
+            const ComponentOps &ops = CheckRegistered(type);
+
+            MTS_CHECK(ops.mSize != 0,
+                      "RuntimeQuery: \"{}\" is a tag, so there is no component to hand back for it. "
+                      "Pass it to With(), Without() or WithAny() instead.",
                       type.name);
         }
 
-        /// Rebuilding the match list mid-walk drops the very tables the walk is
-        /// standing on: EnsureFresh would clear mTables and mColumns while the
-        /// outer ForEach still holds an `Archetype &` and a column pointer into
-        /// them. Debug would fire EnsureFresh's assert, whose message blames
-        /// archetype creation and would send the reader somewhere else entirely.
+        // Rebuilding the match list mid-walk drops the very tables the walk is
+        // standing on: EnsureFresh would clear mTables and mColumns while the
+        // outer ForEach still holds an `Archetype &` and a column pointer into
+        // them. Debug would fire EnsureFresh's assert, whose message blames
+        // archetype creation and would send the reader somewhere else entirely.
         void CheckNotIterating(uint32_t depth, const char *what)
         {
             MTS_ASSERT(depth == 0,
@@ -78,10 +88,12 @@ namespace mts
         mMatcher.RequireAll(SignatureOfTerms(mTerms));
     }
 
+    // Filters test a signature bit, which a tag has like anything else - so
+    // unlike a data term, a filter accepts one.
     RuntimeQuery &RuntimeQuery::With(TypeId type)
     {
         CheckNotIterating(mIterationDepth, "With");
-        CheckQueryable(type);
+        CheckRegistered(type);
         mMatcher.RequireAll(SignatureOfTerms(std::span<const TypeId>(&type, 1)));
         mMatcher.Invalidate();
         return *this;
@@ -90,7 +102,7 @@ namespace mts
     RuntimeQuery &RuntimeQuery::Without(TypeId type)
     {
         CheckNotIterating(mIterationDepth, "Without");
-        CheckQueryable(type);
+        CheckRegistered(type);
         mMatcher.RequireNone(SignatureOfTerms(std::span<const TypeId>(&type, 1)));
         mMatcher.Invalidate();
         return *this;
@@ -104,7 +116,7 @@ namespace mts
                   "every archetype");
 
         for (TypeId type : types)
-            CheckQueryable(type);
+            CheckRegistered(type);
 
         mMatcher.RequireAny(SignatureOfTerms(types));
         mMatcher.Invalidate();

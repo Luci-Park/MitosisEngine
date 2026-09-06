@@ -36,7 +36,7 @@ namespace mts
         CommandBuffer *mBuffer = nullptr;
     };
 
-    /// The published frame buffer, or nullptr when none was installed.
+    // The published frame buffer, or nullptr when none was installed.
     CommandBuffer *FrameCommandBuffer(World &world);
 
     /**
@@ -56,8 +56,8 @@ namespace mts
      */
     bool AddComponentOrDefer(World &world, Entity entity, const ComponentOps &ops, const void *value);
 
-    /// Adds the registry's default value - `T{}` for a C++ component, zeroes
-    /// for a script-declared one.
+    // Adds the registry's default value - `T{}` for a C++ component, zeroes
+    // for a script-declared one.
     bool AddDefaultComponentOrDefer(World &world, Entity entity, const ComponentOps &ops);
 
     bool RemoveComponentOrDefer(World &world, Entity entity, const ComponentOps &ops);

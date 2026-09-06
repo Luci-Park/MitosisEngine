@@ -20,30 +20,17 @@
 
 namespace mts
 {
-    /**
-     * Records structural changes while a Query walk is in flight, and applies
-     * them once the walk is over.
-     *
-     * Why this exists: AddComponent grows a ComponentColumn's byte vector, which
-     * reallocates. Every T& a ForEach callback holds points into that vector, so
-     * an immediate add during iteration dangles them - and it does so silently
-     * whenever the target archetype already exists, because Query's generation
-     * assert only fires when a *new* archetype is created.
-     *
-     * CreateEntity stays immediate and is not routed through here: a new entity
-     * lands in the empty archetype, which has no columns to reallocate and which
-     * no query can match. The handle is usable at once; only the component data
-     * waits for the flush.
-     */
     class CommandBuffer
     {
     public:
-        /// Records a copy of @p value. Visible after the next Flush.
-        /// Last writer wins if two commands add the same component to one entity.
+        // Records a copy of @p value. Visible after the next Flush.
+        // Last writer wins if two commands add the same component to one entity.
         template <typename T>
         void Add(Entity entity, const T &value)
         {
             MTS_ASSERT_COMPONENT(T);
+            static_assert(!kIsTagComponent<T>,
+                          "CommandBuffer::Add: T is a tag - there is no value to record. Use AddTag<T>.");
 
             // mStorage's base comes from plain operator new (std::byte has
             // alignment 1, so the align_val_t overload is never selected), which
@@ -62,6 +49,18 @@ namespace mts
             // offset, not pointer: the next Add resizes mStorage and would
             // dangle a stored pointer
             mCommands.push_back(Command{&ApplyAdd<T>, entity, offset});
+        }
+
+        // Records a tag add. Payload-free, like Remove: a tag's whole value is
+        // that it is there.
+        template <typename T>
+        void AddTag(Entity entity)
+        {
+            MTS_ASSERT_COMPONENT(T);
+            static_assert(kIsTagComponent<T>,
+                          "CommandBuffer::AddTag: T has fields, so it needs a value. Use Add<T>.");
+
+            mCommands.push_back(Command{&ApplyAddTag<T>, entity, kNoPayload});
         }
 
         template <typename T>
@@ -92,14 +91,15 @@ namespace mts
                        "CommandBuffer::AddRaw: over-aligned component \"{}\" ({})", type.name, align);
 
             const std::size_t headerOffset = AlignUp(mStorage.size(), alignof(RawHeader));
-            const std::size_t valueOffset = AlignUp(headerOffset + sizeof(RawHeader), align);
+            const std::size_t valueOffset = AlignUp(headerOffset + sizeof(RawHeader), align == 0 ? 1 : align);
             mStorage.resize(valueOffset + size);
 
             // written after every resize: an offset survives reallocation, a
             // pointer taken before it would not
             const RawHeader header{type, size, align, static_cast<uint32_t>(valueOffset - headerOffset)};
             std::memcpy(mStorage.data() + headerOffset, &header, sizeof(header));
-            std::memcpy(mStorage.data() + valueOffset, value, size);
+            if (size != 0)
+                std::memcpy(mStorage.data() + valueOffset, value, size);
 
             mCommands.push_back(Command{&ApplyAddRaw, entity, headerOffset});
         }
@@ -118,8 +118,8 @@ namespace mts
         bool Empty() const { return mCommands.empty(); }
         std::size_t Size() const { return mCommands.size(); }
 
-        /// Applies every recorded command in order, then clears.
-        /// Called by SystemScheduler at a phase boundary - never mid-ForEach.
+        // Applies every recorded command in order, then clears.
+        // Called by SystemScheduler at a phase boundary - never mid-ForEach.
         void Flush(World &world)
         {
             for (const Command &command : mCommands)
@@ -173,6 +173,16 @@ namespace mts
                 world.AddComponent<T>(entity, *value);
         }
 
+        // Adding a tag twice in one flush is the same legitimate case ApplyAdd
+        // absorbs, and there is no value to overwrite - so already-there is
+        // simply done.
+        template <typename T>
+        static void ApplyAddTag(World &world, Entity entity, void *)
+        {
+            if (world.IsAlive(entity) && !world.Has<T>(entity))
+                world.AddTag<T>(entity);
+        }
+
         template <typename T>
         static void ApplyRemove(World &world, Entity entity, void *)
         {
@@ -190,11 +200,15 @@ namespace mts
             const void *value = static_cast<const std::byte *>(payload) + header.valueOffset;
 
             // overwrite rather than assert on a duplicate, for the same reason
-            // ApplyAdd does
-            if (void *existing = world.GetRaw(entity, header.type))
-                std::memcpy(existing, value, header.size);
-            else
+            // ApplyAdd does.
+            //
+            // HasRaw, not a non-null GetRaw: a tag reads back as null whether
+            // it is there or not, so testing the pointer would take the add
+            // branch every time and assert on the duplicate.
+            if (!world.HasRaw(entity, header.type))
                 world.AddRaw(entity, header.type, header.size, header.align, value);
+            else if (header.size != 0)
+                std::memcpy(world.GetRaw(entity, header.type), value, header.size);
         }
 
         static void ApplyRemoveRaw(World &world, Entity entity, void *payload)

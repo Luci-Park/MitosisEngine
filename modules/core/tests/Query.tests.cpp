@@ -33,14 +33,12 @@ namespace
         int hp;
     };
 
-    // rare marker: opted out of archetypes, so queries must filter it per entity
+    // marker: no fields, so it filters by signature bit and never appears as
+    // a data term
     struct QStunned
     {
-        int turnsLeft;
     };
 }
-
-MTS_COMPONENT_SPARSE(QStunned);
 
 using namespace mts;
 
@@ -140,60 +138,50 @@ TEST_CASE("ForEach spans multiple archetypes", "[ecs][query]")
     REQUIRE(SortedIndices(visited) == SortedIndices({a, b, c}));
 }
 
-TEST_CASE("ForEach filters sparse components per entity", "[ecs][query]")
+TEST_CASE("A tag filters a query by signature bit", "[ecs][query][tag]")
 {
     World world;
 
     const Entity stunned = world.CreateEntity();
     world.AddComponent(stunned, QPosition{1.0f, 1.0f});
-    world.AddComponent(stunned, QStunned{3});
+    world.AddTag<QStunned>(stunned);
 
     const Entity awake = world.CreateEntity();
     world.AddComponent(awake, QPosition{2.0f, 2.0f});
 
-    SECTION("mixed table and sparse query")
+    SECTION("With the tag")
     {
         std::vector<Entity> visited;
-        world.ForEach<QPosition, QStunned>([&](Entity e, QPosition &, QStunned &s)
-                                           {
-                                               visited.push_back(e);
-                                               --s.turnsLeft; });
-
-        REQUIRE(visited.size() == 1);
-        REQUIRE(visited[0] == stunned);
-        REQUIRE(world.GetComponent<QStunned>(stunned)->turnsLeft == 2);
-    }
-
-    SECTION("sparse-only query still walks archetypes")
-    {
-        std::vector<Entity> visited;
-        world.ForEach<QStunned>([&](Entity e, QStunned &)
-                                { visited.push_back(e); });
+        world.GetOrCreateQuery<QPosition>(With<QStunned>{})
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == stunned);
     }
 
-    SECTION("sparse component with no storage yet matches nothing")
+    SECTION("a tag nobody holds matches nothing")
     {
         World fresh;
         const Entity e = fresh.CreateEntity();
         fresh.AddComponent(e, QPosition{});
 
         int calls = 0;
-        fresh.ForEach<QPosition, QStunned>([&](Entity, QPosition &, QStunned &)
-                                           { ++calls; });
+        fresh.GetOrCreateQuery<QPosition>(With<QStunned>{})
+            .ForEach([&](Entity, QPosition &)
+                     { ++calls; });
 
         REQUIRE(calls == 0);
     }
 
-    SECTION("removing the sparse component drops the entity from the query")
+    SECTION("removing the tag drops the entity from the query")
     {
         world.RemoveComponent<QStunned>(stunned);
 
         int calls = 0;
-        world.ForEach<QPosition, QStunned>([&](Entity, QPosition &, QStunned &)
-                                           { ++calls; });
+        world.GetOrCreateQuery<QPosition>(With<QStunned>{})
+            .ForEach([&](Entity, QPosition &)
+                     { ++calls; });
 
         REQUIRE(calls == 0);
     }
@@ -319,38 +307,49 @@ TEST_CASE("Query Or matches any listed component", "[ecs][query]")
     REQUIRE(SortedIndices(visited) == SortedIndices({frozen, shielded}));
 }
 
-TEST_CASE("Query filters on sparse members per row", "[ecs][query]")
+TEST_CASE("Query excludes a tag with Without", "[ecs][query][tag]")
 {
     World world;
 
     const Entity stunned = world.CreateEntity();
     world.AddComponent(stunned, QPosition{});
-    world.AddComponent(stunned, QStunned{1});
+    world.AddTag<QStunned>(stunned);
 
     const Entity awake = world.CreateEntity();
     world.AddComponent(awake, QPosition{});
 
-    SECTION("Without a sparse component")
-    {
-        std::vector<Entity> visited;
-        world.GetOrCreateQuery<QPosition>(Without<QStunned>{})
-            .ForEach([&](Entity e, QPosition &)
-                     { visited.push_back(e); });
+    std::vector<Entity> visited;
+    world.GetOrCreateQuery<QPosition>(Without<QStunned>{})
+        .ForEach([&](Entity e, QPosition &)
+                 { visited.push_back(e); });
 
-        REQUIRE(visited.size() == 1);
-        REQUIRE(visited[0] == awake);
-    }
+    REQUIRE(visited.size() == 1);
+    REQUIRE(visited[0] == awake);
+}
 
-    SECTION("With a sparse component")
-    {
-        std::vector<Entity> visited;
-        world.GetOrCreateQuery<QPosition>(With<QStunned>{})
-            .ForEach([&](Entity e, QPosition &)
-                     { visited.push_back(e); });
+TEST_CASE("Or accepts a tag member", "[ecs][query][tag]")
+{
+    // a tag is one signature bit like anything else, so an or-clause tests it
+    // at the archetype level with no per-row work
+    World world;
 
-        REQUIRE(visited.size() == 1);
-        REQUIRE(visited[0] == stunned);
-    }
+    const Entity tagged = world.CreateEntity();
+    world.AddComponent(tagged, QPosition{});
+    world.AddTag<QStunned>(tagged);
+
+    const Entity healthy = world.CreateEntity();
+    world.AddComponent(healthy, QPosition{});
+    world.AddComponent(healthy, QHealth{10});
+
+    const Entity neither = world.CreateEntity();
+    world.AddComponent(neither, QPosition{});
+
+    std::vector<Entity> visited;
+    world.GetOrCreateQuery<QPosition>(Or<QStunned, QHealth>{})
+        .ForEach([&](Entity e, QPosition &)
+                 { visited.push_back(e); });
+
+    REQUIRE(SortedIndices(visited) == SortedIndices({tagged, healthy}));
 }
 
 TEST_CASE("Query cache survives and refreshes across calls", "[ecs][query]")
@@ -567,10 +566,10 @@ TEST_CASE("A walk does not visit entities the callback spawns", "[ecs][query]")
     const Entity seed = world.CreateEntity();
     world.AddComponent(seed, QPosition{0.0f, 0.0f});
 
-    auto &sparseQuery = world.GetOrCreateQuery<QPosition>();
+    auto &query = world.GetOrCreateQuery<QPosition>();
 
     int visits = 0;
-    sparseQuery.ForEach([&](Entity, QPosition &)
+    query.ForEach([&](Entity, QPosition &)
                         {
                             ++visits;
                             world.CreateEntity(); });

@@ -25,12 +25,6 @@ namespace mts
             return (n + alignment - 1) & ~(alignment - 1);
         }
 
-        // -- the erased operations, shared by every script-declared component --
-        //
-        // One set of functions for all of them, rather than one instantiation
-        // per type: everything that varies is already in the ComponentOps they
-        // are handed.
-
         void *RuntimeGet(const ComponentOps &ops, World &world, Entity entity)
         {
             return world.GetRaw(entity, ops.mType);
@@ -46,8 +40,14 @@ namespace mts
             if (!world.IsAlive(entity))
                 return;
 
-            if (void *existing = world.GetRaw(entity, ops.mType))
-                std::memcpy(existing, value, ops.mSize);
+            // HasRaw, not a non-null GetRaw: a tag has no bytes, so it reads
+            // back as null whether it is there or not, and testing the pointer
+            // would take the add branch every time and assert on the duplicate.
+            if (world.HasRaw(entity, ops.mType))
+            {
+                if (ops.mSize != 0)
+                    std::memcpy(world.GetRaw(entity, ops.mType), value, ops.mSize);
+            }
             else
                 world.AddRaw(entity, ops.mType, ops.mSize, ops.mAlign, value);
         }
@@ -68,8 +68,8 @@ namespace mts
             commands.RemoveRaw(entity, ops.mType);
         }
 
-        /// Whether a re-declaration describes the same component. Names and
-        /// kinds in order, because the offsets are derived from exactly that.
+        // Whether a re-declaration describes the same component. Names and
+        // kinds in order, because the offsets are derived from exactly that.
         bool SameLayout(const ComponentOps &existing, std::span<const RuntimeFieldDecl> fields)
         {
             if (existing.mFields.size() != fields.size())
@@ -177,15 +177,9 @@ namespace mts
                   "Raise kMaxComponentTypes in Signature.h.",
                   ops.mType.name, ops.mType.seq, kMaxComponentTypes);
 
-        // Published before the entry is reachable, so no erased caller can hold
-        // this TypeId before the mask knows what it is. This is the only place
-        // storage kind and seq are both in hand for a type someone may later
-        // name at runtime.
-        if (ops.mStorage == StorageKind::SparseSet)
-            NoteSparseComponentSeq(ops.mType.seq);
-
         mDefaultValues.emplace_back(ops.mSize);
-        std::memcpy(mDefaultValues.back().data(), defaultValue, ops.mSize);
+        if (ops.mSize != 0)
+            std::memcpy(mDefaultValues.back().data(), defaultValue, ops.mSize);
 
         mOps.push_back(ops);
         ComponentOps *stored = &mOps.back();
@@ -254,9 +248,12 @@ namespace mts
             maxAlign = std::max(maxAlign, align);
         }
 
-        // A fieldless tag still needs one byte: ComponentColumn::Count divides
-        // the byte count by the element size.
-        const uint32_t size = std::max(AlignUp(offset, maxAlign), 1u);
+        // A fieldless declaration is a tag: size 0, no column, one signature
+        // bit. Reporting 1 byte instead would build a column of padding and
+        // hide the tag from every caller that branches on size.
+        const bool tag = fields.empty();
+        const uint32_t size = tag ? 0 : AlignUp(offset, maxAlign);
+        const uint32_t align = tag ? 0 : maxAlign;
 
         const uint32_t seq = SeqForHash(hash, name);
 
@@ -276,8 +273,7 @@ namespace mts
         ComponentOps ops{};
         ops.mType = TypeId{seq, hash, Intern(name)};
         ops.mSize = size;
-        ops.mAlign = maxAlign;
-        ops.mStorage = StorageKind::Table;
+        ops.mAlign = align;
         ops.mRuntime = true;
         ops.mGet = &RuntimeGet;
         ops.mHas = &RuntimeHas;

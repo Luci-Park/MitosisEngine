@@ -64,8 +64,8 @@ namespace mts
      */
     LoadedScene LoadScene(World &world, const std::filesystem::path &sceneDir);
 
-    /// Destroys every entity `loaded` created (each guarded by IsAlive, since
-    /// destroying a parent already cascades to its children - 0020). Does not
-    /// touch entities any other loaded scene owns.
+    // Destroys every entity `loaded` created (each guarded by IsAlive, since
+    // destroying a parent already cascades to its children - 0020). Does not
+    // touch entities any other loaded scene owns.
     void UnloadScene(World &world, const LoadedScene &loaded);
 }

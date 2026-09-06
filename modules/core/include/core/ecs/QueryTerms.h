@@ -31,7 +31,6 @@ namespace mts
     {
     };
 
-    // sparse components cannot have or filter
     template <typename... Es>
     struct Or
     {
@@ -68,13 +67,5 @@ namespace mts
             static const uint32_t id = NextQueryKey();
             return id;
         }
-
-        // Saves Filter for sparse components
-        struct SparseFilterCheck
-        {
-            bool (*has)(const void *storage, Entity entity);
-            const void *storage;
-            bool wantPresent; // = With / Without
-        };
     }
 }
