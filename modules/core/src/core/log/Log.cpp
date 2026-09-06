@@ -74,8 +74,6 @@ namespace mir
                 loc.file_name(), static_cast<int>(loc.line()), loc.function_name()};
         }
 
-        // Feeds LogHistory so UI panels (e.g. the editor's Output panel) can
-        // render recent log entries without depending on spdlog directly.
         class UiHistorySink : public spdlog::sinks::base_sink<std::mutex>
         {
         protected:

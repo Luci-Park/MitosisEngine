@@ -26,9 +26,6 @@ namespace mir
         std::chrono::system_clock::time_point time;
     };
 
-    /// Thread-safe fixed-capacity ring buffer fed by InitLog's UI sink
-    /// (see Log.cpp), so panels can render log history without depending
-    /// on spdlog directly. Oldest entries are dropped once capacity is hit.
     class LogHistory
     {
     public:
