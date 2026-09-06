@@ -1,5 +1,6 @@
 #include <app/App.h>
 
+#include <core/EngineVersion.h>
 #include <core/ecs/ComponentRegistry.h>
 #include <core/ecs/DeferredAccess.h>
 #include <core/ecs/TransformHierarchy.h>
@@ -10,6 +11,7 @@
 #include <scene/SceneIO.h>
 #include <script/ComponentRegistration.h>
 #include <script/ScriptSystem.h>
+#include <window/Splash.h>
 
 #include <algorithm>
 #include <chrono>
@@ -24,6 +26,13 @@ namespace mts
     bool App::Initialize(const AppDesc &desc)
     {
         mDesc = desc;
+
+        SplashScreen splash;
+        splash.Show({.mEngineName = desc.mAppName,
+                     .mVersion = kEngineVersion,
+                     .mCopyright = kEngineCopyright,
+                     .mStatus = "Loading...",
+                     .mProgress = 0.3f});
 
         WindowDesc windowDesc{};
         windowDesc.mWidth = desc.mWidth;
