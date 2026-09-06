@@ -59,10 +59,12 @@ engine_add_shaders(HelloWorld
     ENTRIES vertexMain:vertex fragmentMain:fragment)
 
 engine_cook_assets(HelloWorld
-    SOURCE_ROOTS assets/
+    SOURCE_ROOTS assets/ games/HelloWorld/assets/
     OUT_DIR ${CMAKE_BINARY_DIR}/cooked_assets)
 
 engine_copy_fonts(HelloWorld SOURCE_DIR fonts)
+
+find_package(nlohmann_json CONFIG REQUIRED)
 
 target_link_libraries(HelloWorld PRIVATE
     mts::app
@@ -70,4 +72,5 @@ target_link_libraries(HelloWorld PRIVATE
     mts::core
     mts::scene
     mts::script
+    nlohmann_json::nlohmann_json
 )

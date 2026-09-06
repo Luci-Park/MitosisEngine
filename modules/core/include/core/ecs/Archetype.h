@@ -98,7 +98,7 @@ namespace mts
         }
 
     private:
-        Signature mSignature;
+        Signature mSignature;                  // types of components in the archetype
         std::vector<Entity> mEntities;         // row -> entity, for swap-remove fixup and iteration
         std::vector<ComponentColumn> mColumns; // sorted by TypeId::seq
     };

@@ -8,6 +8,7 @@
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
 #include <scene/SceneIO.h>
+#include <script/ComponentRegistration.h>
 #include <script/ScriptSystem.h>
 
 #include <algorithm>
@@ -63,6 +64,7 @@ namespace mts
         // Before anything may load a script
         RegisterCoreComponents();
         RegisterRendererComponents();
+        RegisterScriptComponents();
 
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});

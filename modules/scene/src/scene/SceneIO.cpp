@@ -79,6 +79,12 @@ namespace mts
                 const auto *h = static_cast<const uint32_t *>(bytes);
                 return json::array({h[0], h[1]});
             }
+            case FieldKind::String:
+            {
+                // buffer is always null-terminated (JsonToField below and every
+                // writer guarantee it), so this is just reading a C string.
+                return std::string(static_cast<const char *>(bytes));
+            }
             case FieldKind::EntityRef:
                 break; // handled by the caller, needs the id map
             }
@@ -136,6 +142,15 @@ namespace mts
                 auto *h = static_cast<uint32_t *>(outBytes);
                 h[0] = value.at(0).get<uint32_t>();
                 h[1] = value.at(1).get<uint32_t>();
+                break;
+            }
+            case FieldKind::String:
+            {
+                const std::string s = value.get<std::string>();
+                auto *out = static_cast<char *>(outBytes);
+                const std::size_t n = std::min(s.size(), std::size_t{kFieldStringCapacity} - 1);
+                std::memcpy(out, s.data(), n);
+                out[n] = '\0';
                 break;
             }
             case FieldKind::EntityRef:

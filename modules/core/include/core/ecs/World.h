@@ -1,7 +1,7 @@
 /**
  * @file World.h
  * @author Sumin Park
- * @brief Owns entities and their archetypes
+ * @brief Owns entities, components, and the interactions with/of them
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -48,7 +48,7 @@ namespace mts
         bool operator==(const EntityDestroyHook &) const = default;
     };
 
-    // where an entity's components live: which table, and which row of it
+    // entity position of entity's archetype
     struct EntityRecord
     {
         Archetype *archetype = nullptr;
@@ -114,8 +114,6 @@ namespace mts
             return ResourceIdOf<std::remove_cvref_t<T>>();
         }
 
-        // Type-erased owner, so World can destroy a resource it knows nothing
-        // about. The virtual destructor is the whole point of the base.
         class IResource
         {
         public:
@@ -160,11 +158,6 @@ namespace mts
         World(World &&) = delete;
         World &operator=(World &&) = delete;
 
-        // Deliberately allowed during a query walk, unlike the mutators below.
-        // The new entity lands in the empty archetype, so no matched table's
-        // columns move; a sparse-only query does match that table, but its rows
-        // are appended and Query::ForEach never walks past the count it started
-        // with. Recording the component into a CommandBuffer is what defers.
         Entity CreateEntity()
         {
             const Entity entity = mPool.Create();
@@ -172,19 +165,12 @@ namespace mts
             if (entity.mIndex >= mRecords.size())
                 mRecords.resize(entity.mIndex + 1);
 
+            // no defer needed
             mRecords[entity.mIndex] = EntityRecord{mEmptyArchetype, mEmptyArchetype->AddRow(entity)};
             return entity;
         }
 
-        /**
-         * Registers a hook to run before each entity is torn down. Adding the
-         * same fn+user twice is a no-op, so an installer can be called from
-         * every entry point without tracking whether it already ran.
-         *
-         * World stays ignorant of what any hook means: this is how the scene
-         * hierarchy makes destruction cascade without World learning what a
-         * parent is.
-         */
+        // registers a hook to run before entity destroy
         void AddDestroyHook(void (*fn)(World &, Entity, void *), void *user = nullptr)
         {
             const EntityDestroyHook hook{fn, user};
@@ -197,15 +183,6 @@ namespace mts
             mDestroyHooks.push_back(hook);
         }
 
-        /**
-         * Undoes a matching AddDestroyHook. Symmetric with it, and for the
-         * same reason a system needs it: a system that installs a hook in
-         * OnStart and is later torn down (SystemScheduler::Reset, or an
-         * App::Shutdown followed by another Initialize) leaves a dangling
-         * `user` in mDestroyHooks forever if it never removes what it added -
-         * the next entity destroyed after teardown calls back into whatever
-         * used to live there. A no-op if the hook isn't present.
-         */
         void RemoveDestroyHook(void (*fn)(World &, Entity, void *), void *user = nullptr)
         {
             const EntityDestroyHook hook{fn, user};
@@ -727,13 +704,9 @@ namespace mts
                     ++j;
                 }
                 else if (fromSeq < toSeq)
-                {
                     ++i;
-                }
                 else
-                {
                     ++j;
-                }
             }
         }
 
