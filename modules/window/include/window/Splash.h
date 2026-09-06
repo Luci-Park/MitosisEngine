@@ -35,8 +35,8 @@ namespace mts
         SplashScreen(SplashScreen &&) = delete;
         SplashScreen &operator=(SplashScreen &&) = delete;
 
-        static constexpr int kWidth = 640;
-        static constexpr int kHeight = 360;
+        static constexpr int kWidth = 1280;
+        static constexpr int kHeight = 720;
 
         bool Show(const SplashDesc &desc);
 

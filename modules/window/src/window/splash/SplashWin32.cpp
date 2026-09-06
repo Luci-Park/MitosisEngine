@@ -41,14 +41,17 @@ namespace mts
 
         constexpr UINT kUpdateMessage = WM_APP + 1;
 
-        // Bottom strip: status text + progress bar + version/copyright.
-        constexpr int kStripHeight = 100;
-        constexpr int kMargin = 20;
-        constexpr int kBarHeight = 6;
+        constexpr char kArtworkFile[] = "wanderer-splash-screen.jpg";
+        constexpr wchar_t kArtworkCredit[] = L"\"Wanderer\" by deadsoftie";
+        constexpr wchar_t kArtworkCopyright[] = L"(c) deadsoftie";
 
-        // Owns copies of the desc strings for the window's lifetime - the
-        // caller's SplashDesc (often built from temporaries) does not need
-        // to outlive Show().
+        // Bottom strip: status text + progress bar + version/copyright.
+        // Scaled 2x alongside SplashScreen::kWidth/kHeight (640x360 -> 1280x720).
+        constexpr int kStripHeight = 200;
+        constexpr int kMargin = 40;
+        constexpr int kBarHeight = 12;
+        constexpr int kCreditLineHeight = 34;
+
         struct PaintState
         {
             std::string mEngineName;
@@ -78,6 +81,17 @@ namespace mts
             std::wstring wide(static_cast<size_t>(len), L'\0');
             ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), wide.data(), len);
             return wide;
+        }
+
+        void DrawTextWithShadow(HDC dc, const wchar_t *text, RECT rect, UINT format)
+        {
+            RECT shadowRect = rect;
+            ::OffsetRect(&shadowRect, 1, 1);
+            ::SetTextColor(dc, RGB(0, 0, 0));
+            ::DrawTextW(dc, text, -1, &shadowRect, format);
+
+            ::SetTextColor(dc, RGB(255, 255, 255));
+            ::DrawTextW(dc, text, -1, &rect, format);
         }
 
         struct ComGuard
@@ -186,15 +200,15 @@ namespace mts
             static HBRUSH trackBrush = ::CreateSolidBrush(RGB(45, 45, 52));
             static HBRUSH fillBrush = ::CreateSolidBrush(RGB(90, 140, 235));
             static HFONT nameFont = ::CreateFontW(
-                36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                72, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
             static HFONT smallFont = ::CreateFontW(
-                14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
             static HBITMAP artBitmap = [] {
-                HBITMAP bmp = LoadArtworkBitmap(BrandingPath("wanderer-splash-screen.jpg"),
+                HBITMAP bmp = LoadArtworkBitmap(BrandingPath(kArtworkFile),
                                                  SplashScreen::kWidth, SplashScreen::kHeight - kStripHeight);
                 if (bmp == nullptr)
                     MTS_LOG_WARN("Splash: could not load branding artwork, using placeholder fill");
@@ -232,13 +246,13 @@ namespace mts
             // Status text, top-left of the bottom strip.
             ::SelectObject(dc, smallFont);
             ::SetTextColor(dc, RGB(200, 200, 205));
-            RECT statusRect{kMargin, stripRect.top + 14, client.right - kMargin, stripRect.top + 34};
+            RECT statusRect{kMargin, stripRect.top + 28, client.right - kMargin, stripRect.top + 68};
             const std::wstring status = Utf8ToWide(state.mStatus);
             ::DrawTextW(dc, status.c_str(), -1, &statusRect,
                         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 
             // Progress bar under the status text.
-            RECT barTrack{kMargin, statusRect.bottom + 6, client.right - kMargin, statusRect.bottom + 6 + kBarHeight};
+            RECT barTrack{kMargin, statusRect.bottom + 12, client.right - kMargin, statusRect.bottom + 12 + kBarHeight};
             ::FillRect(dc, &barTrack, trackBrush);
 
             const float progress = std::clamp(state.mProgress, 0.0f, 1.0f);
@@ -250,13 +264,26 @@ namespace mts
             }
 
             // Version (bottom-left) + copyright (bottom-right).
-            RECT versionRect{kMargin, client.bottom - 26, client.right / 2, client.bottom - 6};
+            RECT versionRect{kMargin, client.bottom - 52, client.right / 2, client.bottom - 12};
             const std::wstring version = Utf8ToWide(state.mVersion);
             ::DrawTextW(dc, version.c_str(), -1, &versionRect, DT_LEFT | DT_SINGLELINE);
 
-            RECT copyrightRect{client.right / 2, client.bottom - 26, client.right - kMargin, client.bottom - 6};
+            RECT copyrightRect{client.right / 2, client.bottom - 52, client.right - kMargin, client.bottom - 12};
             const std::wstring copyright = Utf8ToWide(state.mCopyright);
             ::DrawTextW(dc, copyright.c_str(), -1, &copyrightRect, DT_RIGHT | DT_SINGLELINE);
+
+            // Artist credit
+            if (artBitmap != nullptr)
+            {
+                ::SelectObject(dc, smallFont);
+                RECT creditRect{artRect.left + kMargin, artRect.bottom - kMargin - kCreditLineHeight * 2,
+                                 artRect.right - kMargin, artRect.bottom - kMargin - kCreditLineHeight};
+                DrawTextWithShadow(dc, kArtworkCredit, creditRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                RECT artCopyrightRect{artRect.left + kMargin, artRect.bottom - kMargin - kCreditLineHeight,
+                                       artRect.right - kMargin, artRect.bottom - kMargin};
+                DrawTextWithShadow(dc, kArtworkCopyright, artCopyrightRect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+            }
 
             ::SelectObject(dc, prevFont);
         }
