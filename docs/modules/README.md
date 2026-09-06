@@ -13,6 +13,7 @@ together; these say how one of them works.
 | window | [window.md](window.md) | Sumin Park |
 | renderer | - | - |
 | app | [app.md](app.md) | Sumin Park |
+| script | [script.md](script.md) | Rahul Nair |
 
 Add your row when you start a document.
 
