@@ -24,4 +24,6 @@ namespace mts
         // X11 Window ids are unsigned long, need to change to pointers
         return {WindowBackend::Xlib, glfwGetX11Display(), reinterpret_cast<void *>(static_cast<uintptr_t>(glfwGetX11Window(mHandle)))};
     }
+    void GLFWWindow::InstallCustomTitleBar() {}
+    void GLFWWindow::UninstallCustomTitleBar() {}
 }

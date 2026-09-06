@@ -43,6 +43,7 @@ namespace mts
         // No OpenGL context. The renderer owns the graphics API.
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, desc.mResizable ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(GLFW_MAXIMIZED, desc.mMaximized ? GLFW_TRUE : GLFW_FALSE);
 
         mHandle = glfwCreateWindow(static_cast<int>(desc.mWidth),
                                     static_cast<int>(desc.mHeight),
@@ -51,6 +52,11 @@ namespace mts
                                     nullptr);
         MTS_CHECK(mHandle != nullptr, "glfwCreateWindow failed");
         ++g_windowCount;
+
+        mTitle = desc.mTitle;
+        mHasCustomTitleBar = desc.mCustomTitleBar;
+        if (mHasCustomTitleBar)
+            InstallCustomTitleBar();
 
         int fbWidth = 0;
         int fbHeight = 0;
@@ -69,6 +75,9 @@ namespace mts
     {
         if (mHandle != nullptr)
         {
+            if (mHasCustomTitleBar)
+                UninstallCustomTitleBar();
+
             glfwDestroyWindow(mHandle);
             mHandle = nullptr;
             --g_windowCount;
@@ -96,6 +105,29 @@ namespace mts
         float yscale = 1.0f;
         glfwGetWindowContentScale(mHandle, &xscale, &yscale);
         return xscale;
+    }
+
+    void GLFWWindow::Minimize()
+    {
+        glfwIconifyWindow(mHandle);
+    }
+
+    void GLFWWindow::ToggleMaximize()
+    {
+        if (glfwGetWindowAttrib(mHandle, GLFW_MAXIMIZED) == GLFW_TRUE)
+            glfwRestoreWindow(mHandle);
+        else
+            glfwMaximizeWindow(mHandle);
+    }
+
+    bool GLFWWindow::IsMaximized() const
+    {
+        return glfwGetWindowAttrib(mHandle, GLFW_MAXIMIZED) == GLFW_TRUE;
+    }
+
+    void GLFWWindow::RequestClose()
+    {
+        glfwSetWindowShouldClose(mHandle, GLFW_TRUE);
     }
 
     void GLFWWindow::OnFramebufferSize(GLFWwindow *handle, int width, int height)

@@ -7,6 +7,7 @@ target_link_libraries(engine_app
            mts::renderer
            mts::editor
            mts::scene
+           mts::script
 )
 
 target_sources(engine_app PRIVATE src/app/App.cpp)

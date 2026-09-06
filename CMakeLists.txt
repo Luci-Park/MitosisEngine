@@ -42,6 +42,7 @@ add_subdirectory(modules/editor)
 add_subdirectory(modules/editortheme)
 add_subdirectory(modules/renderer)
 add_subdirectory(modules/scene)
+add_subdirectory(modules/script)
 add_subdirectory(modules/window)
 
 add_subdirectory(tools/AssetCooker)
@@ -68,4 +69,5 @@ target_link_libraries(HelloWorld PRIVATE
     mts::assets
     mts::core
     mts::scene
+    mts::script
 )

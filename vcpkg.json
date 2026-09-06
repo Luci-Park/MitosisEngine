@@ -10,7 +10,14 @@
         "volk",
         "vulkan-memory-allocator",
         "catch2",
-        "nlohmann-json"
+        "nlohmann-json",
+        "luajit",
+        {
+            "name": "pkgconf",
+            "host": true
+        },
+        "sol2",
+        "catch2"
     ],
     "$comment": "builtin-baseline = SHA of vcpkg"
 }

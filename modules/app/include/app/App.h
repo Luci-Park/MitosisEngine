@@ -16,6 +16,8 @@
 #include <editor/Editor.h>
 #include <renderer/VulkanRenderer.h>
 #include <scene/SceneAsset.h>
+#include <script/ScriptHost.h>
+#include <script/ScriptReloadWatcher.h>
 #include <window/Window.h>
 
 #include <cstdint>
@@ -63,6 +65,8 @@ namespace mts
 
         World &GetWorld() { return mWorld; }
         SystemScheduler &Systems() { return mScheduler; }
+        ScriptHost &Scripts() { return mScriptHost; }
+        ScriptReloadWatcher &ScriptReload() { return mScriptReloadWatcher; }
 
         /// Temporary seam
         VulkanRenderer &Renderer() { return mRenderer; }
@@ -109,6 +113,8 @@ namespace mts
 
         World mWorld;
         SystemScheduler mScheduler;
+        ScriptHost mScriptHost;
+        ScriptReloadWatcher mScriptReloadWatcher{mScriptHost};
         LoadedScene mScene;
 
         AppDesc mDesc;

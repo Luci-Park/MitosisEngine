@@ -8,6 +8,7 @@
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
 #include <scene/SceneIO.h>
+#include <script/ScriptSystem.h>
 
 #include <algorithm>
 #include <chrono>
@@ -27,6 +28,8 @@ namespace mts
         windowDesc.mWidth = desc.mWidth;
         windowDesc.mHeight = desc.mHeight;
         windowDesc.mTitle = desc.mTitle;
+        windowDesc.mMaximized = true;
+        windowDesc.mCustomTitleBar = desc.mEnableEditorLayout;
 
         mWindow = Window::Create(windowDesc);
         if (!mWindow)
@@ -63,6 +66,11 @@ namespace mts
 
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
+
+        // Scripts read this frame's settled state (last frame's PostUpdate/
+        // Render already ran) and anything they spawn or mutate is visible to
+        // this frame's later phases as soon as PreUpdate's boundary flushes.
+        mScheduler.Add<ScriptSystem>(SystemPhase::PreUpdate, mScriptHost);
 
         // should be before any other system in PostUpdate
         mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);
@@ -179,6 +187,8 @@ namespace mts
             // be handed to the renderer before Update runs, not after.
             mRenderer.SetImGuiDrawData(mEditor.EndFrame());
             mRenderer.SetSceneViewport(mEditor.SceneViewportRect());
+
+            mScriptReloadWatcher.Poll(Assets(), dt);
 
             SystemContext context = MakeContext(dt);
             mScheduler.Update(context);

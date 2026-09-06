@@ -1482,11 +1482,15 @@ namespace mts
         sceneRect.extent.height = std::min(sceneRect.extent.height,
                                            mSwapchainExtent.height - static_cast<uint32_t>(sceneRect.offset.y));
 
+        // A collapsed dock split (e.g. the central node squeezed to nothing
+        // by other panels during an extreme resize) can legitimately reach
+        // zero here. The scissor tolerates that; vkCmdSetViewport does not
+        // (width/height must be > 0), so the viewport alone gets floored.
         const VkViewport viewport{
             .x = static_cast<float>(sceneRect.offset.x),
             .y = static_cast<float>(sceneRect.offset.y),
-            .width = static_cast<float>(sceneRect.extent.width),
-            .height = static_cast<float>(sceneRect.extent.height),
+            .width = static_cast<float>(std::max(sceneRect.extent.width, 1u)),
+            .height = static_cast<float>(std::max(sceneRect.extent.height, 1u)),
             .minDepth = 0.0f,
             .maxDepth = 1.0f};
         vkCmdSetViewport(cmd, 0, 1, &viewport);
