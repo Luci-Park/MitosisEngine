@@ -34,6 +34,7 @@ namespace mir
         LogLevel fileLevel = LogLevel::Trace;
         std::size_t maxFileBytes = 5 * 1024 * 1024;
         std::size_t maxFiles = 3;
+        std::size_t uiHistoryCapacity = 2000;
     };
 
     void InitLog(const LogConfig &config = {});

@@ -9,6 +9,7 @@ target_include_directories(engine_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/genera
 
 target_sources(engine_core PRIVATE
     src/core/log/Log.cpp
+    src/core/log/LogHistory.cpp
     src/core/fs/Paths.cpp
     src/core/ecs/TransformHierarchy.cpp
     src/core/ecs/HierarchyIndex.cpp

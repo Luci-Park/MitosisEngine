@@ -9,4 +9,6 @@ target_link_libraries(engine_editor
             iconfontcppheaders::iconfontcppheaders
 )
 
-target_sources(engine_editor PRIVATE src/editor/Editor.cpp)
+target_sources(engine_editor PRIVATE
+    src/editor/Editor.cpp
+    src/editor/panels/LogPanel.cpp)

@@ -10,6 +10,7 @@
 #pragma once
 
 #include <core/platform/Surface.h>
+#include <editor/panels/LogPanel.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
@@ -85,5 +86,6 @@ namespace mir
         VkRect2D mSceneViewportRect{};
         Window *mWindow = nullptr;
         std::vector<PixelRect> mTitleBarInteractiveRects;
+        LogPanel mLogPanel;
     };
 }

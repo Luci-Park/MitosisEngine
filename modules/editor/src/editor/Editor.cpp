@@ -186,11 +186,15 @@ namespace mir
                 ImGui::DockBuilderFinish(dockspaceId);
             }
 
-            for (const char *name : {"Hierarchy", "Inspector", "Output"})
+            for (const char *name : {"Hierarchy", "Inspector"})
             {
                 ImGui::Begin(name);
                 ImGui::End();
             }
+
+            if (ImGui::Begin("Output"))
+                mLogPanel.Draw();
+            ImGui::End();
 
             if (const ImGuiDockNode *centralNode = ImGui::DockBuilderGetCentralNode(dockspaceId);
                 centralNode != nullptr)
