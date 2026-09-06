@@ -18,7 +18,7 @@
 
 struct ImDrawData;
 
-namespace mts
+namespace mir
 {
     enum class SceneMenuAction
     {

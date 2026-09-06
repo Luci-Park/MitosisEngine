@@ -10,7 +10,7 @@
 #pragma once
 #include <cstdint>
 
-namespace mts
+namespace mir
 {
     struct Entity
     {

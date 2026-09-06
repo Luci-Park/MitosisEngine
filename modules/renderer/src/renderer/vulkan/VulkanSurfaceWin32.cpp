@@ -10,7 +10,7 @@
 #include "VulkanSurface.h"
 #include <core/log/Log.h>
 
-namespace mts::vk
+namespace mir::vk
 {
     const char *PlatformSurfaceExtension(WindowBackend backend)
     {
@@ -23,7 +23,7 @@ namespace mts::vk
     {
         if (handle.backend != WindowBackend::Win32)
         {
-            MTS_LOG_CRITICAL("backend is not Win32");
+            MIR_LOG_CRITICAL("backend is not Win32");
             return VK_NULL_HANDLE;
         }
 

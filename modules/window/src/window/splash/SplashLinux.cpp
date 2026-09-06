@@ -11,7 +11,7 @@
 
 #include "core/log/Assert.h"
 
-namespace mts
+namespace mir
 {
     // Never actually created (Show() always returns false below), but
     // unique_ptr<SplashImpl>'s destructor still needs the type complete
@@ -27,7 +27,7 @@ namespace mts
 
     void SplashScreen::SetProgress(const char *status, float)
     {
-        MTS_ASSERT(status != nullptr, "SplashScreen::SetProgress: status must not be null");
+        MIR_ASSERT(status != nullptr, "SplashScreen::SetProgress: status must not be null");
     }
 
     void SplashScreen::Close() {}

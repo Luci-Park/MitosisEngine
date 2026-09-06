@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <memory>
 
-namespace mts
+namespace mir
 {
     namespace
     {

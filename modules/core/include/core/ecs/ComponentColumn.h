@@ -17,7 +17,7 @@
 #include <cstring>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     class ComponentColumn
     {
@@ -26,7 +26,7 @@ namespace mts
         template <typename T>
         static ComponentColumn For()
         {
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
             return ComponentColumn(TypeIdOf<T>(), sizeof(T), alignof(T));
         }
 
@@ -34,7 +34,7 @@ namespace mts
             : mType(type), mElementSize(elementSize), mAlignment(alignment)
         {
             // max_align_t is different between MSVC & GCC/Clang => use __STDCPP_DEFAULT_NEW_ALIGNMENT(16)
-            MTS_ASSERT(alignment <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+            MIR_ASSERT(alignment <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                        "ComponentColumn: component \"{}\" is over-aligned ({}), unsupported", type.name, alignment);
         }
 
@@ -50,7 +50,7 @@ namespace mts
         // casting to T should be done outside of this class
         void *At(uint32_t row)
         {
-            MTS_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
+            MIR_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
             return mBytes.data() + static_cast<std::size_t>(row) * mElementSize;
         }
 
@@ -58,7 +58,7 @@ namespace mts
         // casting to T should be done outside of this class
         const void *At(uint32_t row) const
         {
-            MTS_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
+            MIR_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
             return mBytes.data() + static_cast<std::size_t>(row) * mElementSize;
         }
 
@@ -81,7 +81,7 @@ namespace mts
         // when a row needs to be removed, swap with last row then remove
         void SwapRemove(uint32_t row)
         {
-            MTS_ASSERT(row < Count(), "ComponentColumn::SwapRemove: row {} out of range ({})", row, Count());
+            MIR_ASSERT(row < Count(), "ComponentColumn::SwapRemove: row {} out of range ({})", row, Count());
 
             const uint32_t lastRow = Count() - 1;
             if (row != lastRow)

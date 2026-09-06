@@ -19,7 +19,7 @@
 
 namespace
 {
-    std::string HexId(mts::AssetId id)
+    std::string HexId(mir::AssetId id)
     {
         std::ostringstream out;
         out << std::hex << std::setfill('0') << std::setw(16) << id.value;
@@ -50,17 +50,17 @@ namespace
     bool BlobMatchesCurrentFormat(const std::filesystem::path &cooked)
     {
         const std::optional<std::vector<std::byte>> prefix =
-            mts::ReadFilePrefix(cooked, sizeof(mts::AssetBlobHeader));
+            mir::ReadFilePrefix(cooked, sizeof(mir::AssetBlobHeader));
         if (!prefix.has_value())
             return false;
 
-        mts::AssetBlobHeader header{};
+        mir::AssetBlobHeader header{};
         std::memcpy(&header, prefix->data(), sizeof(header));
 
-        return header.magic == mts::kAssetBlobMagic &&
-               header.formatVersion == mts::kAssetBlobFormatVersion &&
-               header.typeTag == mts::kRawAssetTypeTag &&
-               header.contentVersion == mts::kRawAssetContentVersion;
+        return header.magic == mir::kAssetBlobMagic &&
+               header.formatVersion == mir::kAssetBlobFormatVersion &&
+               header.typeTag == mir::kRawAssetTypeTag &&
+               header.contentVersion == mir::kRawAssetContentVersion;
     }
 
     bool IsUpToDate(const std::filesystem::path &source, const std::filesystem::path &cooked)
@@ -87,7 +87,7 @@ namespace
 
     struct CookedFile
     {
-        mts::AssetId id;
+        mir::AssetId id;
         std::string fileName;
     };
 }
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    mts::InitLog();
+    mir::InitLog();
 
     const std::filesystem::path outPath = outDir;
     std::filesystem::create_directories(outPath);
@@ -138,8 +138,8 @@ int main(int argc, char **argv)
         // assets yet needs a .gitkeep, since git does not track empty dirs.)
         if (!std::filesystem::exists(rootPath))
         {
-            MTS_LOG_ERROR("AssetCooker: source root does not exist: {}", root);
-            mts::FlushLog();
+            MIR_LOG_ERROR("AssetCooker: source root does not exist: {}", root);
+            mir::FlushLog();
             return 1;
         }
 
@@ -153,51 +153,51 @@ int main(int argc, char **argv)
 
             const std::filesystem::path relative = std::filesystem::relative(entry.path(), rootPath);
             const std::string idSource = (std::filesystem::path(NormalizeRoot(root)) / relative).generic_string();
-            const mts::AssetId id = mts::MakeAssetId(idSource);
+            const mir::AssetId id = mir::MakeAssetId(idSource);
 
             const std::string fileName = HexId(id) + ".blob";
             const std::filesystem::path blobPath = outPath / fileName;
 
             if (IsUpToDate(entry.path(), blobPath))
             {
-                MTS_LOG_INFO("up to date {} -> {}", idSource, fileName);
+                MIR_LOG_INFO("up to date {} -> {}", idSource, fileName);
                 cooked.push_back(CookedFile{id, fileName});
                 continue;
             }
 
-            const std::optional<std::vector<std::byte>> bytes = mts::ReadFileBytes(entry.path());
+            const std::optional<std::vector<std::byte>> bytes = mir::ReadFileBytes(entry.path());
             if (!bytes.has_value())
             {
-                MTS_LOG_ERROR("AssetCooker: failed to read {}", entry.path().string());
-                mts::FlushLog();
+                MIR_LOG_ERROR("AssetCooker: failed to read {}", entry.path().string());
+                mir::FlushLog();
                 return 1;
             }
 
             const std::vector<std::byte> blob =
-                mts::BuildAssetBlob(mts::kRawAssetTypeTag, mts::kRawAssetContentVersion, *bytes);
-            if (!mts::WriteFileBytes(blobPath, blob))
+                mir::BuildAssetBlob(mir::kRawAssetTypeTag, mir::kRawAssetContentVersion, *bytes);
+            if (!mir::WriteFileBytes(blobPath, blob))
             {
-                MTS_LOG_ERROR("AssetCooker: failed to write {}", blobPath.string());
-                mts::FlushLog();
+                MIR_LOG_ERROR("AssetCooker: failed to write {}", blobPath.string());
+                mir::FlushLog();
                 return 1;
             }
 
-            MTS_LOG_INFO("cooked {} -> {}", idSource, fileName);
+            MIR_LOG_INFO("cooked {} -> {}", idSource, fileName);
             cooked.push_back(CookedFile{id, fileName});
         }
     }
 
-    std::vector<mts::AssetManifestSourceEntry> entries;
+    std::vector<mir::AssetManifestSourceEntry> entries;
     entries.reserve(cooked.size());
     for (const CookedFile &file : cooked)
-        entries.push_back(mts::AssetManifestSourceEntry{
-            {file.id, mts::kRawAssetTypeTag, mts::kRawAssetContentVersion}, file.fileName});
+        entries.push_back(mir::AssetManifestSourceEntry{
+            {file.id, mir::kRawAssetTypeTag, mir::kRawAssetContentVersion}, file.fileName});
 
-    const std::vector<std::byte> manifestBlob = mts::BuildAssetManifestBlob(entries);
-    if (!mts::WriteFileBytes(outPath / "manifest.blob", manifestBlob))
+    const std::vector<std::byte> manifestBlob = mir::BuildAssetManifestBlob(entries);
+    if (!mir::WriteFileBytes(outPath / "manifest.blob", manifestBlob))
     {
-        MTS_LOG_ERROR("AssetCooker: failed to write manifest.blob");
-        mts::FlushLog();
+        MIR_LOG_ERROR("AssetCooker: failed to write manifest.blob");
+        mir::FlushLog();
         return 1;
     }
 
@@ -224,15 +224,15 @@ int main(int argc, char **argv)
 
         std::error_code removeEc;
         if (std::filesystem::remove(entry.path(), removeEc))
-            MTS_LOG_INFO("pruned stale {}", fileName);
+            MIR_LOG_INFO("pruned stale {}", fileName);
         else
-            MTS_LOG_WARN("AssetCooker: could not prune stale {}: {}", fileName, removeEc.message());
+            MIR_LOG_WARN("AssetCooker: could not prune stale {}: {}", fileName, removeEc.message());
     }
 
     if (pruneEc)
-        MTS_LOG_WARN("AssetCooker: could not scan {} for stale blobs: {}", outDir, pruneEc.message());
+        MIR_LOG_WARN("AssetCooker: could not scan {} for stale blobs: {}", outDir, pruneEc.message());
 
-    MTS_LOG_INFO("AssetCooker: cooked {} assets into {}", cooked.size(), outDir);
-    mts::FlushLog();
+    MIR_LOG_INFO("AssetCooker: cooked {} assets into {}", cooked.size(), outDir);
+    mir::FlushLog();
     return 0;
 }

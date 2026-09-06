@@ -23,19 +23,19 @@
 
 namespace
 {
-    using mts::AllocateStableId;
-    using mts::ComponentOps;
-    using mts::ComponentRegistry;
-    using mts::CreateSceneEntity;
-    using mts::Entity;
-    using mts::FieldKind;
-    using mts::kNullStableId;
-    using mts::LoadedScene;
-    using mts::NewScene;
-    using mts::RuntimeFieldDecl;
-    using mts::StableId;
-    using mts::Transform;
-    using mts::World;
+    using mir::AllocateStableId;
+    using mir::ComponentOps;
+    using mir::ComponentRegistry;
+    using mir::CreateSceneEntity;
+    using mir::Entity;
+    using mir::FieldKind;
+    using mir::kNullStableId;
+    using mir::LoadedScene;
+    using mir::NewScene;
+    using mir::RuntimeFieldDecl;
+    using mir::StableId;
+    using mir::Transform;
+    using mir::World;
 
     // A fresh temp directory per test, removed on scope exit - tests never
     // leave a scene directory behind for the next run to trip over.
@@ -44,7 +44,7 @@ namespace
         std::filesystem::path mPath;
 
         explicit TempSceneDir(std::string_view name)
-            : mPath(std::filesystem::temp_directory_path() / "mts_scene_tests" / name)
+            : mPath(std::filesystem::temp_directory_path() / "mir_scene_tests" / name)
         {
             std::filesystem::remove_all(mPath);
         }
@@ -63,18 +63,18 @@ namespace
 
 TEST_CASE("SaveScene then LoadScene round-trips a Transform", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
 
     World world;
     LoadedScene scene = NewScene("test");
     Entity entity = CreateSceneEntity(world, scene);
-    mts::AddTransform(world, entity, Transform{glm::vec3(1.0f, 2.0f, 3.0f)});
+    mir::AddTransform(world, entity, Transform{glm::vec3(1.0f, 2.0f, 3.0f)});
 
     TempSceneDir dir("transform_roundtrip");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
 
     REQUIRE(loaded.mName == "test");
     REQUIRE(loaded.mEntities.size() == 1);
@@ -89,15 +89,15 @@ TEST_CASE("SaveScene then LoadScene round-trips a Transform", "[scene]")
 
 TEST_CASE("SaveScene writes a clean decimal for a float that isn't exactly representable", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
 
     World world;
     LoadedScene scene = NewScene("test");
     Entity entity = CreateSceneEntity(world, scene);
-    mts::AddTransform(world, entity, Transform{glm::vec3(1.8f, 0.0f, 0.0f)});
+    mir::AddTransform(world, entity, Transform{glm::vec3(1.8f, 0.0f, 0.0f)});
 
     TempSceneDir dir("clean_float");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     std::ifstream file(dir.mPath / "entities" / "1.json");
     REQUIRE(file);
@@ -114,30 +114,30 @@ TEST_CASE("SaveScene writes a clean decimal for a float that isn't exactly repre
 
 TEST_CASE("SaveScene then LoadScene round-trips parent/child structure", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
 
     World world;
     LoadedScene scene = NewScene("test");
     Entity parent = CreateSceneEntity(world, scene);
     Entity child = CreateSceneEntity(world, scene, parent);
-    mts::AddTransform(world, parent, Transform{});
-    mts::AddTransform(world, child, Transform{}, parent);
+    mir::AddTransform(world, parent, Transform{});
+    mir::AddTransform(world, child, Transform{}, parent);
 
     TempSceneDir dir("parent_child_roundtrip");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
 
     Entity loadedParent = loaded.mEntities.at(1);
     Entity loadedChild = loaded.mEntities.at(2);
-    CHECK(mts::ParentOf(loadedWorld, loadedChild) == loadedParent);
-    CHECK(mts::ParentOf(loadedWorld, loadedParent).IsNull());
+    CHECK(mir::ParentOf(loadedWorld, loadedChild) == loadedParent);
+    CHECK(mir::ParentOf(loadedWorld, loadedParent).IsNull());
 }
 
 TEST_CASE("SaveScene then LoadScene round-trips an EntityRef field", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
     const ComponentOps &sceneRefOps = SceneRefOps();
 
     World world;
@@ -148,10 +148,10 @@ TEST_CASE("SaveScene then LoadScene round-trips an EntityRef field", "[scene]")
     sceneRefOps.FindField("target")->Write(sceneRefOps.Get(world, referrer), &target);
 
     TempSceneDir dir("entity_ref_roundtrip");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
 
     Entity loadedTarget = loaded.mEntities.at(1);
     Entity loadedReferrer = loaded.mEntities.at(2);
@@ -163,7 +163,7 @@ TEST_CASE("SaveScene then LoadScene round-trips an EntityRef field", "[scene]")
 
 TEST_CASE("SaveScene writes an unset EntityRef as kNullStableId, and it loads back null", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
     const ComponentOps &sceneRefOps = SceneRefOps();
 
     World world;
@@ -172,10 +172,10 @@ TEST_CASE("SaveScene writes an unset EntityRef as kNullStableId, and it loads ba
     sceneRefOps.AddDefault(world, referrer); // target left at its default: null Entity
 
     TempSceneDir dir("entity_ref_null");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
     Entity loadedReferrer = loaded.mEntities.at(1);
 
     Entity resolved{};
@@ -186,7 +186,7 @@ TEST_CASE("SaveScene writes an unset EntityRef as kNullStableId, and it loads ba
 
 TEST_CASE("LoadScene skips a component name it does not recognise", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
 
     TempSceneDir dir("unknown_component");
     std::filesystem::create_directories(dir.mPath / "entities");
@@ -208,7 +208,7 @@ TEST_CASE("LoadScene skips a component name it does not recognise", "[scene]")
     }
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
 
     REQUIRE(loaded.mEntities.size() == 1);
     Entity loadedEntity = loaded.mEntities.at(1);
@@ -219,23 +219,23 @@ TEST_CASE("LoadScene skips a component name it does not recognise", "[scene]")
 
 TEST_CASE("UnloadScene destroys exactly the entities it loaded", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
 
     World world;
     LoadedScene scene = NewScene("test");
     Entity parent = CreateSceneEntity(world, scene);
     Entity child = CreateSceneEntity(world, scene, parent);
-    mts::AddTransform(world, parent, Transform{});
-    mts::AddTransform(world, child, Transform{}, parent);
+    mir::AddTransform(world, parent, Transform{});
+    mir::AddTransform(world, child, Transform{}, parent);
     Entity outsider = world.CreateEntity(); // not part of the saved scene
 
     TempSceneDir dir("unload_scoped");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
-    LoadedScene loaded = mts::LoadScene(world, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(world, dir.mPath);
     REQUIRE(loaded.mEntities.size() == 2);
 
-    mts::UnloadScene(world, loaded);
+    mir::UnloadScene(world, loaded);
 
     CHECK_FALSE(world.IsAlive(loaded.mEntities.at(1)));
     CHECK_FALSE(world.IsAlive(loaded.mEntities.at(2))); // cascaded via parent destroy (0020)
@@ -263,7 +263,7 @@ TEST_CASE("AllocateStableId never reissues an id, even one whose entity was dele
 
 TEST_CASE("LoadScene's nextId survives a save, even past a deleted entity's id", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
 
     World world;
     LoadedScene scene = NewScene("test");
@@ -274,12 +274,12 @@ TEST_CASE("LoadScene's nextId survives a save, even past a deleted entity's id",
     world.DestroyEntity(first);
 
     TempSceneDir dir("next_id_survives_save");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
     REQUIRE(loaded.mEntities.size() == 1); // only id 2 was ever written
 
-    mts::StableId next = AllocateStableId(loaded);
+    mir::StableId next = AllocateStableId(loaded);
     CHECK(next == 3); // not 2 (already used) and not reset to 1
 }

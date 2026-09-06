@@ -15,7 +15,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     namespace detail
     {
@@ -76,7 +76,7 @@ namespace mts
         std::size_t NodeCount() const;
 
     private:
-        // Mutating is private so that mts::SetParent is the only way in. It
+        // Mutating is private so that mir::SetParent is the only way in. It
         // pairs every structural change with the WorldTransform invalidation
         // that a reparent needs - the version stamps cannot see a reparent on
         // their own - and a caller reaching the graph directly would silently

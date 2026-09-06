@@ -21,7 +21,7 @@ namespace
         {
             static std::atomic<int> counter{0};
             path = std::filesystem::temp_directory_path() /
-                   ("mitosis_assetcache_test_" + std::to_string(counter.fetch_add(1)));
+                   ("mjolnir_assetcache_test_" + std::to_string(counter.fetch_add(1)));
             std::filesystem::create_directories(path);
         }
 
@@ -52,19 +52,19 @@ namespace
 TEST_CASE("AssetCache loads a cooked blob through the manifest", "[assets][cache]")
 {
     ScratchDir dir;
-    const mts::AssetId id = mts::MakeAssetId("greeting.raw");
+    const mir::AssetId id = mir::MakeAssetId("greeting.raw");
     const std::vector<std::byte> content = MakeContent("hello asset cache");
-    WriteFile(dir.path / "greeting.blob", mts::BuildAssetBlob(1, 1, content));
+    WriteFile(dir.path / "greeting.blob", mir::BuildAssetBlob(1, 1, content));
 
-    const mts::AssetManifestSourceEntry sourceEntry{{id, 1, 1}, "greeting.blob"};
-    const std::optional<mts::AssetManifest> manifest =
-        mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({&sourceEntry, 1}));
+    const mir::AssetManifestSourceEntry sourceEntry{{id, 1, 1}, "greeting.blob"};
+    const std::optional<mir::AssetManifest> manifest =
+        mir::AssetManifest::Parse(mir::BuildAssetManifestBlob({&sourceEntry, 1}));
     REQUIRE(manifest.has_value());
 
-    mts::AssetCache cache(&*manifest, dir.path);
+    mir::AssetCache cache(&*manifest, dir.path);
     REQUIRE(cache.Get(id) == nullptr);
 
-    const mts::AssetBlobView *view = cache.Load(id);
+    const mir::AssetBlobView *view = cache.Load(id);
     REQUIRE(view != nullptr);
     REQUIRE(view->content.size() == content.size());
     CHECK(std::memcmp(view->content.data(), content.data(), content.size()) == 0);
@@ -76,23 +76,23 @@ TEST_CASE("AssetCache loads a cooked blob through the manifest", "[assets][cache
 TEST_CASE("AssetCache Load returns nullptr for an unknown id", "[assets][cache]")
 {
     ScratchDir dir;
-    const std::optional<mts::AssetManifest> manifest = mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({}));
+    const std::optional<mir::AssetManifest> manifest = mir::AssetManifest::Parse(mir::BuildAssetManifestBlob({}));
     REQUIRE(manifest.has_value());
 
-    mts::AssetCache cache(&*manifest, dir.path);
-    CHECK(cache.Load(mts::MakeAssetId("missing")) == nullptr);
+    mir::AssetCache cache(&*manifest, dir.path);
+    CHECK(cache.Load(mir::MakeAssetId("missing")) == nullptr);
 }
 
 TEST_CASE("AssetCache Load returns nullptr when the file is missing", "[assets][cache]")
 {
     ScratchDir dir;
-    const mts::AssetId id = mts::MakeAssetId("ghost.raw");
-    const mts::AssetManifestSourceEntry sourceEntry{{id, 1, 1}, "ghost.blob"};
-    const std::optional<mts::AssetManifest> manifest =
-        mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({&sourceEntry, 1}));
+    const mir::AssetId id = mir::MakeAssetId("ghost.raw");
+    const mir::AssetManifestSourceEntry sourceEntry{{id, 1, 1}, "ghost.blob"};
+    const std::optional<mir::AssetManifest> manifest =
+        mir::AssetManifest::Parse(mir::BuildAssetManifestBlob({&sourceEntry, 1}));
     REQUIRE(manifest.has_value());
 
-    mts::AssetCache cache(&*manifest, dir.path);
+    mir::AssetCache cache(&*manifest, dir.path);
     CHECK(cache.Load(id) == nullptr);
     CHECK(cache.Load(id) == nullptr);
 }
@@ -100,15 +100,15 @@ TEST_CASE("AssetCache Load returns nullptr when the file is missing", "[assets][
 TEST_CASE("AssetCache Load rejects a blob that does not match its manifest entry", "[assets][cache]")
 {
     ScratchDir dir;
-    const mts::AssetId id = mts::MakeAssetId("mismatch.raw");
-    WriteFile(dir.path / "mismatch.blob", mts::BuildAssetBlob(1, 1, MakeContent("payload")));
+    const mir::AssetId id = mir::MakeAssetId("mismatch.raw");
+    WriteFile(dir.path / "mismatch.blob", mir::BuildAssetBlob(1, 1, MakeContent("payload")));
 
-    const mts::AssetManifestSourceEntry sourceEntry{{id, 2, 1}, "mismatch.blob"};
-    const std::optional<mts::AssetManifest> manifest =
-        mts::AssetManifest::Parse(mts::BuildAssetManifestBlob({&sourceEntry, 1}));
+    const mir::AssetManifestSourceEntry sourceEntry{{id, 2, 1}, "mismatch.blob"};
+    const std::optional<mir::AssetManifest> manifest =
+        mir::AssetManifest::Parse(mir::BuildAssetManifestBlob({&sourceEntry, 1}));
     REQUIRE(manifest.has_value());
 
-    mts::AssetCache cache(&*manifest, dir.path);
+    mir::AssetCache cache(&*manifest, dir.path);
     CHECK(cache.Load(id) == nullptr);
 }
 
@@ -116,11 +116,11 @@ TEST_CASE("AssetCache and its entries are move-only", "[assets][cache]")
 {
     // AssetCacheEntry::view.content spans that entry's own raw buffer, so a copy
     // would allocate a fresh buffer and leave the view aliasing the original
-    STATIC_REQUIRE_FALSE(std::is_copy_constructible_v<mts::AssetCacheEntry>);
-    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<mts::AssetCacheEntry>);
-    STATIC_REQUIRE(std::is_move_constructible_v<mts::AssetCacheEntry>);
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible_v<mir::AssetCacheEntry>);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<mir::AssetCacheEntry>);
+    STATIC_REQUIRE(std::is_move_constructible_v<mir::AssetCacheEntry>);
 
-    STATIC_REQUIRE_FALSE(std::is_copy_constructible_v<mts::AssetCache>);
-    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<mts::AssetCache>);
-    STATIC_REQUIRE(std::is_move_constructible_v<mts::AssetCache>);
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible_v<mir::AssetCache>);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<mir::AssetCache>);
+    STATIC_REQUIRE(std::is_move_constructible_v<mir::AssetCache>);
 }

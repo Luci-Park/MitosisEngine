@@ -29,7 +29,7 @@
 #include <chrono>
 #include <format>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -73,16 +73,16 @@ namespace mts
         {
             if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
             {
-                MTS_LOG_ERROR("[vulkan] {}", data->pMessage);
-                MTS_DEBUG_BREAK();
+                MIR_LOG_ERROR("[vulkan] {}", data->pMessage);
+                MIR_DEBUG_BREAK();
             }
             else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
             {
-                MTS_LOG_WARN("[vulkan] {}", data->pMessage);
+                MIR_LOG_WARN("[vulkan] {}", data->pMessage);
             }
             else
             {
-                MTS_LOG_INFO("[vulkan] {}", data->pMessage);
+                MIR_LOG_INFO("[vulkan] {}", data->pMessage);
             }
 
             // VK_TRUE would abort the call that triggered this. That is a layer
@@ -277,14 +277,14 @@ namespace mts
             std::ifstream file(path, std::ios::binary | std::ios::ate);
             if (!file)
             {
-                MTS_LOG_CRITICAL("Cannot open SPIR-V: {}", path.string());
+                MIR_LOG_CRITICAL("Cannot open SPIR-V: {}", path.string());
                 return std::nullopt;
             }
 
             const std::streamsize byteSize = file.tellg();
             if (byteSize <= 0 || byteSize % 4 != 0)
             {
-                MTS_LOG_CRITICAL("Bad SPIR-V size ({} bytes): {}", byteSize, path.string());
+                MIR_LOG_CRITICAL("Bad SPIR-V size ({} bytes): {}", byteSize, path.string());
                 return std::nullopt;
             }
 
@@ -294,7 +294,7 @@ namespace mts
 
             if (!file)
             {
-                MTS_LOG_CRITICAL("Short read on SPIR-V: {}", path.string());
+                MIR_LOG_CRITICAL("Short read on SPIR-V: {}", path.string());
                 return std::nullopt;
             }
             return words;
@@ -314,7 +314,7 @@ namespace mts
             VkShaderModule module = VK_NULL_HANDLE;
             if (vkCreateShaderModule(device, &info, nullptr, &module) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("vkCreateShaderModule failed: {}", path.string());
+                MIR_LOG_CRITICAL("vkCreateShaderModule failed: {}", path.string());
                 return VK_NULL_HANDLE;
             }
             return module;
@@ -325,7 +325,7 @@ namespace mts
     {
         if (desc.window == nullptr)
         {
-            MTS_LOG_ERROR("no window");
+            MIR_LOG_ERROR("no window");
             return false;
         }
 
@@ -333,7 +333,7 @@ namespace mts
 
         if (volkInitialize() != VK_SUCCESS)
         {
-            MTS_LOG_ERROR("volk initialized failed");
+            MIR_LOG_ERROR("volk initialized failed");
             return false;
         }
 
@@ -370,7 +370,7 @@ namespace mts
         if (mDefaultMaterial.IsNull())
             return false;
 
-        NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MitosisEngine device");
+        NameObject(VK_OBJECT_TYPE_DEVICE, reinterpret_cast<uint64_t>(mDevice), "MjolnirEngine device");
         NameObject(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<uint64_t>(mGfxQueue), "Graphics+present queue");
         NameObject(VK_OBJECT_TYPE_SWAPCHAIN_KHR, reinterpret_cast<uint64_t>(mSwapchain), "Swapchain");
         NameObject(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(mMaterials[mDefaultMaterial.mIndex].mPipeline), "Default material pipeline");
@@ -389,7 +389,7 @@ namespace mts
         void CheckImGuiVulkanResult(VkResult result)
         {
             if (result != VK_SUCCESS)
-                MTS_LOG_ERROR("ImGui Vulkan backend call failed: {}", static_cast<int>(result));
+                MIR_LOG_ERROR("ImGui Vulkan backend call failed: {}", static_cast<int>(result));
         }
     }
 
@@ -417,7 +417,7 @@ namespace mts
 
         if (!ImGui_ImplVulkan_Init(&initInfo))
         {
-            MTS_LOG_ERROR("ImGui_ImplVulkan_Init failed");
+            MIR_LOG_ERROR("ImGui_ImplVulkan_Init failed");
             return false;
         }
 
@@ -476,7 +476,7 @@ namespace mts
             // must still land here at 0 bytes.
             VmaTotalStatistics stats{};
             vmaCalculateStatistics(mAllocator, &stats);
-            MTS_LOG_INFO("[vma] live bytes at shutdown: {} in {} allocation(s)",
+            MIR_LOG_INFO("[vma] live bytes at shutdown: {} in {} allocation(s)",
                          stats.total.statistics.allocationBytes,
                          stats.total.statistics.allocationCount);
 
@@ -531,7 +531,7 @@ namespace mts
         const char *platformExt = vk::PlatformSurfaceExtension(backend);
         if (platformExt == nullptr)
         {
-            MTS_LOG_CRITICAL("No Vulkan surface extension for window backend {}",
+            MIR_LOG_CRITICAL("No Vulkan surface extension for window backend {}",
                              static_cast<int>(backend));
             return false;
         }
@@ -543,7 +543,7 @@ namespace mts
         {
             if (!HasExtension(availableExts, name))
             {
-                MTS_LOG_CRITICAL("Required instance extension missing: {}", name);
+                MIR_LOG_CRITICAL("Required instance extension missing: {}", name);
                 return false;
             }
         }
@@ -562,7 +562,7 @@ namespace mts
             }
             else
             {
-                MTS_LOG_WARN("Validation unavailable (layer: {}, debug_utils: {}); "
+                MIR_LOG_WARN("Validation unavailable (layer: {}, debug_utils: {}); "
                              "install the Vulkan SDK to enable it",
                              hasLayer, hasDebugUtils);
             }
@@ -597,7 +597,7 @@ namespace mts
 
         if (vkCreateInstance(&createInfo, nullptr, &mVulkanInstance) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreateInstance failed");
+            MIR_LOG_CRITICAL("vkCreateInstance failed");
             return false;
         }
 
@@ -609,7 +609,7 @@ namespace mts
 
         if (vkCreateDebugUtilsMessengerEXT(mVulkanInstance, &info, nullptr, &mDebugMessenger) != VK_SUCCESS)
         {
-            MTS_LOG_ERROR("vkCreateDebugUtilsMessengerEXT failed");
+            MIR_LOG_ERROR("vkCreateDebugUtilsMessengerEXT failed");
             return false;
         }
         return true;
@@ -620,7 +620,7 @@ namespace mts
 
         if (mSurface == VK_NULL_HANDLE)
         {
-            MTS_LOG_CRITICAL("Vulkan surface creation failed");
+            MIR_LOG_CRITICAL("Vulkan surface creation failed");
             return false;
         }
         return true;
@@ -632,7 +632,7 @@ namespace mts
         vkEnumeratePhysicalDevices(mVulkanInstance, &count, nullptr);
         if (count == 0)
         {
-            MTS_LOG_CRITICAL("No Vulkan-capable GPU found");
+            MIR_LOG_CRITICAL("No Vulkan-capable GPU found");
             return false;
         }
 
@@ -649,31 +649,31 @@ namespace mts
             // Every rejection says which device and why
             if (props.apiVersion < VulkanVersion)
             {
-                MTS_LOG_INFO("Rejected {}: Vulkan {}.{}, need 1.3", props.deviceName,
+                MIR_LOG_INFO("Rejected {}: Vulkan {}.{}, need 1.3", props.deviceName,
                              VK_API_VERSION_MAJOR(props.apiVersion),
                              VK_API_VERSION_MINOR(props.apiVersion));
                 continue;
             }
             if (!HasDeviceExtension(device, VK_KHR_SWAPCHAIN_EXTENSION_NAME))
             {
-                MTS_LOG_INFO("Rejected {}: no swapchain extension", props.deviceName);
+                MIR_LOG_INFO("Rejected {}: no swapchain extension", props.deviceName);
                 continue;
             }
             if (!HasRequiredFeatures(device))
             {
-                MTS_LOG_INFO("Rejected {}: missing dynamicRendering / sync2 / timeline / shaderDrawParameters", props.deviceName);
+                MIR_LOG_INFO("Rejected {}: missing dynamicRendering / sync2 / timeline / shaderDrawParameters", props.deviceName);
                 continue;
             }
             if (!HasSurfaceSupport(device, mSurface))
             {
-                MTS_LOG_INFO("Rejected {}: no surface formats or present modes", props.deviceName);
+                MIR_LOG_INFO("Rejected {}: no surface formats or present modes", props.deviceName);
                 continue;
             }
 
             const uint32_t family = FindGraphicsPresentFamily(device, mSurface);
             if (family == UINT32_MAX)
             {
-                MTS_LOG_INFO("Rejected {}: no graphics+present queue family", props.deviceName);
+                MIR_LOG_INFO("Rejected {}: no graphics+present queue family", props.deviceName);
                 continue;
             }
 
@@ -690,13 +690,13 @@ namespace mts
 
         if (mPhysicalDevice == VK_NULL_HANDLE)
         {
-            MTS_LOG_CRITICAL("No suitable GPU among {} candidate(s)", count);
+            MIR_LOG_CRITICAL("No suitable GPU among {} candidate(s)", count);
             return false;
         }
 
         VkPhysicalDeviceProperties props{};
         vkGetPhysicalDeviceProperties(mPhysicalDevice, &props);
-        MTS_LOG_INFO("GPU: {} | {} | Vulkan {}.{}.{} | graphics+present family {}",
+        MIR_LOG_INFO("GPU: {} | {} | Vulkan {}.{}.{} | graphics+present family {}",
                      props.deviceName,
                      props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "discrete" : "integrated",
                      VK_API_VERSION_MAJOR(props.apiVersion),
@@ -755,7 +755,7 @@ namespace mts
 
         if (vkCreateDevice(mPhysicalDevice, &deviceInfo, nullptr, &mDevice) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreateDevice Failed");
+            MIR_LOG_CRITICAL("vkCreateDevice Failed");
             return false;
         }
 
@@ -780,7 +780,7 @@ namespace mts
 
         if (vmaCreateAllocator(&allocatorInfo, &mAllocator) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vmaCreateAllocator failed");
+            MIR_LOG_CRITICAL("vmaCreateAllocator failed");
             return false;
         }
         return true;
@@ -821,7 +821,7 @@ namespace mts
 
         if (vkCreateSwapchainKHR(mDevice, &info, nullptr, &mSwapchain) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreateSwapchainKHR failed");
+            MIR_LOG_CRITICAL("vkCreateSwapchainKHR failed");
             mSwapchain = VK_NULL_HANDLE;
             return false;
         }
@@ -839,7 +839,7 @@ namespace mts
         mSwapchainImages.resize(actualCount);
         vkGetSwapchainImagesKHR(mDevice, mSwapchain, &actualCount, mSwapchainImages.data());
 
-        MTS_LOG_INFO("Swapchain: {}x{} | {} image(s), requested {} | present mode {}",
+        MIR_LOG_INFO("Swapchain: {}x{} | {} image(s), requested {} | present mode {}",
                      extent.width, extent.height, actualCount, imageCount,
                      presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? "MAILBOX" : "FIFO");
 
@@ -865,7 +865,7 @@ namespace mts
 
             if (vkCreateImageView(mDevice, &info, nullptr, &mSwapchainViews[i]) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("vkCreateImageView failed for swapchain image {}", i);
+                MIR_LOG_CRITICAL("vkCreateImageView failed for swapchain image {}", i);
                 return false;
             }
         }
@@ -878,7 +878,7 @@ namespace mts
         vkGetPhysicalDeviceFormatProperties(mPhysicalDevice, kDepthFormat, &formatProps);
         if ((formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0)
         {
-            MTS_LOG_CRITICAL("VK_FORMAT_D32_SFLOAT unsupported as an optimal-tiling depth attachment");
+            MIR_LOG_CRITICAL("VK_FORMAT_D32_SFLOAT unsupported as an optimal-tiling depth attachment");
             return false;
         }
 
@@ -902,7 +902,7 @@ namespace mts
             if (vmaCreateImage(mAllocator, &imageInfo, &allocInfo,
                                &mDepthImages[i], &mDepthAllocations[i], nullptr) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("vmaCreateImage failed for depth buffer {}", i);
+                MIR_LOG_CRITICAL("vmaCreateImage failed for depth buffer {}", i);
                 return false;
             }
 
@@ -920,7 +920,7 @@ namespace mts
 
             if (vkCreateImageView(mDevice, &viewInfo, nullptr, &mDepthViews[i]) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("vkCreateImageView failed for depth buffer {}", i);
+                MIR_LOG_CRITICAL("vkCreateImageView failed for depth buffer {}", i);
                 return false;
             }
 
@@ -999,7 +999,7 @@ namespace mts
 
         if (vkCreatePipelineLayout(mDevice, &layoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreatePipelineLayout failed");
+            MIR_LOG_CRITICAL("vkCreatePipelineLayout failed");
             return false;
         }
 
@@ -1133,7 +1133,7 @@ namespace mts
 
         if (result != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("vkCreateGraphicsPipelines failed: {}", static_cast<int>(result));
+            MIR_LOG_CRITICAL("vkCreateGraphicsPipelines failed: {}", static_cast<int>(result));
             return VK_NULL_HANDLE;
         }
 
@@ -1148,7 +1148,7 @@ namespace mts
 
         mMaterials.push_back(GpuMaterial{pipeline});
 
-        MTS_LOG_INFO("Material created: {} (index {})", desc.shaderName, mMaterials.size() - 1);
+        MIR_LOG_INFO("Material created: {} (index {})", desc.shaderName, mMaterials.size() - 1);
         return MaterialHandle{static_cast<uint32_t>(mMaterials.size() - 1), 0};
     }
 
@@ -1175,7 +1175,7 @@ namespace mts
     {
         if (vertices.empty() || indices.empty())
         {
-            MTS_LOG_ERROR("CreateMesh: vertices and indices must both be non-empty");
+            MIR_LOG_ERROR("CreateMesh: vertices and indices must both be non-empty");
             return kNullMesh;
         }
 
@@ -1193,7 +1193,7 @@ namespace mts
                               VMA_ALLOCATION_CREATE_MAPPED_BIT,
                           staging, stagingAllocation, &stagingInfo))
         {
-            MTS_LOG_CRITICAL("CreateMesh: staging buffer allocation failed");
+            MIR_LOG_CRITICAL("CreateMesh: staging buffer allocation failed");
             return kNullMesh;
         }
 
@@ -1219,7 +1219,7 @@ namespace mts
 
         if (!buffersCreated)
         {
-            MTS_LOG_CRITICAL("CreateMesh: device buffer allocation failed");
+            MIR_LOG_CRITICAL("CreateMesh: device buffer allocation failed");
             // The && above short-circuits, so one of the two may be null here.
             // Both destroys are guarded, so this handles either case.
             if (mesh.mVertexBuffer != VK_NULL_HANDLE)
@@ -1239,7 +1239,7 @@ namespace mts
 
         if (vkCreateCommandPool(mDevice, &poolInfo, nullptr, &uploadPool) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("CreateMesh: upload command pool creation failed");
+            MIR_LOG_CRITICAL("CreateMesh: upload command pool creation failed");
             vmaDestroyBuffer(mAllocator, mesh.mVertexBuffer, mesh.mVertexAllocation);
             vmaDestroyBuffer(mAllocator, mesh.mIndexBuffer, mesh.mIndexAllocation);
             vmaDestroyBuffer(mAllocator, staging, stagingAllocation);
@@ -1288,7 +1288,7 @@ namespace mts
         NameObject(VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(mesh.mIndexBuffer),
                    std::format("Mesh {} indices", index).c_str());
 
-        MTS_LOG_INFO("Mesh {} uploaded: {} vertices, {} indices, {} bytes",
+        MIR_LOG_INFO("Mesh {} uploaded: {} vertices, {} indices, {} bytes",
                      index, vertices.size(), indices.size(), vertexBytes + indexBytes);
 
         return MeshHandle{index, mesh.mGeneration};
@@ -1348,7 +1348,7 @@ namespace mts
         {
             if (vkCreateCommandPool(mDevice, &poolInfo, nullptr, &mCmdPools[i]) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("vkCreateCommandPool failed for frame {}", i);
+                MIR_LOG_CRITICAL("vkCreateCommandPool failed for frame {}", i);
                 return false;
             }
 
@@ -1360,13 +1360,13 @@ namespace mts
 
             if (vkAllocateCommandBuffers(mDevice, &allocInfo, &mCmdBuffers[i]) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("vkAllocateCommandBuffers failed for frame {}", i);
+                MIR_LOG_CRITICAL("vkAllocateCommandBuffers failed for frame {}", i);
                 return false;
             }
 
             if (vkCreateSemaphore(mDevice, &semInfo, nullptr, &mImageAcquired[i]) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("image-acquired semaphore failed for frame {}", i);
+                MIR_LOG_CRITICAL("image-acquired semaphore failed for frame {}", i);
                 return false;
             }
         }
@@ -1383,7 +1383,7 @@ namespace mts
 
         if (vkCreateSemaphore(mDevice, &timelineInfo, nullptr, &mTimeline) != VK_SUCCESS)
         {
-            MTS_LOG_CRITICAL("timeline semaphore creation failed");
+            MIR_LOG_CRITICAL("timeline semaphore creation failed");
             return false;
         }
 
@@ -1401,7 +1401,7 @@ namespace mts
         {
             if (vkCreateSemaphore(mDevice, &info, nullptr, &sem) != VK_SUCCESS)
             {
-                MTS_LOG_CRITICAL("render-complete semaphore creation failed");
+                MIR_LOG_CRITICAL("render-complete semaphore creation failed");
                 return false;
             }
         }
@@ -1600,7 +1600,7 @@ namespace mts
         }
         else if (acquireResult != VK_SUCCESS)
         {
-            MTS_LOG_ERROR("vkAcquireNextImageKHR failed: {}", static_cast<int>(acquireResult));
+            MIR_LOG_ERROR("vkAcquireNextImageKHR failed: {}", static_cast<int>(acquireResult));
             --mNextSignalValue;
             return;
         }
@@ -1644,7 +1644,7 @@ namespace mts
 
         if (vkQueueSubmit2(mGfxQueue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS)
         {
-            MTS_LOG_ERROR("vkQueueSubmit2 failed");
+            MIR_LOG_ERROR("vkQueueSubmit2 failed");
             return;
         }
         const VkPresentInfoKHR presentInfo{
@@ -1659,7 +1659,7 @@ namespace mts
         if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR)
             mNeedRecreate = true;
         else if (presentResult != VK_SUCCESS)
-            MTS_LOG_ERROR("vkQueuePresentKHR failed: {}", static_cast<int>(presentResult));
+            MIR_LOG_ERROR("vkQueuePresentKHR failed: {}", static_cast<int>(presentResult));
 
         mFrameIndex = (mFrameIndex + 1) % kFramesInFlight;
     }

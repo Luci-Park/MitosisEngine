@@ -28,7 +28,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     /**
      * Everything the engine can do to one component type, with the type erased.
@@ -151,7 +151,7 @@ namespace mts
         template <typename T>
         const ComponentOps &Register(std::span<const FieldDesc> fields = {})
         {
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
             static_assert(std::is_default_constructible_v<T>,
                           "ComponentRegistry::Register: T must be default constructible - the registry "
                           "captures a default value so a script can add the component without supplying one");
@@ -227,7 +227,7 @@ namespace mts
         const ComponentOps &InsertNative(const ComponentOps &ops, const void *defaultValue);
 
         /// The existing seq for this name, or a freshly allocated one. The
-        /// MTS_CHECK is where the component budget is actually enforced: the
+        /// MIR_CHECK is where the component budget is actually enforced: the
         /// name can come from a data file, so exceeding it must stop a release
         /// build with a message rather than corrupt the signature bitset.
         uint32_t SeqForHash(uint32_t hash, std::string_view name);

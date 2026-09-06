@@ -20,7 +20,7 @@
 #include <cstring>
 #include <string_view>
 
-namespace mts
+namespace mir
 {
     /// The value types a script or an inspector may read and write. Deliberately
     /// small: every one is trivially copyable and at most 4-byte aligned, so a

@@ -31,7 +31,7 @@ namespace
     /// engine_cook_assets already documents (see cmake/Assets.cmake).
     struct GameProject
     {
-        std::string mTitle = "MitosisEngine";
+        std::string mTitle = "MjolnirEngine";
         std::string mAssetsRoot = "assets";
         std::string mSceneDir = "scenes/default";
     };
@@ -46,7 +46,7 @@ namespace
         std::ifstream in(path);
         if (!in)
         {
-            MTS_LOG_ERROR("LoadGameProject: could not open '{}', using defaults", path.string());
+            MIR_LOG_ERROR("LoadGameProject: could not open '{}', using defaults", path.string());
             return project;
         }
 
@@ -57,7 +57,7 @@ namespace
         }
         catch (const nlohmann::json::parse_error &e)
         {
-            MTS_LOG_ERROR("LoadGameProject: '{}' is not valid JSON ({}), using defaults", path.string(), e.what());
+            MIR_LOG_ERROR("LoadGameProject: '{}' is not valid JSON ({}), using defaults", path.string(), e.what());
             return project;
         }
 
@@ -73,18 +73,18 @@ namespace
     /// False when assets aren't available or the file failed to load or
     /// parse - logged by AssetCache/ScriptHost already, so the caller just
     /// decides whether to attach the script.
-    bool LoadScriptAsset(mts::App &app, std::string_view assetPath, std::string_view scriptName)
+    bool LoadScriptAsset(mir::App &app, std::string_view assetPath, std::string_view scriptName)
     {
-        mts::AssetCache *cache = app.Assets();
+        mir::AssetCache *cache = app.Assets();
         if (cache == nullptr)
             return false;
 
-        const mts::AssetId id = mts::MakeAssetId(assetPath);
-        const mts::AssetBlobView *blob = cache->Load(id);
+        const mir::AssetId id = mir::MakeAssetId(assetPath);
+        const mir::AssetBlobView *blob = cache->Load(id);
         if (blob == nullptr)
             return false;
 
-        if (!app.Scripts().LoadScriptSource(scriptName, mts::AsStringView(*blob)))
+        if (!app.Scripts().LoadScriptSource(scriptName, mir::AsStringView(*blob)))
             return false;
 
         app.ScriptReload().Track(std::string(scriptName), id);
@@ -99,12 +99,12 @@ namespace
     /// up here instead: for every such entity, load <assetsRoot>/scripts/
     /// <name>.lua by convention and wire up the instance ScriptSystem will
     /// then drive.
-    void ResolveSceneScripts(mts::App &app, const GameProject &project)
+    void ResolveSceneScripts(mir::App &app, const GameProject &project)
     {
-        mts::World &world = app.GetWorld();
+        mir::World &world = app.GetWorld();
 
-        world.GetOrCreateQuery<mts::ScriptRef>().ForEach(
-            [&](mts::Entity, mts::ScriptRef &ref)
+        world.GetOrCreateQuery<mir::ScriptRef>().ForEach(
+            [&](mir::Entity, mir::ScriptRef &ref)
             {
                 if (ref.instanceRef >= 0 || ref.scriptName[0] == '\0')
                     return;
@@ -114,7 +114,7 @@ namespace
 
                 if (!LoadScriptAsset(app, assetPath, name))
                 {
-                    MTS_LOG_ERROR("ResolveSceneScripts: could not load '{}' for script '{}'", assetPath, name);
+                    MIR_LOG_ERROR("ResolveSceneScripts: could not load '{}' for script '{}'", assetPath, name);
                     return;
                 }
 
@@ -128,7 +128,7 @@ namespace
     /// until there's a reason for more. Malformed JSON logs and returns
     /// nullopt rather than throwing - one bad mesh asset shouldn't take the
     /// whole load down.
-    std::optional<mts::MeshData> ParseMeshAsset(std::string_view text, std::string_view assetPath)
+    std::optional<mir::MeshData> ParseMeshAsset(std::string_view text, std::string_view assetPath)
     {
         nlohmann::json json;
         try
@@ -137,14 +137,14 @@ namespace
         }
         catch (const nlohmann::json::parse_error &e)
         {
-            MTS_LOG_ERROR("ParseMeshAsset: '{}' is not valid JSON ({})", assetPath, e.what());
+            MIR_LOG_ERROR("ParseMeshAsset: '{}' is not valid JSON ({})", assetPath, e.what());
             return std::nullopt;
         }
 
-        mts::MeshData mesh;
+        mir::MeshData mesh;
         for (const auto &v : json.value("vertices", nlohmann::json::array()))
         {
-            mts::Vertex vertex{};
+            mir::Vertex vertex{};
             const auto &p = v.at("position");
             const auto &c = v.at("color");
             const auto &n = v.at("normal");
@@ -163,21 +163,21 @@ namespace
     /// null until this pass fills them in. Handles are cached by asset id /
     /// shader name so entities sharing one mesh or material asset share one
     /// upload instead of duplicating it per entity.
-    void ResolveSceneMeshes(mts::App &app, const GameProject &project)
+    void ResolveSceneMeshes(mir::App &app, const GameProject &project)
     {
-        mts::World &world = app.GetWorld();
-        mts::AssetCache *cache = app.Assets();
+        mir::World &world = app.GetWorld();
+        mir::AssetCache *cache = app.Assets();
 
-        std::unordered_map<uint64_t, mts::MeshHandle> meshCache;
-        std::unordered_map<std::string, mts::MaterialHandle> materialCache;
+        std::unordered_map<uint64_t, mir::MeshHandle> meshCache;
+        std::unordered_map<std::string, mir::MaterialHandle> materialCache;
 
-        world.GetOrCreateQuery<mts::MeshRenderer>().ForEach(
-            [&](mts::Entity, mts::MeshRenderer &renderer)
+        world.GetOrCreateQuery<mir::MeshRenderer>().ForEach(
+            [&](mir::Entity, mir::MeshRenderer &renderer)
             {
                 if (renderer.mesh.IsNull() && renderer.meshName[0] != '\0')
                 {
                     const std::string assetPath = project.mAssetsRoot + "/" + renderer.meshName;
-                    const mts::AssetId id = mts::MakeAssetId(assetPath);
+                    const mir::AssetId id = mir::MakeAssetId(assetPath);
 
                     if (auto it = meshCache.find(id.value); it != meshCache.end())
                     {
@@ -185,9 +185,9 @@ namespace
                     }
                     else if (cache != nullptr)
                     {
-                        if (const mts::AssetBlobView *blob = cache->Load(id); blob != nullptr)
+                        if (const mir::AssetBlobView *blob = cache->Load(id); blob != nullptr)
                         {
-                            if (auto mesh = ParseMeshAsset(mts::AsStringView(*blob), assetPath))
+                            if (auto mesh = ParseMeshAsset(mir::AsStringView(*blob), assetPath))
                             {
                                 renderer.mesh = app.Renderer().CreateMesh(mesh->vertices, mesh->indices);
                                 meshCache.emplace(id.value, renderer.mesh);
@@ -195,7 +195,7 @@ namespace
                         }
                         else
                         {
-                            MTS_LOG_ERROR("ResolveSceneMeshes: could not load '{}'", assetPath);
+                            MIR_LOG_ERROR("ResolveSceneMeshes: could not load '{}'", assetPath);
                         }
                     }
                 }
@@ -208,58 +208,58 @@ namespace
                     else
                         renderer.material = materialCache
                                                  .emplace(shaderName, app.Renderer().CreateMaterial(
-                                                                          mts::MaterialDesc{.shaderName = shaderName}))
+                                                                          mir::MaterialDesc{.shaderName = shaderName}))
                                                  .first->second;
                 }
             });
     }
 
-    void BuildScene(mts::App &app, const GameProject &project)
+    void BuildScene(mir::App &app, const GameProject &project)
     {
-        mts::World &world = app.GetWorld();
-        mts::LoadedScene &scene = app.Scene();
+        mir::World &world = app.GetWorld();
+        mir::LoadedScene &scene = app.Scene();
 
-        const mts::MeshData cube = mts::MakeCube();
-        const mts::MeshHandle cubeMesh = app.Renderer().CreateMesh(cube.vertices, cube.indices);
+        const mir::MeshData cube = mir::MakeCube();
+        const mir::MeshHandle cubeMesh = app.Renderer().CreateMesh(cube.vertices, cube.indices);
 
-        const mts::Entity cubeEntity = mts::CreateSceneEntity(world, scene);
-        mts::AddTransform(world, cubeEntity, mts::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
-        mts::MeshRenderer cubeRenderer{.mesh = cubeMesh};
+        const mir::Entity cubeEntity = mir::CreateSceneEntity(world, scene);
+        mir::AddTransform(world, cubeEntity, mir::Transform{glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f)});
+        mir::MeshRenderer cubeRenderer{.mesh = cubeMesh};
         std::snprintf(cubeRenderer.meshName, sizeof(cubeRenderer.meshName), "meshes/cube.mesh.json");
-        world.AddComponent<mts::MeshRenderer>(cubeEntity, cubeRenderer);
+        world.AddComponent<mir::MeshRenderer>(cubeEntity, cubeRenderer);
 
         const std::string spinAssetPath = project.mAssetsRoot + "/scripts/spin.lua";
         if (LoadScriptAsset(app, spinAssetPath, "spin"))
         {
             const int32_t spinInstance = app.Scripts().CreateInstance("spin");
-            mts::ScriptRef ref{.instanceRef = spinInstance};
+            mir::ScriptRef ref{.instanceRef = spinInstance};
             std::snprintf(ref.scriptName, sizeof(ref.scriptName), "spin");
-            world.AddComponent<mts::ScriptRef>(cubeEntity, ref);
+            world.AddComponent<mir::ScriptRef>(cubeEntity, ref);
         }
         else
         {
-            MTS_LOG_ERROR("BuildScene: could not load '{}' - cube will not spin", spinAssetPath);
+            MIR_LOG_ERROR("BuildScene: could not load '{}' - cube will not spin", spinAssetPath);
         }
 
-        const mts::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mts::MaterialDesc{.shaderName = "unlit"});
+        const mir::MaterialHandle unlitMaterial = app.Renderer().CreateMaterial(mir::MaterialDesc{.shaderName = "unlit"});
 
-        const mts::Entity unlitCube = mts::CreateSceneEntity(world, scene);
-        mts::AddTransform(world, unlitCube, mts::Transform{glm::vec3(1.8f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.5f)});
-        mts::MeshRenderer unlitRenderer{.mesh = cubeMesh, .material = unlitMaterial};
+        const mir::Entity unlitCube = mir::CreateSceneEntity(world, scene);
+        mir::AddTransform(world, unlitCube, mir::Transform{glm::vec3(1.8f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.5f)});
+        mir::MeshRenderer unlitRenderer{.mesh = cubeMesh, .material = unlitMaterial};
         std::snprintf(unlitRenderer.meshName, sizeof(unlitRenderer.meshName), "meshes/cube.mesh.json");
         std::snprintf(unlitRenderer.materialShader, sizeof(unlitRenderer.materialShader), "unlit");
-        world.AddComponent<mts::MeshRenderer>(unlitCube, unlitRenderer);
+        world.AddComponent<mir::MeshRenderer>(unlitCube, unlitRenderer);
 
-        const mts::Entity camera = mts::CreateSceneEntity(world, scene);
-        mts::AddTransform(world, camera, mts::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
-        world.AddComponent<mts::Camera>(camera, mts::Camera{});
+        const mir::Entity camera = mir::CreateSceneEntity(world, scene);
+        mir::AddTransform(world, camera, mir::Transform{glm::vec3(0.0f, 0.0f, 5.0f)});
+        world.AddComponent<mir::Camera>(camera, mir::Camera{});
     }
 }
 
 int main()
 {
     // Logging lives outside App so early construction failures are still visible.
-    mts::InitLog();
+    mir::InitLog();
 
     // Single hardcoded project for now - no discovery/switcher yet, see
     // GameProject's comment. This is what "games/HelloWorld/game.json exists"
@@ -267,15 +267,15 @@ int main()
     // instead of stringing "games/HelloWorld/..." through main.cpp by hand.
     const GameProject project = LoadGameProject("games/HelloWorld/game.json");
 
-    mts::App app;
+    mir::App app;
 
-    mts::AppDesc desc{};
+    mir::AppDesc desc{};
     desc.mTitle = project.mTitle.c_str();
     desc.mSceneDir = project.mSceneDir;
 
     if (!app.Initialize(desc))
     {
-        mts::FlushLog();
+        mir::FlushLog();
         return -1;
     }
 
@@ -306,6 +306,6 @@ int main()
     app.Run();
     app.Shutdown();
 
-    mts::FlushLog();
+    mir::FlushLog();
     return 0;
 }

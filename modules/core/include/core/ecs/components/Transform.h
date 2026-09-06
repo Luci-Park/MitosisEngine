@@ -16,7 +16,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
-namespace mts
+namespace mir
 {
     /**
      * The transform a game *writes*. Stored as TRS rather than a mat4 because
@@ -113,7 +113,7 @@ namespace mts
         uint32_t mVersion = 1;
     };
 
-    MTS_ASSERT_COMPONENT(Transform);
+    MIR_ASSERT_COMPONENT(Transform);
 
     /**
      * Transform as a script or an inspector sees it.

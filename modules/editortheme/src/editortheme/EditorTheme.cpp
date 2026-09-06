@@ -10,7 +10,7 @@
 
 #include <imgui.h>
 
-namespace mts
+namespace mir
 {
     namespace
     {

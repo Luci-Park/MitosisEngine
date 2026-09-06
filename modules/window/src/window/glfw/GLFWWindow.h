@@ -16,7 +16,7 @@
 
 struct GLFWwindow;
 
-namespace mts
+namespace mir
 {
     class GLFWWindow final : public Window
     {

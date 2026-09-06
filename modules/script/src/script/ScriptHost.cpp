@@ -12,7 +12,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace mts
+namespace mir
 {
     struct ScriptHostImpl
     {
@@ -37,7 +37,7 @@ namespace mts
                     first = false;
                     line += tostring(arg.get<sol::object>()).get<std::string>();
                 }
-                MTS_LOG_INFO("[lua] {}", line);
+                MIR_LOG_INFO("[lua] {}", line);
             });
 
             RegisterEntityBindings(mLua);
@@ -55,7 +55,7 @@ namespace mts
             const auto it = mLoadedScripts.find(std::string(scriptName));
             if (it == mLoadedScripts.end() || !it->second.is<sol::table>())
             {
-                MTS_LOG_ERROR("script: CreateInstance: '{}' is not a loaded script table", scriptName);
+                MIR_LOG_ERROR("script: CreateInstance: '{}' is not a loaded script table", scriptName);
                 return -1;
             }
 
@@ -74,7 +74,7 @@ namespace mts
             if (!result.valid())
             {
                 const sol::error err = result;
-                MTS_LOG_ERROR("script: '{}'.NewInstanceData() failed: {}; using an empty instance", scriptName,
+                MIR_LOG_ERROR("script: '{}'.NewInstanceData() failed: {}; using an empty instance", scriptName,
                               err.what());
                 return mLua.create_table();
             }
@@ -82,7 +82,7 @@ namespace mts
             const sol::object data = result.get<sol::object>();
             if (!data.is<sol::table>())
             {
-                MTS_LOG_ERROR("script: '{}'.NewInstanceData() did not return a table; using an empty instance",
+                MIR_LOG_ERROR("script: '{}'.NewInstanceData() did not return a table; using an empty instance",
                               scriptName);
                 return mLua.create_table();
             }
@@ -115,7 +115,7 @@ namespace mts
             if (!result.valid())
             {
                 const sol::error err = result;
-                MTS_LOG_ERROR("script: {} failed: {}", callbackName, err.what());
+                MIR_LOG_ERROR("script: {} failed: {}", callbackName, err.what());
             }
         }
 
@@ -139,7 +139,7 @@ namespace mts
         if (!result.valid())
         {
             const sol::error err = result;
-            MTS_LOG_ERROR("script: failed to load '{}': {}", name, err.what());
+            MIR_LOG_ERROR("script: failed to load '{}': {}", name, err.what());
             return false;
         }
 

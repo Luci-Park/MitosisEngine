@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <string>
 
-namespace mts
+namespace mir
 {
     /// kNullMaterial = default material
     struct MaterialHandle

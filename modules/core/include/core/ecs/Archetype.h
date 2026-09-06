@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     class Archetype
     {
@@ -29,7 +29,7 @@ namespace mts
         uint32_t RowCount() const { return static_cast<uint32_t>(mEntities.size()); }
         Entity EntityAt(uint32_t row) const
         {
-            MTS_ASSERT(row < RowCount(), "Archetype::EntityAt: row {} out of range ({})", row, RowCount());
+            MIR_ASSERT(row < RowCount(), "Archetype::EntityAt: row {} out of range ({})", row, RowCount());
             return mEntities[row];
         }
 
@@ -39,7 +39,7 @@ namespace mts
 
         void AddColumn(ComponentColumn column)
         {
-            MTS_ASSERT(RowCount() == 0, "Archetype::AddColumn: columns must be added before any rows exist");
+            MIR_ASSERT(RowCount() == 0, "Archetype::AddColumn: columns must be added before any rows exist");
 
             // columns will be sorted by Type().seq
             const auto pos = std::lower_bound(mColumns.begin(), mColumns.end(), column.Type().seq,
@@ -83,7 +83,7 @@ namespace mts
         // returns the moved entity for info fixing
         Entity SwapRemoveRow(uint32_t row)
         {
-            MTS_ASSERT(row < RowCount(), "Archetype::SwapRemoveRow: row {} out of range ({})", row, RowCount());
+            MIR_ASSERT(row < RowCount(), "Archetype::SwapRemoveRow: row {} out of range ({})", row, RowCount());
 
             const uint32_t lastRow = RowCount() - 1;
             const Entity moved = (row != lastRow) ? mEntities[lastRow] : kNullEntity;

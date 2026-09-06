@@ -26,14 +26,14 @@
 #include <memory>
 #include <optional>
 
-namespace mts
+namespace mir
 {
     struct AppDesc
     {
         uint32_t mWidth = 1280;
         uint32_t mHeight = 720;
-        const char *mTitle = "MitosisEngine";
-        const char *mAppName = "MitosisEngine";
+        const char *mTitle = "MjolnirEngine";
+        const char *mAppName = "MjolnirEngine";
         bool mEnableValidation = true;
 
         bool mEnableEditorLayout = true;

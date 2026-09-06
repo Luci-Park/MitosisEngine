@@ -9,7 +9,7 @@
  */
 #pragma once
 
-namespace mts
+namespace mir
 {
     inline constexpr const char *kEngineVersion = "@PROJECT_VERSION@";
     inline constexpr const char *kEngineCopyright = "Copyright (c) 2026 DigiPen (USA) Corporation";

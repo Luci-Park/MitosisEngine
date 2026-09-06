@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     /**
      * Records structural changes while a Query walk is in flight, and applies
@@ -43,7 +43,7 @@ namespace mts
         template <typename T>
         void Add(Entity entity, const T &value)
         {
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
 
             // mStorage's base comes from plain operator new (std::byte has
             // alignment 1, so the align_val_t overload is never selected), which
@@ -88,7 +88,7 @@ namespace mts
          */
         void AddRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
         {
-            MTS_ASSERT(align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+            MIR_ASSERT(align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                        "CommandBuffer::AddRaw: over-aligned component \"{}\" ({})", type.name, align);
 
             const std::size_t headerOffset = AlignUp(mStorage.size(), alignof(RawHeader));

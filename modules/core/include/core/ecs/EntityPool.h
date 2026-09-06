@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // recycle ids, distinguish them with generations
     class EntityPool
@@ -30,14 +30,14 @@ namespace mts
             }
 
             const uint32_t index = static_cast<uint32_t>(mGenerations.size());
-            MTS_ASSERT(index != Entity::kNullIndex, "EntityPool::Create: entity index space exhausted");
+            MIR_ASSERT(index != Entity::kNullIndex, "EntityPool::Create: entity index space exhausted");
             mGenerations.push_back(0);
             return Entity{index, 0};
         }
 
         void Destroy(Entity entity)
         {
-            MTS_ASSERT(IsAlive(entity), "EntityPool::Destroy: entity is not alive");
+            MIR_ASSERT(IsAlive(entity), "EntityPool::Destroy: entity is not alive");
 
             ++mGenerations[entity.mIndex];
             mFreeList.push_back(entity.mIndex);

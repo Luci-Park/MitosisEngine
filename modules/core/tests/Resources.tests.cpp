@@ -15,8 +15,8 @@
 
 namespace
 {
-    using mts::Entity;
-    using mts::World;
+    using mir::Entity;
+    using mir::World;
 
     struct Counter
     {
@@ -156,8 +156,8 @@ TEST_CASE("Resources do not consume component signature bits", "[ecs][resources]
     world.EmplaceResource<Settings>("x", 0);
     world.EmplaceResource<Tracked>(&destructions, 0);
 
-    CHECK(mts::detail::ResourceIdOf<Counter>() < mts::kMaxComponentTypes);
-    CHECK(mts::detail::ResourceIdOf<Settings>() != mts::detail::ResourceIdOf<Counter>());
+    CHECK(mir::detail::ResourceIdOf<Counter>() < mir::kMaxComponentTypes);
+    CHECK(mir::detail::ResourceIdOf<Settings>() != mir::detail::ResourceIdOf<Counter>());
 
     // and the world still works as an ECS afterwards
     const Entity entity = world.CreateEntity();

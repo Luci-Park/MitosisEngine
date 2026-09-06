@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <chrono>
 
-namespace mts
+namespace mir
 {
     App::~App()
     {
@@ -34,7 +34,7 @@ namespace mts
                            .mStatus = "Creating window...",
                            .mProgress = 0.0f}))
         {
-            MTS_LOG_WARN("Splash screen failed to show, continuing without it");
+            MIR_LOG_WARN("Splash screen failed to show, continuing without it");
         }
 
         WindowDesc windowDesc{};
@@ -48,7 +48,7 @@ namespace mts
         mWindow = Window::Create(windowDesc);
         if (!mWindow)
         {
-            MTS_LOG_ERROR("Window creation failed");
+            MIR_LOG_ERROR("Window creation failed");
             return false;
         }
 
@@ -57,7 +57,7 @@ namespace mts
                                    .appName = desc.mAppName,
                                    .enableValidation = desc.mEnableValidation}))
         {
-            MTS_LOG_ERROR("Renderer initialization failed");
+            MIR_LOG_ERROR("Renderer initialization failed");
             mWindow.reset();
             return false;
         }
@@ -65,7 +65,7 @@ namespace mts
         mSplash.SetProgress("Initializing editor...", 0.5f);
         if (!mEditor.Initialize(*mWindow, mRenderer))
         {
-            MTS_LOG_ERROR("Editor initialization failed");
+            MIR_LOG_ERROR("Editor initialization failed");
             mRenderer.Shutdown();
             mWindow.reset();
             return false;
@@ -99,7 +99,7 @@ namespace mts
         mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
 
         mSplash.SetProgress("Loading scene...", 0.9f);
-        mScene = mts::NewScene("untitled");
+        mScene = mir::NewScene("untitled");
 
         mWindow->Show();
 
@@ -109,12 +109,12 @@ namespace mts
     void App::NewScene(std::string name)
     {
         UnloadScene(mWorld, mScene);
-        mScene = mts::NewScene(std::move(name));
+        mScene = mir::NewScene(std::move(name));
     }
 
     bool App::SaveScene()
     {
-        return mts::SaveScene(mWorld, mDesc.mSceneDir, mScene);
+        return mir::SaveScene(mWorld, mDesc.mSceneDir, mScene);
     }
 
     bool App::LoadScene()
@@ -125,12 +125,12 @@ namespace mts
         // was rather than replacing it with an empty one.
         if (!std::filesystem::exists(mDesc.mSceneDir / "scene.json"))
         {
-            MTS_LOG_ERROR("App::LoadScene: no scene.json in '{}'", mDesc.mSceneDir.string());
+            MIR_LOG_ERROR("App::LoadScene: no scene.json in '{}'", mDesc.mSceneDir.string());
             return false;
         }
 
         UnloadScene(mWorld, mScene);
-        mScene = mts::LoadScene(mWorld, mDesc.mSceneDir);
+        mScene = mir::LoadScene(mWorld, mDesc.mSceneDir);
         return true;
     }
 
@@ -146,7 +146,7 @@ namespace mts
         mAssetManifest = AssetManifest::LoadFile(manifestPath);
         if (!mAssetManifest.has_value())
         {
-            MTS_LOG_ERROR("Asset manifest load failed, assets unavailable: {}", manifestPath.string());
+            MIR_LOG_ERROR("Asset manifest load failed, assets unavailable: {}", manifestPath.string());
             mAssetLoadFailed = true;
             return nullptr;
         }
@@ -252,6 +252,6 @@ namespace mts
         // Renderer holds the surface built from the window: window dies last.
         mWindow.reset();
         mInitialized = false;
-        MTS_LOG_INFO("App shut down");
+        MIR_LOG_INFO("App shut down");
     }
 }

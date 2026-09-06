@@ -8,7 +8,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace mts
+namespace mir
 {
     glm::mat4 MakeViewProjection(const glm::mat4 &cameraWorld,
                                  float fovYDegrees, float nearZ, float farZ,

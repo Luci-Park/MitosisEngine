@@ -26,10 +26,10 @@ param(
     [ValidateSet('class', 'header')]
     [string]$Template = 'class',
 
-    # Defaults to $env:MITOSIS_AUTHOR, then git user.name, then the OS user name.
+    # Defaults to $env:MJOLNIR_AUTHOR, then git user.name, then the OS user name.
     [string]$Author,
 
-    # Defaults to $env:MITOSIS_ORG, then "DigiPen (USA) Corporation".
+    # Defaults to $env:MJOLNIR_ORG, then "DigiPen (USA) Corporation".
     [string]$Organization
 )
 
@@ -60,7 +60,7 @@ $values['INCLUDE']    = $includePath
 
 # The template tree is flat; place each generated file by its extension.
 $templateRoot = Join-Path $repoRoot "templates\file\$Template"
-$staging      = Join-Path ([System.IO.Path]::GetTempPath()) ("mitosis_" + [guid]::NewGuid().ToString('N'))
+$staging      = Join-Path ([System.IO.Path]::GetTempPath()) ("mjolnir_" + [guid]::NewGuid().ToString('N'))
 $created      = @()
 $addedSources = @()
 

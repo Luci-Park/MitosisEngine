@@ -6,14 +6,14 @@
 
 #include <optional>
 
-namespace mts
+namespace mir
 {
     AssetCache::AssetCache(const AssetManifest *manifest, std::filesystem::path cookedRoot)
         : mManifest(manifest), mCookedRoot(std::move(cookedRoot))
     {
         // Load dereferences this unconditionally; catching it here names the
         // real mistake instead of crashing on the first asset request.
-        MTS_ASSERT(mManifest != nullptr, "AssetCache: manifest must not be null");
+        MIR_ASSERT(mManifest != nullptr, "AssetCache: manifest must not be null");
     }
 
     const AssetBlobView *AssetCache::Load(AssetId id)
@@ -27,7 +27,7 @@ namespace mts
         const AssetManifestEntry *entry = mManifest->Find(id);
         if (entry == nullptr)
         {
-            MTS_LOG_ERROR("AssetCache::Load: no manifest entry for asset {:#x}", id.value);
+            MIR_LOG_ERROR("AssetCache::Load: no manifest entry for asset {:#x}", id.value);
             mFailedLoads.insert(id.value);
             return nullptr;
         }
@@ -49,7 +49,7 @@ namespace mts
 
         if (view->header.typeTag != entry->typeTag || view->header.contentVersion != entry->contentVersion)
         {
-            MTS_LOG_ERROR("AssetCache::Load: {} does not match its manifest entry", path.string());
+            MIR_LOG_ERROR("AssetCache::Load: {} does not match its manifest entry", path.string());
             mFailedLoads.insert(id.value);
             return nullptr;
         }

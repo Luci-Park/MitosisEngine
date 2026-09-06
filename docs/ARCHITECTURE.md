@@ -53,14 +53,14 @@ builds/             build trees, gitignored
 No engine dependencies. Links `spdlog` privately.
 
 - `ecs/` - see below, and [modules/core.md](modules/core.md) for detail.
-- `log/` - `MTS_LOG_*` over spdlog with a compile-time floor (Trace in Debug,
-  Info in Release); `MTS_ASSERT`/`MTS_VARIFY` (Debug) and `MTS_CHECK` (always).
+- `log/` - `MIR_LOG_*` over spdlog with a compile-time floor (Trace in Debug,
+  Info in Release); `MIR_ASSERT`/`MIR_VARIFY` (Debug) and `MIR_CHECK` (always).
 - `fs/Paths.h` - executable-relative paths, so a copied build tree runs.
 - `platform/Surface.h` - `NativeWindowHandle`, `ISurfaceProvider`.
 
 Entities are `{index, generation}` handles, the generation guarding against ABA.
 Components are POD, in one of two storages: archetype tables by default, sparse
-sets for churny components via `MTS_COMPONENT_SPARSE(T)`.
+sets for churny components via `MIR_COMPONENT_SPARSE(T)`.
 `Signature` is a 256-bit bitset over sequence-numbered types and keys the
 archetype map. `Query<Ts...>` caches matching archetypes, re-resolving when the
 world's archetype generation changes; filters are `With`, `Without`, `Or`.
@@ -173,7 +173,7 @@ phase). `App.cpp` has no ImGui calls of its own - all of that lives in
 
 ## Build system
 
-- `engine_add_module(<name>)` - target `engine_<name>`, alias `mts::<name>`,
+- `engine_add_module(<name>)` - target `engine_<name>`, alias `mir::<name>`,
   `include/` public. `engine_add_module_tests(<name> <sources>)` - Catch2 binary,
   one CTest case per `TEST_CASE`.
 - `EnginePlatform.cmake` - `ENGINE_PLATFORM` plus family flags, ordered so the

@@ -1,6 +1,6 @@
 #include "assets/AssetId.h"
 
-namespace mts
+namespace mir
 {
     uint64_t Fnv1a64(std::span<const std::byte> bytes)
     {

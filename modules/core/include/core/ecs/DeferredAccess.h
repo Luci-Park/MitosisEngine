@@ -13,7 +13,7 @@
 #include "Entity.h"
 #include "World.h"
 
-namespace mts
+namespace mir
 {
     /**
      * The frame's CommandBuffer, published as a resource.

@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <string_view>
 
-namespace mts
+namespace mir
 {
     const std::filesystem::path &ExecutableDir();
 

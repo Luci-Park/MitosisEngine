@@ -13,7 +13,7 @@
 
 #include <algorithm>
 
-namespace mts
+namespace mir
 {
     HierarchyIndex::Node *HierarchyIndex::Find(Entity entity)
     {

@@ -1,7 +1,7 @@
 # script
 
 - **Maintainer:** Rahul Nair
-- **Depends on:** `mts::core` (public), `mts::assets` (private); `sol2`, `luajit` (private, third-party)
+- **Depends on:** `mir::core` (public), `mir::assets` (private); `sol2`, `luajit` (private, third-party)
 - **Public API:** `modules/script/include/script/`
 - **Last reviewed:** 2026-09-05
 
@@ -72,15 +72,15 @@ this module.
 The shape `main.cpp` and `ResolveSceneScripts` both use - load, instantiate, attach:
 
 ```cpp
-mts::AssetCache *cache = app.Assets();
-const mts::AssetId id = mts::MakeAssetId("games/HelloWorld/assets/scripts/spin.lua");
-const mts::AssetBlobView *blob = cache->Load(id);
+mir::AssetCache *cache = app.Assets();
+const mir::AssetId id = mir::MakeAssetId("games/HelloWorld/assets/scripts/spin.lua");
+const mir::AssetBlobView *blob = cache->Load(id);
 
-app.Scripts().LoadScriptSource("spin", mts::AsStringView(*blob));
+app.Scripts().LoadScriptSource("spin", mir::AsStringView(*blob));
 app.ScriptReload().Track("spin", id);                     // picks up an edit on the next cook
 
 const int32_t instance = app.Scripts().CreateInstance("spin");
-world.AddComponent<mts::ScriptRef>(entity, mts::ScriptRef{.instanceRef = instance});
+world.AddComponent<mir::ScriptRef>(entity, mir::ScriptRef{.instanceRef = instance});
 ```
 
 A minimal script:
@@ -105,7 +105,7 @@ return Spin
 ## Invariants
 
 - **Script state never lives in a component.** Components stay POD
-  (`MTS_ASSERT_COMPONENT`); a script's data lives in `ScriptHostImpl`'s two
+  (`MIR_ASSERT_COMPONENT`); a script's data lives in `ScriptHostImpl`'s two
   maps, addressed by `instanceRef`.
 - **Every Lua callback goes through `sol::protected_function`,** never a
   raw call. This is what keeps a script's runtime error from unwinding

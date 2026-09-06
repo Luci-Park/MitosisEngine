@@ -1,7 +1,7 @@
 # window
 
 - **Maintainer:** Sumin Park
-- **Depends on:** `mts::core` publicly; `glfw` privately, desktop only
+- **Depends on:** `mir::core` publicly; `glfw` privately, desktop only
 - **Public API:** `modules/window/include/window/`
 - **Last reviewed:** 2026-09-01
 
@@ -59,7 +59,7 @@ Wayland display elsewhere.
 WindowDesc desc{};
 desc.mWidth = 1280;
 desc.mHeight = 720;
-desc.mTitle = "MitosisEngine";
+desc.mTitle = "MjolnirEngine";
 
 std::unique_ptr<Window> window = Window::Create(desc);
 
@@ -96,7 +96,7 @@ while (!window->ShouldClose())
   GLFW backend holds a raw `GLFWwindow*` it destroys, and GLFW holds a user
   pointer back to the instance.
 - **Failure aborts rather than returning.** `glfwInit` and `glfwCreateWindow` are
-  wrapped in `MTS_CHECK`, which fires in Release too, so `Window::Create` never
+  wrapped in `MIR_CHECK`, which fires in Release too, so `Window::Create` never
   returns null on the desktop backend. This is a departure from the convention
   that init paths return `bool` and let the caller decide - see Open questions.
 
@@ -111,7 +111,7 @@ while (!window->ShouldClose())
 - Size is read once in the constructor and then only ever updated by the
   framebuffer callback, so `Width`/`Height` are a cached value, not a query.
 - The error callback is installed before `glfwInit`, so GLFW's own diagnostics go
-  through `MTS_LOG_ERROR` rather than being lost.
+  through `MIR_LOG_ERROR` rather than being lost.
 - `GLFWLinux.cpp` picks between Wayland and X11 at **runtime** with
   `glfwGetPlatform()`, even though the file itself was selected at build time.
   Both native headers are exposed and both code paths are compiled in.
@@ -142,7 +142,7 @@ covered in practice by the engine failing to start.
 
 ## Open questions
 
-- `MTS_CHECK` versus returning `nullptr`. `App::Initialize` already has a
+- `MIR_CHECK` versus returning `nullptr`. `App::Initialize` already has a
   `if (!mWindow)` branch that the current backend can never take, so the two
   disagree; one of them should change.
 - Where input belongs: more virtuals on `Window`, a separate `input` module fed

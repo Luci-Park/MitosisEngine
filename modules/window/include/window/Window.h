@@ -14,7 +14,7 @@
 #include <memory>
 #include <span>
 
-namespace mts
+namespace mir
 {
     void EnsureDpiAware();
 
@@ -22,7 +22,7 @@ namespace mts
     {
         uint32_t mWidth = 1280;
         uint32_t mHeight = 720;
-        const char *mTitle = "MitosisEngine";
+        const char *mTitle = "MjolnirEngine";
         bool mResizable = true;
         bool mMaximized = false;
         bool mCustomTitleBar = false;

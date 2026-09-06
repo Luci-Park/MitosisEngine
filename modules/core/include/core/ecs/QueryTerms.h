@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace mts
+namespace mir
 {
     template <typename... Ts>
     class Query;

@@ -40,9 +40,9 @@ namespace
     };
 }
 
-MTS_COMPONENT_SPARSE(QStunned);
+MIR_COMPONENT_SPARSE(QStunned);
 
-using namespace mts;
+using namespace mir;
 
 namespace
 {

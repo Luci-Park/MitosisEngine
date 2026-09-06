@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <glm/mat4x4.hpp>
 
-namespace mts
+namespace mir
 {
     namespace detail
     {
@@ -65,7 +65,7 @@ namespace mts
         bool mDirty = true;
     };
 
-    MTS_ASSERT_COMPONENT(WorldTransform);
+    MIR_ASSERT_COMPONENT(WorldTransform);
 
     /// Read-only, expressed as a getter with no setter: a game never authors a
     /// world matrix, it authors a Transform and a parent. Writing here would be

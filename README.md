@@ -1,4 +1,4 @@
-# Mitosis Engine
+# Mjolnir Engine
 
 A modular 3D engine: an archetype ECS, a Vulkan 1.3 renderer, and an offline
 asset pipeline. This is a CMake project built with VSCode. Everything is driven
@@ -47,7 +47,7 @@ third_party/          vendored (not vcpkg) - see Dependencies below
   imgui_config/         repo-owned imconfig.h override (IMGUI_USER_CONFIG)
   IconFontCppHeaders/   icon codepoint header for Font Awesome
 
-modules/              one static library each, mts::<name>
+modules/              one static library each, mir::<name>
   core/                 ECS, logging, paths, surface contract
   window/               GLFW window behind an interface
   renderer/             Vulkan 1.3 renderer

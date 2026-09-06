@@ -21,7 +21,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -180,7 +180,7 @@ namespace mts
         fs::create_directories(sceneDir / "entities", ec);
         if (ec)
         {
-            MTS_LOG_ERROR("SaveScene: could not create '{}': {}", sceneDir.string(), ec.message());
+            MIR_LOG_ERROR("SaveScene: could not create '{}': {}", sceneDir.string(), ec.message());
             return false;
         }
 
@@ -208,7 +208,7 @@ namespace mts
             std::ofstream out(sceneDir / "scene.json");
             if (!out)
             {
-                MTS_LOG_ERROR("SaveScene: could not write scene.json in '{}'", sceneDir.string());
+                MIR_LOG_ERROR("SaveScene: could not write scene.json in '{}'", sceneDir.string());
                 return false;
             }
             out << manifest.dump(2);
@@ -263,7 +263,7 @@ namespace mts
             std::ofstream out(EntityFilePath(sceneDir, id));
             if (!out)
             {
-                MTS_LOG_ERROR("SaveScene: could not write entity file for id {}", id);
+                MIR_LOG_ERROR("SaveScene: could not write entity file for id {}", id);
                 return false;
             }
             out << file.dump(2);
@@ -279,7 +279,7 @@ namespace mts
         std::ifstream manifestFile(sceneDir / "scene.json");
         if (!manifestFile)
         {
-            MTS_LOG_ERROR("LoadScene: no scene.json in '{}'", sceneDir.string());
+            MIR_LOG_ERROR("LoadScene: no scene.json in '{}'", sceneDir.string());
             return loaded;
         }
         json manifest;
@@ -317,7 +317,7 @@ namespace mts
             std::ifstream entityFile(EntityFilePath(sceneDir, id));
             if (!entityFile)
             {
-                MTS_LOG_ERROR("LoadScene: entity file for id {} listed in manifest but missing", id);
+                MIR_LOG_ERROR("LoadScene: entity file for id {} listed in manifest but missing", id);
                 continue; // 0030 leaves this failure mode open; skip rather than abort the load
             }
             json ejson;
@@ -336,7 +336,7 @@ namespace mts
                 const ComponentOps *ops = registry.Find(typeName);
                 if (ops == nullptr)
                 {
-                    MTS_LOG_WARN("LoadScene: unknown component '{}', skipped", typeName);
+                    MIR_LOG_WARN("LoadScene: unknown component '{}', skipped", typeName);
                     continue; // forward compatibility (0031): a name this build doesn't know
                 }
 
@@ -369,7 +369,7 @@ namespace mts
             auto it = loaded.mEntities.find(p.mParent);
             if (it == loaded.mEntities.end())
             {
-                MTS_LOG_WARN("LoadScene: parent id {} not found in this scene, leaving unparented", p.mParent);
+                MIR_LOG_WARN("LoadScene: parent id {} not found in this scene, leaving unparented", p.mParent);
                 continue;
             }
             SetParent(world, p.mEntity, it->second);
@@ -386,7 +386,7 @@ namespace mts
                 if (it != loaded.mEntities.end())
                     resolved = it->second;
                 else
-                    MTS_LOG_WARN("LoadScene: EntityRef target id {} not found in this scene", r.mTarget);
+                    MIR_LOG_WARN("LoadScene: EntityRef target id {} not found in this scene", r.mTarget);
             }
 
             void *component = r.mOps->Get(world, r.mEntity);

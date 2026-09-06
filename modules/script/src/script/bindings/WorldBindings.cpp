@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -267,7 +267,7 @@ namespace mts
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
             if (ops == nullptr)
             {
-                MTS_LOG_ERROR("script: world:has unknown component '{}'", componentName);
+                MIR_LOG_ERROR("script: world:has unknown component '{}'", componentName);
                 return false;
             }
             return ops->Has(world, entity);
@@ -280,7 +280,7 @@ namespace mts
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
             if (ops == nullptr)
             {
-                MTS_LOG_ERROR("script: world:get unknown component '{}'", componentName);
+                MIR_LOG_ERROR("script: world:get unknown component '{}'", componentName);
                 return sol::nil;
             }
 
@@ -300,7 +300,7 @@ namespace mts
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
             if (ops == nullptr)
             {
-                MTS_LOG_ERROR("script: world:set unknown component '{}'", componentName);
+                MIR_LOG_ERROR("script: world:set unknown component '{}'", componentName);
                 return false;
             }
 
@@ -311,21 +311,21 @@ namespace mts
             const FieldDesc *field = ops->FindField(fieldName);
             if (field == nullptr)
             {
-                MTS_LOG_ERROR("script: world:set unknown field '{}' on component '{}'", fieldName, componentName);
+                MIR_LOG_ERROR("script: world:set unknown field '{}' on component '{}'", fieldName, componentName);
                 return false;
             }
 
             FieldScratch scratch;
             if (!LuaValueToField(*field, value, scratch))
             {
-                MTS_LOG_ERROR("script: world:set '{}.{}' - value has wrong shape for a {}", componentName, fieldName,
+                MIR_LOG_ERROR("script: world:set '{}.{}' - value has wrong shape for a {}", componentName, fieldName,
                               FieldKindName(field->mKind));
                 return false;
             }
 
             if (!field->Write(component, &scratch))
             {
-                MTS_LOG_ERROR("script: world:set '{}.{}' is read-only", componentName, fieldName);
+                MIR_LOG_ERROR("script: world:set '{}.{}' is read-only", componentName, fieldName);
                 return false;
             }
             return true;
@@ -347,7 +347,7 @@ namespace mts
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
             if (ops == nullptr)
             {
-                MTS_LOG_ERROR("script: world:add unknown component '{}'", componentName);
+                MIR_LOG_ERROR("script: world:add unknown component '{}'", componentName);
                 return false;
             }
 
@@ -364,7 +364,7 @@ namespace mts
                     FieldScratch scratch;
                     if (!LuaValueToField(field, value, scratch))
                     {
-                        MTS_LOG_ERROR("script: world:add '{}.{}' - value has wrong shape for a {}", componentName,
+                        MIR_LOG_ERROR("script: world:add '{}.{}' - value has wrong shape for a {}", componentName,
                                       field.mName, FieldKindName(field.mKind));
                         continue;
                     }
@@ -380,7 +380,7 @@ namespace mts
             const ComponentOps *ops = ComponentRegistry::Instance().Find(componentName);
             if (ops == nullptr)
             {
-                MTS_LOG_ERROR("script: world:remove unknown component '{}'", componentName);
+                MIR_LOG_ERROR("script: world:remove unknown component '{}'", componentName);
                 return false;
             }
             return RemoveComponentOrDefer(world, entity, *ops);
@@ -392,14 +392,14 @@ namespace mts
 
             if (args.size() < 2)
             {
-                MTS_LOG_ERROR("script: world:each needs at least one component name and a callback");
+                MIR_LOG_ERROR("script: world:each needs at least one component name and a callback");
                 return;
             }
 
             const sol::object callbackObj = args[args.size() - 1];
             if (!callbackObj.is<sol::protected_function>())
             {
-                MTS_LOG_ERROR("script: world:each's last argument must be a function");
+                MIR_LOG_ERROR("script: world:each's last argument must be a function");
                 return;
             }
             const sol::protected_function callback = callbackObj;
@@ -411,7 +411,7 @@ namespace mts
                 const sol::object nameObj = args[i];
                 if (!nameObj.is<std::string>())
                 {
-                    MTS_LOG_ERROR("script: world:each - component name #{} is not a string", i + 1);
+                    MIR_LOG_ERROR("script: world:each - component name #{} is not a string", i + 1);
                     return;
                 }
 
@@ -419,7 +419,7 @@ namespace mts
                 const ComponentOps *ops = ComponentRegistry::Instance().Find(name);
                 if (ops == nullptr)
                 {
-                    MTS_LOG_ERROR("script: world:each unknown component '{}'", name);
+                    MIR_LOG_ERROR("script: world:each unknown component '{}'", name);
                     return;
                 }
                 termOps.push_back(ops);
@@ -459,7 +459,7 @@ namespace mts
                     if (!result.valid())
                     {
                         const sol::error err = result;
-                        MTS_LOG_ERROR("script: world:each callback failed: {}", err.what());
+                        MIR_LOG_ERROR("script: world:each callback failed: {}", err.what());
                     }
                 });
         }
@@ -468,7 +468,7 @@ namespace mts
         {
             if (componentName.empty())
             {
-                MTS_LOG_ERROR("script: world:declare - component name is empty");
+                MIR_LOG_ERROR("script: world:declare - component name is empty");
                 return false;
             }
 
@@ -481,7 +481,7 @@ namespace mts
             {
                 if (!kv.second.is<sol::table>())
                 {
-                    MTS_LOG_ERROR("script: world:declare '{}' - each field must be a table", componentName);
+                    MIR_LOG_ERROR("script: world:declare '{}' - each field must be a table", componentName);
                     return false;
                 }
                 const sol::table entry = kv.second.as<sol::table>();
@@ -491,7 +491,7 @@ namespace mts
 
                 if (name.empty() || !kind)
                 {
-                    MTS_LOG_ERROR("script: world:declare '{}' - bad field entry (name='{}', kind='{}')",
+                    MIR_LOG_ERROR("script: world:declare '{}' - bad field entry (name='{}', kind='{}')",
                                   componentName, name, kindStr);
                     return false;
                 }
@@ -499,7 +499,7 @@ namespace mts
                 {
                     if (seen == name)
                     {
-                        MTS_LOG_ERROR("script: world:declare '{}' declares field '{}' twice", componentName, name);
+                        MIR_LOG_ERROR("script: world:declare '{}' declares field '{}' twice", componentName, name);
                         return false;
                     }
                 }
@@ -512,7 +512,7 @@ namespace mts
             {
                 if (!existing->mRuntime)
                 {
-                    MTS_LOG_ERROR("script: world:declare '{}' - already a native C++ component", componentName);
+                    MIR_LOG_ERROR("script: world:declare '{}' - already a native C++ component", componentName);
                     return false;
                 }
 
@@ -524,7 +524,7 @@ namespace mts
 
                 if (!sameLayout)
                 {
-                    MTS_LOG_ERROR("script: world:declare '{}' - already declared with a different field list; "
+                    MIR_LOG_ERROR("script: world:declare '{}' - already declared with a different field list; "
                                   "restart to change a component's fields",
                                   componentName);
                     return false;
