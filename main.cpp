@@ -3,6 +3,7 @@
 #include <assets/AssetCache.h>
 #include <assets/AssetId.h>
 #include <core/ecs/TransformHierarchy.h>
+#include <core/fs/Paths.h>
 #include <core/log/Log.h>
 #include <renderer/Shapes.h>
 #include <renderer/components/Camera.h>
@@ -265,7 +266,7 @@ int main()
     // GameProject's comment. This is what "games/HelloWorld/game.json exists"
     // actually buys today: naming its assets/scenes roots in one place
     // instead of stringing "games/HelloWorld/..." through main.cpp by hand.
-    const GameProject project = LoadGameProject("games/HelloWorld/game.json");
+    const GameProject project = LoadGameProject(mir::ExecutableDir() / "games/HelloWorld/game.json");
 
     mir::App app;
 

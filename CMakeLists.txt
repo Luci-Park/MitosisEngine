@@ -70,6 +70,12 @@ engine_cook_assets(HelloWorld
 engine_copy_fonts(HelloWorld SOURCE_DIR fonts)
 engine_copy_branding(HelloWorld SOURCE_DIR branding)
 
+add_custom_command(TARGET HelloWorld POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different
+            "${CMAKE_SOURCE_DIR}/games" "$<TARGET_FILE_DIR:HelloWorld>/games"
+    COMMENT "Copying game projects next to HelloWorld"
+    VERBATIM)
+
 find_package(nlohmann_json CONFIG REQUIRED)
 
 target_link_libraries(HelloWorld PRIVATE

@@ -26,6 +26,9 @@ namespace mir
     {
         mDesc = desc;
 
+        if (mDesc.mSceneDir.is_relative())
+            mDesc.mSceneDir = ExecutableDir() / mDesc.mSceneDir;
+
         EnsureDpiAware();
 
         if (!mSplash.Show({.mEngineName = desc.mAppName,
