@@ -31,8 +31,8 @@ namespace mts
         splash.Show({.mEngineName = desc.mAppName,
                      .mVersion = kEngineVersion,
                      .mCopyright = kEngineCopyright,
-                     .mStatus = "Loading...",
-                     .mProgress = 0.3f});
+                     .mStatus = "Creating window...",
+                     .mProgress = 0.0f});
 
         WindowDesc windowDesc{};
         windowDesc.mWidth = desc.mWidth;
@@ -48,6 +48,7 @@ namespace mts
             return false;
         }
 
+        splash.SetProgress("Initializing renderer...", 0.2f);
         if (!mRenderer.Initialize({.window = mWindow.get(),
                                    .appName = desc.mAppName,
                                    .enableValidation = desc.mEnableValidation}))
@@ -57,6 +58,7 @@ namespace mts
             return false;
         }
 
+        splash.SetProgress("Initializing editor...", 0.5f);
         if (!mEditor.Initialize(*mWindow, mRenderer))
         {
             MTS_LOG_ERROR("Editor initialization failed");
@@ -66,6 +68,8 @@ namespace mts
         }
 
         mInitialized = true;
+
+        splash.SetProgress("Registering components...", 0.75f);
 
         // scene graph + install destroy hook
         InstallHierarchy(mWorld);
@@ -90,8 +94,10 @@ namespace mts
         // already current for this frame - see RenderSystem's own comment.
         mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
 
+        splash.SetProgress("Loading scene...", 0.9f);
         mScene = mts::NewScene("untitled");
 
+        splash.SetProgress("Ready", 1.0f);
         return true;
     }
 

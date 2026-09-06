@@ -190,6 +190,30 @@ namespace mts
         return true;
     }
 
+    void SplashScreen::SetProgress(const char *status, float progress)
+    {
+        if (mHandle == nullptr)
+            return;
+
+        HWND hwnd = static_cast<HWND>(mHandle);
+        auto *state = reinterpret_cast<PaintState *>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+        if (state == nullptr)
+            return;
+
+        state->mStatus = status;
+        state->mProgress = progress;
+
+        ::InvalidateRect(hwnd, nullptr, FALSE);
+        ::UpdateWindow(hwnd); // synchronous repaint, same as Show()
+
+        MSG msg{};
+        while (::PeekMessageW(&msg, hwnd, 0, 0, PM_REMOVE))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessageW(&msg);
+        }
+    }
+
     void SplashScreen::Close()
     {
         if (mHandle == nullptr)

@@ -15,5 +15,7 @@ namespace mts
 
     bool SplashScreen::Show(const SplashDesc &) { return false; }
 
+    void SplashScreen::SetProgress(const char *, float) {}
+
     void SplashScreen::Close() {}
 }

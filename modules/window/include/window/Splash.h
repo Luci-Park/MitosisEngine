@@ -36,6 +36,8 @@ namespace mts
 
         bool Show(const SplashDesc &desc);
 
+        void SetProgress(const char *status, float progress);
+
         void Close();
 
         bool IsShowing() const { return mHandle != nullptr; }
