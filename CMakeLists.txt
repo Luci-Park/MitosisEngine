@@ -48,8 +48,12 @@ add_subdirectory(modules/window)
 
 add_subdirectory(tools/AssetCooker)
 
-add_executable(HelloWorld)
+add_executable(HelloWorld WIN32)
 target_sources(HelloWorld PRIVATE main.cpp)
+
+if(MSVC)
+    set_target_properties(HelloWorld PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
+endif()
 
 engine_add_shaders(HelloWorld
     SOURCE assets/shaders/triangle.slang
