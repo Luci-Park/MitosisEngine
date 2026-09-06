@@ -16,6 +16,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <fstream>
+#include <iterator>
+#include <string>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 
@@ -83,6 +85,31 @@ TEST_CASE("SaveScene then LoadScene round-trips a Transform", "[scene]")
     CHECK(transform->Position() == glm::vec3(1.0f, 2.0f, 3.0f));
     CHECK(transform->Rotation() == glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
     CHECK(transform->Scale() == glm::vec3(1.0f));
+}
+
+TEST_CASE("SaveScene writes a clean decimal for a float that isn't exactly representable", "[scene]")
+{
+    mts::RegisterCoreComponents();
+
+    World world;
+    LoadedScene scene = NewScene("test");
+    Entity entity = CreateSceneEntity(world, scene);
+    mts::AddTransform(world, entity, Transform{glm::vec3(1.8f, 0.0f, 0.0f)});
+
+    TempSceneDir dir("clean_float");
+    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+
+    std::ifstream file(dir.mPath / "entities" / "1.json");
+    REQUIRE(file);
+    const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+    // 1.8f promoted straight to double and printed at double precision reads
+    // as 1.7999999523162842 - exactly what CleanFloat exists to avoid, since
+    // every re-save would otherwise jitter a value that never actually
+    // changed, defeating the diff-friendliness the per-entity split (0030)
+    // is for.
+    CHECK(text.find("1.7999999") == std::string::npos);
+    CHECK(text.find("1.8") != std::string::npos);
 }
 
 TEST_CASE("SaveScene then LoadScene round-trips parent/child structure", "[scene]")

@@ -16,6 +16,8 @@
 #include "core/log/Log.h"
 
 #include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -38,6 +40,19 @@ namespace mts
             return sceneDir / "entities" / (std::to_string(id) + ".json");
         }
 
+        double CleanFloat(float value)
+        {
+            if (!std::isfinite(value))
+                return static_cast<double>(value); // JSON has no representation for these anyway
+
+            char buffer[32];
+            const auto formatted = std::to_chars(buffer, buffer + sizeof(buffer), value);
+
+            double clean = 0.0;
+            std::from_chars(buffer, formatted.ptr, clean);
+            return clean;
+        }
+
         // ---- one FieldKind <-> one json value; EntityRef is the caller's job,
         // it needs the StableId map neither of these functions has ----
 
@@ -50,28 +65,28 @@ namespace mts
             case FieldKind::Int:
                 return *static_cast<const int32_t *>(bytes);
             case FieldKind::Float:
-                return *static_cast<const float *>(bytes);
+                return CleanFloat(*static_cast<const float *>(bytes));
             case FieldKind::Vec3:
             {
                 const auto &v = *static_cast<const glm::vec3 *>(bytes);
-                return json::array({v.x, v.y, v.z});
+                return json::array({CleanFloat(v.x), CleanFloat(v.y), CleanFloat(v.z)});
             }
             case FieldKind::Vec4:
             {
                 const auto &v = *static_cast<const glm::vec4 *>(bytes);
-                return json::array({v.x, v.y, v.z, v.w});
+                return json::array({CleanFloat(v.x), CleanFloat(v.y), CleanFloat(v.z), CleanFloat(v.w)});
             }
             case FieldKind::Quat:
             {
                 const auto &q = *static_cast<const glm::quat *>(bytes);
-                return json::array({q.x, q.y, q.z, q.w});
+                return json::array({CleanFloat(q.x), CleanFloat(q.y), CleanFloat(q.z), CleanFloat(q.w)});
             }
             case FieldKind::Mat4:
             {
                 const float *m = &static_cast<const glm::mat4 *>(bytes)->operator[](0).x;
                 json arr = json::array();
                 for (int i = 0; i < 16; ++i)
-                    arr.push_back(m[i]);
+                    arr.push_back(CleanFloat(m[i]));
                 return arr;
             }
             case FieldKind::Handle:
