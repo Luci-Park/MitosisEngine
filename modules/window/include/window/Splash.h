@@ -8,8 +8,12 @@
  */
 #pragma once
 
+#include <memory>
+
 namespace mts
 {
+    struct SplashImpl;
+
     struct SplashDesc
     {
         const char *mEngineName = "MitosisEngine";
@@ -23,7 +27,7 @@ namespace mts
     class SplashScreen
     {
     public:
-        SplashScreen() = default;
+        SplashScreen();
         ~SplashScreen();
 
         SplashScreen(const SplashScreen &) = delete;
@@ -43,6 +47,6 @@ namespace mts
         bool IsShowing() const { return mImpl != nullptr; }
 
     private:
-        void *mImpl = nullptr;
+        std::unique_ptr<SplashImpl> mImpl;
     };
 }

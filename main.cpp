@@ -1,10 +1,3 @@
-#if defined(_WIN32)
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0A00 // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 (Windows 10)
-#endif
-#include <windows.h>
-#endif
-
 #include <app/App.h>
 #include <assets/AssetBlob.h>
 #include <assets/AssetCache.h>
@@ -265,10 +258,6 @@ namespace
 
 int main()
 {
-#if defined(_WIN32)
-    ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-#endif
-
     // Logging lives outside App so early construction failures are still visible.
     mts::InitLog();
 
@@ -297,13 +286,22 @@ int main()
     // when it fails, so this can't silently double up entities either way.
     if (app.LoadScene())
     {
+        app.Splash().SetProgress("Resolving scripts...", 0.93f);
         ResolveSceneScripts(app, project);
+
+        app.Splash().SetProgress("Resolving meshes...", 0.97f);
         ResolveSceneMeshes(app, project);
     }
     else
     {
+        app.Splash().SetProgress("Building scene...", 0.95f);
         BuildScene(app, project);
     }
+
+    // Only now is startup actually done - close explicitly rather than
+    // leaning on WS_EX_TOPMOST z-order to hide the swap.
+    app.Splash().SetProgress("Ready", 1.0f);
+    app.Splash().Close();
 
     app.Run();
     app.Shutdown();

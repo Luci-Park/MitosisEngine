@@ -9,13 +9,26 @@
  */
 #include "window/Splash.h"
 
+#include "core/log/Assert.h"
+
 namespace mts
 {
+    // Never actually created (Show() always returns false below), but
+    // unique_ptr<SplashImpl>'s destructor still needs the type complete
+    // wherever it's instantiated - including here.
+    struct SplashImpl
+    {
+    };
+
+    SplashScreen::SplashScreen() = default;
     SplashScreen::~SplashScreen() = default;
 
     bool SplashScreen::Show(const SplashDesc &) { return false; }
 
-    void SplashScreen::SetProgress(const char *, float) {}
+    void SplashScreen::SetProgress(const char *status, float)
+    {
+        MTS_ASSERT(status != nullptr, "SplashScreen::SetProgress: status must not be null");
+    }
 
     void SplashScreen::Close() {}
 }

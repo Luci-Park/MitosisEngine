@@ -18,6 +18,7 @@
 #include <scene/SceneAsset.h>
 #include <script/ScriptHost.h>
 #include <script/ScriptReloadWatcher.h>
+#include <window/Splash.h>
 #include <window/Window.h>
 
 #include <cstdint>
@@ -66,6 +67,14 @@ namespace mts
         /// Temporary seam
         VulkanRenderer &Renderer() { return mRenderer; }
 
+        /// Startup splash. Initialize() shows it and drives its own stages
+        /// but deliberately does not close it - for a non-trivial game the
+        /// real long pole is scene/asset loading, which happens after
+        /// Initialize() returns (main.cpp's LoadScene/ResolveSceneMeshes or
+        /// BuildScene call, today). A caller doing that should keep updating
+        /// this and Close() it once actually done, right before Run().
+        SplashScreen &Splash() { return mSplash; }
+
         /// The asset cache, loading the manifest on first use.
         /// Returns nullptr when no manifest is available - a build with no cooked
         /// assets, or an exe moved away from its cooked/ folder - so a missing
@@ -96,6 +105,7 @@ namespace mts
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
 
+        SplashScreen mSplash;
         std::unique_ptr<Window> mWindow;
         VulkanRenderer mRenderer;
         Editor mEditor;

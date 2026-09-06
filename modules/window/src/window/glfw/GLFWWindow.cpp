@@ -44,7 +44,7 @@ namespace mts
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, desc.mResizable ? GLFW_TRUE : GLFW_FALSE);
         glfwWindowHint(GLFW_MAXIMIZED, desc.mMaximized ? GLFW_TRUE : GLFW_FALSE);
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_VISIBLE, desc.mStartHidden ? GLFW_FALSE : GLFW_TRUE);
 
         mHandle = glfwCreateWindow(static_cast<int>(desc.mWidth),
                                     static_cast<int>(desc.mHeight),

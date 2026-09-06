@@ -16,6 +16,8 @@
 
 namespace mts
 {
+    void EnsureDpiAware();
+
     struct WindowDesc
     {
         uint32_t mWidth = 1280;
@@ -24,6 +26,8 @@ namespace mts
         bool mResizable = true;
         bool mMaximized = false;
         bool mCustomTitleBar = false;
+
+        bool mStartHidden = false;
     };
 
     class Window : public ISurfaceProvider
