@@ -241,7 +241,7 @@ namespace mts
          */
         bool IsIterating() const { return mQueryIterationDepth > 0; }
 
-        // Get table of entity
+        // GetComponent table of entity
         const Archetype *ArchetypeOf(Entity entity) const
         {
             MTS_ASSERT(mPool.IsAlive(entity), "World::ArchetypeOf: entity is not alive");
@@ -271,7 +271,7 @@ namespace mts
         }
 
         template <typename T>
-        T *Get(Entity entity)
+        T *GetComponent(Entity entity)
         {
             if (!mPool.IsAlive(entity))
                 return nullptr;
@@ -279,7 +279,7 @@ namespace mts
             if constexpr (kIsSparseComponent<T>)
             {
                 SparseSetStorage<T> *storage = FindSparseStorage<T>();
-                return storage ? storage->Get(entity) : nullptr;
+                return storage ? storage->GetComponent(entity) : nullptr;
             }
             else
             {
@@ -290,7 +290,7 @@ namespace mts
         }
 
         template <typename T>
-        const T *Get(Entity entity) const
+        const T *GetComponent(Entity entity) const
         {
             if (!mPool.IsAlive(entity))
                 return nullptr;
@@ -298,7 +298,7 @@ namespace mts
             if constexpr (kIsSparseComponent<T>)
             {
                 const SparseSetStorage<T> *storage = FindSparseStorage<T>();
-                return storage ? storage->Get(entity) : nullptr;
+                return storage ? storage->GetComponent(entity) : nullptr;
             }
             else
             {
@@ -320,7 +320,7 @@ namespace mts
             {
                 SparseSetStorage<T> &storage = SparseStorageFor<T>();
                 storage.Add(entity, value);
-                return *storage.Get(entity);
+                return *storage.GetComponent(entity);
             }
             else
             {

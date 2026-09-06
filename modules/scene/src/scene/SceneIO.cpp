@@ -218,7 +218,7 @@ namespace mts
                     continue;
 
                 json fields = json::object();
-                const void *component = ops->Get(world, entity);
+                const void *component = ops->GetComponent(world, entity);
                 for (const FieldDesc &field : ops->mFields)
                 {
                     FieldBuffer buffer{};
@@ -326,7 +326,7 @@ namespace mts
                 }
 
                 ops->AddCopy(world, entity, ops->mDefaultValue.data());
-                void *component = ops->Get(world, entity);
+                void *component = ops->GetComponent(world, entity);
 
                 const json &fields = blob.value("fields", json::object());
                 for (const FieldDesc &field : ops->mFields)
@@ -361,7 +361,7 @@ namespace mts
         }
 
         // --- pass 3: EntityRef fields, now that every entity exists and no
-        // more structural change is coming, so Get()'s pointer holds ---
+        // more structural change is coming, so GetComponent()'s pointer holds ---
         for (const auto &r : pendingRefs)
         {
             Entity resolved = kNullEntity;
@@ -374,7 +374,7 @@ namespace mts
                     MTS_LOG_WARN("LoadScene: EntityRef target id {} not found in this scene", r.mTarget);
             }
 
-            void *component = r.mOps->Get(world, r.mEntity);
+            void *component = r.mOps->GetComponent(world, r.mEntity);
             const FieldDesc *field = r.mOps->FindField(r.mField);
             if (component != nullptr && field != nullptr)
                 field->Write(component, &resolved);

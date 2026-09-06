@@ -89,7 +89,7 @@ namespace mts
 
         void InvalidateCache(World &world, Entity entity)
         {
-            if (WorldTransform *cache = world.Get<WorldTransform>(entity))
+            if (WorldTransform *cache = world.GetComponent<WorldTransform>(entity))
                 detail::TransformResolver::Invalidate(*cache);
         }
 
@@ -204,8 +204,8 @@ namespace mts
         for (uint32_t i = depth; i-- > 0;)
         {
             const Entity current = chain[i];
-            const Transform *local = world.Get<Transform>(current);
-            WorldTransform *cache = world.Get<WorldTransform>(current);
+            const Transform *local = world.GetComponent<Transform>(current);
+            WorldTransform *cache = world.GetComponent<WorldTransform>(current);
 
             // No Transform means the node contributes identity but still passes
             // its parent's space through - an empty pivot node.
@@ -280,7 +280,7 @@ namespace mts
         // a row to an archetype the entity already occupies and leave its
         // record naming a row that no longer exists.
         if (world.Has<Transform>(entity))
-            *world.Get<Transform>(entity) = transform;
+            *world.GetComponent<Transform>(entity) = transform;
         else
             world.AddComponent<Transform>(entity, transform);
 
@@ -295,7 +295,7 @@ namespace mts
         // Re-fetched, not carried over from AddComponent: adding WorldTransform
         // moves the entity to another archetype and relocates the Transform row
         // the first reference pointed at.
-        return *world.Get<Transform>(entity);
+        return *world.GetComponent<Transform>(entity);
     }
 
     void TransformPropagateSystem::OnStart(SystemContext &context)

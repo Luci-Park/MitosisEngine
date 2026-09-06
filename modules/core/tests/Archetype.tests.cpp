@@ -61,10 +61,10 @@ TEST_CASE("World AddComponent makes the component readable", "[ecs][archetype]")
     world.AddComponent(entity, Position{1.0f, 2.0f});
 
     REQUIRE(world.Has<Position>(entity));
-    REQUIRE(world.Get<Position>(entity) != nullptr);
-    CHECK(world.Get<Position>(entity)->x == 1.0f);
-    CHECK(world.Get<Position>(entity)->y == 2.0f);
-    CHECK(world.Get<Velocity>(entity) == nullptr);
+    REQUIRE(world.GetComponent<Position>(entity) != nullptr);
+    CHECK(world.GetComponent<Position>(entity)->x == 1.0f);
+    CHECK(world.GetComponent<Position>(entity)->y == 2.0f);
+    CHECK(world.GetComponent<Velocity>(entity) == nullptr);
 }
 
 TEST_CASE("World preserves existing component values across an archetype move", "[ecs][archetype]")
@@ -78,10 +78,10 @@ TEST_CASE("World preserves existing component values across an archetype move", 
     // Position had to be memcpy'd from the {Position} table into {Position,Velocity}
     REQUIRE(world.Has<Position>(entity));
     REQUIRE(world.Has<Velocity>(entity));
-    CHECK(world.Get<Position>(entity)->x == 1.0f);
-    CHECK(world.Get<Position>(entity)->y == 2.0f);
-    CHECK(world.Get<Velocity>(entity)->dx == 3.0f);
-    CHECK(world.Get<Velocity>(entity)->dy == 4.0f);
+    CHECK(world.GetComponent<Position>(entity)->x == 1.0f);
+    CHECK(world.GetComponent<Position>(entity)->y == 2.0f);
+    CHECK(world.GetComponent<Velocity>(entity)->dx == 3.0f);
+    CHECK(world.GetComponent<Velocity>(entity)->dy == 4.0f);
 }
 
 TEST_CASE("World reuses one archetype regardless of add order", "[ecs][archetype]")
@@ -97,8 +97,8 @@ TEST_CASE("World reuses one archetype regardless of add order", "[ecs][archetype
     world.AddComponent(b, Position{2.0f, 2.0f});
 
     REQUIRE(world.ArchetypeOf(a) == world.ArchetypeOf(b));
-    CHECK(world.Get<Position>(a)->x == 1.0f);
-    CHECK(world.Get<Position>(b)->x == 2.0f);
+    CHECK(world.GetComponent<Position>(a)->x == 1.0f);
+    CHECK(world.GetComponent<Position>(b)->x == 2.0f);
 }
 
 TEST_CASE("World RemoveComponent drops only that component", "[ecs][archetype]")
@@ -112,8 +112,8 @@ TEST_CASE("World RemoveComponent drops only that component", "[ecs][archetype]")
 
     REQUIRE(world.Has<Position>(entity));
     REQUIRE_FALSE(world.Has<Velocity>(entity));
-    CHECK(world.Get<Position>(entity)->x == 1.0f);
-    CHECK(world.Get<Velocity>(entity) == nullptr);
+    CHECK(world.GetComponent<Position>(entity)->x == 1.0f);
+    CHECK(world.GetComponent<Velocity>(entity) == nullptr);
 }
 
 TEST_CASE("World repairs the entity swapped into a vacated row", "[ecs][archetype]")
@@ -134,8 +134,8 @@ TEST_CASE("World repairs the entity swapped into a vacated row", "[ecs][archetyp
     REQUIRE_FALSE(world.IsAlive(a));
     REQUIRE(world.IsAlive(b));
     REQUIRE(world.IsAlive(c));
-    CHECK(world.Get<Health>(b)->hp == 2);
-    CHECK(world.Get<Health>(c)->hp == 3);
+    CHECK(world.GetComponent<Health>(b)->hp == 2);
+    CHECK(world.GetComponent<Health>(c)->hp == 3);
 }
 
 TEST_CASE("World destroys every component of an entity in one row removal", "[ecs][archetype]")
@@ -148,8 +148,8 @@ TEST_CASE("World destroys every component of an entity in one row removal", "[ec
     world.DestroyEntity(entity);
 
     REQUIRE_FALSE(world.IsAlive(entity));
-    CHECK(world.Get<Position>(entity) == nullptr);
-    CHECK(world.Get<Velocity>(entity) == nullptr);
+    CHECK(world.GetComponent<Position>(entity) == nullptr);
+    CHECK(world.GetComponent<Velocity>(entity) == nullptr);
 }
 
 TEST_CASE("World recycles entity indices with a bumped generation", "[ecs][archetype]")
@@ -191,8 +191,8 @@ TEST_CASE("World keeps sparse components out of the archetype", "[ecs][archetype
 
     REQUIRE(world.Has<Frozen>(a));
     REQUIRE_FALSE(world.Has<Frozen>(b));
-    CHECK(world.Get<Frozen>(a)->turnsLeft == 3);
-    CHECK(world.Get<Frozen>(b) == nullptr);
+    CHECK(world.GetComponent<Frozen>(a)->turnsLeft == 3);
+    CHECK(world.GetComponent<Frozen>(b) == nullptr);
 }
 
 TEST_CASE("World removes a sparse component without an archetype move", "[ecs][archetype][sparse]")
@@ -209,7 +209,7 @@ TEST_CASE("World removes a sparse component without an archetype move", "[ecs][a
     CHECK(world.ArchetypeOf(entity) == before);
     REQUIRE_FALSE(world.Has<Frozen>(entity));
     REQUIRE(world.Has<Position>(entity));
-    CHECK(world.Get<Position>(entity)->x == 1.0f);
+    CHECK(world.GetComponent<Position>(entity)->x == 1.0f);
 }
 
 TEST_CASE("World clears sparse components on destroy", "[ecs][archetype][sparse]")
@@ -224,5 +224,5 @@ TEST_CASE("World clears sparse components on destroy", "[ecs][archetype][sparse]
     const mts::Entity second = world.CreateEntity();
     REQUIRE(second.mIndex == first.mIndex);
     CHECK_FALSE(world.Has<Frozen>(second));
-    CHECK(world.Get<Frozen>(second) == nullptr);
+    CHECK(world.GetComponent<Frozen>(second) == nullptr);
 }

@@ -162,7 +162,7 @@ TEST_CASE("Resources do not consume component signature bits", "[ecs][resources]
     // and the world still works as an ECS afterwards
     const Entity entity = world.CreateEntity();
     world.AddComponent<Counter>(entity, Counter{9});
-    CHECK(world.Get<Counter>(entity)->value == 9);
+    CHECK(world.GetComponent<Counter>(entity)->value == 9);
 
     world.RemoveResource<Tracked>();
 }

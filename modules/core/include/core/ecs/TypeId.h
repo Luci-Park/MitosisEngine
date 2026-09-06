@@ -49,7 +49,7 @@ namespace mts
         return counter.fetch_add(1, std::memory_order_relaxed);
     }
 
-// Get name from compiler -> Trim it
+// GetComponent name from compiler -> Trim it
 // strips struct/class/enum keywords, collapses spaces,
 // then also derives unqualified name (BareNameOffset strips leading Namespace::)
 #pragma region Building Hash

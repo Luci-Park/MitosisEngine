@@ -176,7 +176,7 @@ namespace mts
                     return false;
                 const sol::table t = value.as<sol::table>();
                 scratch.asVec4 = glm::vec4(t.get_or("x", 0.0f), t.get_or("y", 0.0f), t.get_or("z", 0.0f),
-                                            t.get_or("w", 0.0f));
+                                           t.get_or("w", 0.0f));
                 return true;
             }
             case FieldKind::Quat:
@@ -185,7 +185,7 @@ namespace mts
                     return false;
                 const sol::table t = value.as<sol::table>();
                 scratch.asQuat = glm::quat(t.get_or("w", 1.0f), t.get_or("x", 0.0f), t.get_or("y", 0.0f),
-                                            t.get_or("z", 0.0f));
+                                           t.get_or("z", 0.0f));
                 return true;
             }
             case FieldKind::Mat4:
@@ -284,7 +284,7 @@ namespace mts
                 return sol::nil;
             }
 
-            void *component = ops->Get(world, entity);
+            void *component = ops->GetComponent(world, entity);
             if (component == nullptr)
                 return sol::nil;
 
@@ -304,7 +304,7 @@ namespace mts
                 return false;
             }
 
-            void *component = ops->Get(world, entity);
+            void *component = ops->GetComponent(world, entity);
             if (component == nullptr)
                 return false; // dead entity or missing component - routine, not an error
 
@@ -540,14 +540,14 @@ namespace mts
     void RegisterWorldBindings(sol::state &lua)
     {
         lua.new_usertype<World>("World",
-                                 "has", &WorldHas,
-                                 "get", &WorldGet,
-                                 "set", &WorldSet,
-                                 "spawn", &WorldSpawn,
-                                 "destroy", &WorldDestroy,
-                                 "add", &WorldAdd,
-                                 "remove", &WorldRemove,
-                                 "each", &WorldEach,
-                                 "declare", &WorldDeclare);
+                                "has", &WorldHas,
+                                "get", &WorldGet,
+                                "set", &WorldSet,
+                                "spawn", &WorldSpawn,
+                                "destroy", &WorldDestroy,
+                                "add", &WorldAdd,
+                                "remove", &WorldRemove,
+                                "each", &WorldEach,
+                                "declare", &WorldDeclare);
     }
 }

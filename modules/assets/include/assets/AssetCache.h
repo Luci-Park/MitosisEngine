@@ -48,7 +48,7 @@ namespace mts
         AssetCache &operator=(AssetCache &&) = default;
 
         const AssetBlobView *Load(AssetId id);
-        const AssetBlobView *Get(AssetId id) const;
+        const AssetBlobView *GetComponent(AssetId id) const;
 
         void Invalidate(AssetId id);
 

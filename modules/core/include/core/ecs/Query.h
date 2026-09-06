@@ -360,7 +360,7 @@ namespace mts
         static T &ResolveRef(ComponentColumn *column, Storage storage, Entity entity, uint32_t row)
         {
             if constexpr (kIsSparseComponent<detail::Bare<T>>)
-                return *storage->Get(entity);
+                return *storage->GetComponent(entity);
             else
                 return *static_cast<T *>(column->At(row));
         }

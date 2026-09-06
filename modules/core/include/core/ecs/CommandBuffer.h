@@ -167,7 +167,7 @@ namespace mts
             // World::AddComponent asserts on a duplicate. Two systems each
             // deferring an add to the same entity in one phase is legitimate, and
             // asserting from inside the flush loses the callsite, so overwrite.
-            if (T *existing = world.Get<T>(entity))
+            if (T *existing = world.GetComponent<T>(entity))
                 *existing = *value;
             else
                 world.AddComponent<T>(entity, *value);

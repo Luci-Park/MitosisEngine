@@ -94,9 +94,10 @@ TEST_CASE("A runtime query writes through to the column")
     const Entity entity = Spawn(world, 1.0f, 0.0f);
 
     RuntimeQuery query(world, terms);
-    query.ForEach([](Entity, std::span<void *const> row) { static_cast<RqPosition *>(row[0])->x = 5.0f; });
+    query.ForEach([](Entity, std::span<void *const> row)
+                  { static_cast<RqPosition *>(row[0])->x = 5.0f; });
 
-    CHECK(world.Get<RqPosition>(entity)->x == 5.0f);
+    CHECK(world.GetComponent<RqPosition>(entity)->x == 5.0f);
 }
 
 TEST_CASE("A runtime query narrows by With and Without")
@@ -112,7 +113,8 @@ TEST_CASE("A runtime query narrows by With and Without")
     query.With(Velocity().mType).Without(Frozen().mType);
 
     std::vector<Entity> seen;
-    query.ForEach([&](Entity entity, std::span<void *const>) { seen.push_back(entity); });
+    query.ForEach([&](Entity entity, std::span<void *const>)
+                  { seen.push_back(entity); });
 
     REQUIRE(seen.size() == 1);
     CHECK(seen.front() == moving);
@@ -145,7 +147,8 @@ TEST_CASE("A runtime query picks up an archetype created after its first walk")
 
     // the empty intermediates contribute no rows
     std::size_t visited = 0;
-    query.ForEach([&](Entity, std::span<void *const>) { ++visited; });
+    query.ForEach([&](Entity, std::span<void *const>)
+                  { ++visited; });
     CHECK(visited == 2);
 }
 
@@ -207,7 +210,7 @@ TEST_CASE("A runtime query mixes a script component with a C++ one")
         });
 
     CHECK(visited == 1);
-    CHECK(world.Get<RqPosition>(entity)->x == 1.5f);
+    CHECK(world.GetComponent<RqPosition>(entity)->x == 1.5f);
 }
 
 TEST_CASE("A runtime query reports the world as iterating")

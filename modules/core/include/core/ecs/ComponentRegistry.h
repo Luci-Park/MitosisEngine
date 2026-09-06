@@ -71,7 +71,7 @@ namespace mts
         /// `T{}` for a native type, all-zero for a script-declared one.
         std::span<const std::byte> mDefaultValue;
 
-        void *Get(World &world, Entity entity) const { return mGet(*this, world, entity); }
+        void *GetComponent(World &world, Entity entity) const { return mGet(*this, world, entity); }
 
         bool Has(const World &world, Entity entity) const { return mHas(*this, world, entity); }
         void AddCopy(World &world, Entity entity, const void *value) const { mAddCopy(*this, world, entity, value); }
@@ -165,7 +165,7 @@ namespace mts
             ops.mFields = fields;
 
             ops.mGet = [](const ComponentOps &, World &world, Entity entity) -> void *
-            { return world.IsAlive(entity) ? world.Get<T>(entity) : nullptr; };
+            { return world.IsAlive(entity) ? world.GetComponent<T>(entity) : nullptr; };
 
             ops.mHas = [](const ComponentOps &, const World &world, Entity entity)
             { return world.IsAlive(entity) && world.Has<T>(entity); };
@@ -178,7 +178,7 @@ namespace mts
                 // overwrite rather than assert on a duplicate, matching
                 // CommandBuffer::ApplyAdd - two callers adding the same
                 // component in one frame is legitimate
-                if (T *existing = world.Get<T>(entity))
+                if (T *existing = world.GetComponent<T>(entity))
                     *existing = *static_cast<const T *>(value);
                 else
                     world.AddComponent<T>(entity, *static_cast<const T *>(value));

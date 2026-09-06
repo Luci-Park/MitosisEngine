@@ -73,7 +73,8 @@ TEST_CASE("ForEach visits only entities holding every component", "[ecs][query]"
     SECTION("single component matches every superset archetype")
     {
         std::vector<Entity> visited;
-        world.ForEach<QPosition>([&](Entity e, QPosition &) { visited.push_back(e); });
+        world.ForEach<QPosition>([&](Entity e, QPosition &)
+                                 { visited.push_back(e); });
 
         REQUIRE(SortedIndices(visited) == SortedIndices({both, positionOnly}));
     }
@@ -81,7 +82,8 @@ TEST_CASE("ForEach visits only entities holding every component", "[ecs][query]"
     SECTION("two components exclude partial matches")
     {
         std::vector<Entity> visited;
-        world.ForEach<QPosition, QVelocity>([&](Entity e, QPosition &, QVelocity &) { visited.push_back(e); });
+        world.ForEach<QPosition, QVelocity>([&](Entity e, QPosition &, QVelocity &)
+                                            { visited.push_back(e); });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == both);
@@ -90,7 +92,8 @@ TEST_CASE("ForEach visits only entities holding every component", "[ecs][query]"
     SECTION("no match yields no calls")
     {
         int calls = 0;
-        world.ForEach<QHealth>([&](Entity, QHealth &) { ++calls; });
+        world.ForEach<QHealth>([&](Entity, QHealth &)
+                               { ++calls; });
 
         REQUIRE(calls == 0);
         REQUIRE(!world.Has<QHealth>(empty));
@@ -108,11 +111,10 @@ TEST_CASE("ForEach yields references that write through to storage", "[ecs][quer
     world.ForEach<QPosition, QVelocity>([](Entity, QPosition &p, QVelocity &v)
                                         {
                                             p.x += v.dx;
-                                            p.y += v.dy;
-                                        });
+                                            p.y += v.dy; });
 
-    REQUIRE(world.Get<QPosition>(entity)->x == 2.0f);
-    REQUIRE(world.Get<QPosition>(entity)->y == -3.0f);
+    REQUIRE(world.GetComponent<QPosition>(entity)->x == 2.0f);
+    REQUIRE(world.GetComponent<QPosition>(entity)->y == -3.0f);
 }
 
 TEST_CASE("ForEach spans multiple archetypes", "[ecs][query]")
@@ -132,7 +134,8 @@ TEST_CASE("ForEach spans multiple archetypes", "[ecs][query]")
     world.AddComponent(c, QHealth{});
 
     std::vector<Entity> visited;
-    world.ForEach<QPosition>([&](Entity e, QPosition &) { visited.push_back(e); });
+    world.ForEach<QPosition>([&](Entity e, QPosition &)
+                             { visited.push_back(e); });
 
     REQUIRE(SortedIndices(visited) == SortedIndices({a, b, c}));
 }
@@ -154,18 +157,18 @@ TEST_CASE("ForEach filters sparse components per entity", "[ecs][query]")
         world.ForEach<QPosition, QStunned>([&](Entity e, QPosition &, QStunned &s)
                                            {
                                                visited.push_back(e);
-                                               --s.turnsLeft;
-                                           });
+                                               --s.turnsLeft; });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == stunned);
-        REQUIRE(world.Get<QStunned>(stunned)->turnsLeft == 2);
+        REQUIRE(world.GetComponent<QStunned>(stunned)->turnsLeft == 2);
     }
 
     SECTION("sparse-only query still walks archetypes")
     {
         std::vector<Entity> visited;
-        world.ForEach<QStunned>([&](Entity e, QStunned &) { visited.push_back(e); });
+        world.ForEach<QStunned>([&](Entity e, QStunned &)
+                                { visited.push_back(e); });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == stunned);
@@ -178,7 +181,8 @@ TEST_CASE("ForEach filters sparse components per entity", "[ecs][query]")
         fresh.AddComponent(e, QPosition{});
 
         int calls = 0;
-        fresh.ForEach<QPosition, QStunned>([&](Entity, QPosition &, QStunned &) { ++calls; });
+        fresh.ForEach<QPosition, QStunned>([&](Entity, QPosition &, QStunned &)
+                                           { ++calls; });
 
         REQUIRE(calls == 0);
     }
@@ -188,7 +192,8 @@ TEST_CASE("ForEach filters sparse components per entity", "[ecs][query]")
         world.RemoveComponent<QStunned>(stunned);
 
         int calls = 0;
-        world.ForEach<QPosition, QStunned>([&](Entity, QPosition &, QStunned &) { ++calls; });
+        world.ForEach<QPosition, QStunned>([&](Entity, QPosition &, QStunned &)
+                                           { ++calls; });
 
         REQUIRE(calls == 0);
     }
@@ -206,11 +211,12 @@ TEST_CASE("ForEach skips destroyed entities", "[ecs][query]")
     world.DestroyEntity(doomed);
 
     std::vector<Entity> visited;
-    world.ForEach<QPosition>([&](Entity e, QPosition &) { visited.push_back(e); });
+    world.ForEach<QPosition>([&](Entity e, QPosition &)
+                             { visited.push_back(e); });
 
     REQUIRE(visited.size() == 1);
     REQUIRE(visited[0] == kept);
-    REQUIRE(world.Get<QPosition>(visited[0])->x == 5.0f);
+    REQUIRE(world.GetComponent<QPosition>(visited[0])->x == 5.0f);
 }
 
 namespace
@@ -238,10 +244,9 @@ TEST_CASE("ForEach accepts const terms", "[ecs][query]")
     world.ForEach<QPosition, const QVelocity>([](Entity, QPosition &p, const QVelocity &v)
                                               {
                                                   static_assert(std::is_const_v<std::remove_reference_t<decltype(v)>>);
-                                                  p.x += v.dx;
-                                              });
+                                                  p.x += v.dx; });
 
-    REQUIRE(world.Get<QPosition>(entity)->x == 6.0f);
+    REQUIRE(world.GetComponent<QPosition>(entity)->x == 6.0f);
 }
 
 TEST_CASE("Query filters by With and Without", "[ecs][query]")
@@ -263,7 +268,8 @@ TEST_CASE("Query filters by With and Without", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(Without<QFrozen>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(SortedIndices(visited) == SortedIndices({plain, shielded}));
     }
@@ -272,7 +278,8 @@ TEST_CASE("Query filters by With and Without", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(With<QShield>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == shielded);
@@ -282,7 +289,8 @@ TEST_CASE("Query filters by With and Without", "[ecs][query]")
     {
         int calls = 0;
         world.GetOrCreateQuery<QPosition>(With<QShield>{}, Without<QFrozen>{})
-            .ForEach([&](Entity, QPosition &) { ++calls; });
+            .ForEach([&](Entity, QPosition &)
+                     { ++calls; });
 
         REQUIRE(calls == 1);
     }
@@ -305,7 +313,8 @@ TEST_CASE("Query Or matches any listed component", "[ecs][query]")
 
     std::vector<Entity> visited;
     world.GetOrCreateQuery<QPosition>(Or<QFrozen, QShield>{})
-        .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+        .ForEach([&](Entity e, QPosition &)
+                 { visited.push_back(e); });
 
     REQUIRE(SortedIndices(visited) == SortedIndices({frozen, shielded}));
 }
@@ -325,7 +334,8 @@ TEST_CASE("Query filters on sparse members per row", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(Without<QStunned>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == awake);
@@ -335,7 +345,8 @@ TEST_CASE("Query filters on sparse members per row", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(With<QStunned>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(visited.size() == 1);
         REQUIRE(visited[0] == stunned);
@@ -359,7 +370,8 @@ TEST_CASE("Query cache survives and refreshes across calls", "[ecs][query]")
     REQUIRE(static_cast<void *>(&filtered) != static_cast<void *>(&first));
 
     int calls = 0;
-    first.ForEach([&](Entity, QPosition &) { ++calls; });
+    first.ForEach([&](Entity, QPosition &)
+                  { ++calls; });
     REQUIRE(calls == 1);
 
     SECTION("rows added to an already-matched archetype are picked up")
@@ -368,7 +380,8 @@ TEST_CASE("Query cache survives and refreshes across calls", "[ecs][query]")
         world.AddComponent(b, QPosition{}); // no new archetype, so no generation bump
 
         calls = 0;
-        first.ForEach([&](Entity, QPosition &) { ++calls; });
+        first.ForEach([&](Entity, QPosition &)
+                      { ++calls; });
         REQUIRE(calls == 2);
     }
 
@@ -383,7 +396,8 @@ TEST_CASE("Query cache survives and refreshes across calls", "[ecs][query]")
         REQUIRE(world.Generation() > before);
 
         std::vector<Entity> visited;
-        first.ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+        first.ForEach([&](Entity e, QPosition &)
+                      { visited.push_back(e); });
         REQUIRE(SortedIndices(visited) == SortedIndices({a, b}));
     }
 }
@@ -409,10 +423,12 @@ TEST_CASE("Query cache keys on filters, not just data terms", "[ecs][query]")
     REQUIRE(&excludeFrozen != &requireShield);
 
     std::vector<Entity> withoutFrozen;
-    excludeFrozen.ForEach([&](Entity e, QPosition &, QVelocity &) { withoutFrozen.push_back(e); });
+    excludeFrozen.ForEach([&](Entity e, QPosition &, QVelocity &)
+                          { withoutFrozen.push_back(e); });
 
     std::vector<Entity> withShield;
-    requireShield.ForEach([&](Entity e, QPosition &, QVelocity &) { withShield.push_back(e); });
+    requireShield.ForEach([&](Entity e, QPosition &, QVelocity &)
+                          { withShield.push_back(e); });
 
     REQUIRE(withoutFrozen.size() == 1);
     REQUIRE(withoutFrozen[0] == mover);
@@ -469,7 +485,8 @@ TEST_CASE("Query Or terms are independent clauses", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(Or<QMelee, QRanged>{}, Or<QFrozen, QShield>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(SortedIndices(visited) == SortedIndices({meleeFrozen, rangedShield}));
     }
@@ -478,7 +495,8 @@ TEST_CASE("Query Or terms are independent clauses", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(Or<QMelee, QRanged, QFrozen, QShield>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(SortedIndices(visited) ==
                 SortedIndices({meleeFrozen, rangedShield, meleeOnly, shieldOnly}));
@@ -488,7 +506,8 @@ TEST_CASE("Query Or terms are independent clauses", "[ecs][query]")
     {
         std::vector<Entity> visited;
         world.GetOrCreateQuery<QPosition>(Or<QMelee, QRanged>{}, Without<QFrozen>{})
-            .ForEach([&](Entity e, QPosition &) { visited.push_back(e); });
+            .ForEach([&](Entity e, QPosition &)
+                     { visited.push_back(e); });
 
         REQUIRE(SortedIndices(visited) == SortedIndices({rangedShield, meleeOnly}));
     }
@@ -507,7 +526,8 @@ TEST_CASE("The world reports itself as iterating during a walk", "[ecs][query]")
     CHECK_FALSE(world.IsIterating());
 
     bool sawIterating = false;
-    world.ForEach<QPosition>([&](Entity, QPosition &) { sawIterating = world.IsIterating(); });
+    world.ForEach<QPosition>([&](Entity, QPosition &)
+                             { sawIterating = world.IsIterating(); });
 
     CHECK(sawIterating);
     CHECK_FALSE(world.IsIterating());
@@ -574,13 +594,10 @@ TEST_CASE("Query allows a nested walk when no rebuild is needed", "[ecs][query]"
 
     int pairs = 0;
     query.ForEach([&](Entity outer, QPosition &)
-                  {
-                      query.ForEach([&](Entity inner, QPosition &)
-                                    {
+                  { query.ForEach([&](Entity inner, QPosition &)
+                                  {
                                         if (!(outer == inner))
-                                            ++pairs;
-                                    });
-                  });
+                                            ++pairs; }); });
 
     REQUIRE(pairs == 6); // 3 entities, ordered pairs
 }

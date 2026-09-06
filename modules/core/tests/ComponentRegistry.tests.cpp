@@ -102,7 +102,7 @@ TEST_CASE("Erased ops add, read and remove a C++ component")
     ops.AddCopy(world, entity, &value);
 
     REQUIRE(ops.Has(world, entity));
-    CHECK(world.Get<RegistryHealth>(entity)->hp == 42);
+    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 42);
     CHECK(static_cast<RegistryHealth *>(ops.Get(world, entity))->hp == 42);
 
     ops.Remove(world, entity);
@@ -139,7 +139,7 @@ TEST_CASE("Adding twice through the erased path overwrites instead of failing")
     ops.AddCopy(world, entity, &first);
     ops.AddCopy(world, entity, &second);
 
-    CHECK(world.Get<RegistryHealth>(entity)->hp == 2);
+    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 2);
 }
 
 TEST_CASE("AddDefault installs the type's default value")
@@ -152,7 +152,7 @@ TEST_CASE("AddDefault installs the type's default value")
     ops.AddDefault(world, entity);
 
     REQUIRE(ops.Has(world, entity));
-    CHECK(world.Get<RegistryHealth>(entity)->hp == RegistryHealth{}.hp);
+    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == RegistryHealth{}.hp);
 }
 
 TEST_CASE("A field write on Transform goes through the setter, not the bytes")
@@ -166,7 +166,7 @@ TEST_CASE("A field write on Transform goes through the setter, not the bytes")
     const Entity entity = world.CreateEntity();
     world.AddComponent<Transform>(entity, Transform{});
 
-    Transform *transform = world.Get<Transform>(entity);
+    Transform *transform = world.GetComponent<Transform>(entity);
     const uint32_t before = transform->Version();
 
     const FieldDesc *position = ops.FindField("position");
@@ -216,7 +216,7 @@ TEST_CASE("Registering a sparse component publishes it to the erased path")
     sparse.AddCopy(world, entity, &value);
 
     REQUIRE(sparse.Has(world, entity));
-    CHECK(world.Get<RegistrySparse>(entity)->tick == 3);
+    CHECK(world.GetComponent<RegistrySparse>(entity)->tick == 3);
     CHECK_FALSE(world.HasRaw(entity, dense.mType)); // dense one really is absent
 
     sparse.Remove(world, entity);
@@ -385,7 +385,7 @@ TEST_CASE("Interleaved erased and typed commands both survive one flush")
 
     REQUIRE(native.Has(world, entity));
     REQUIRE(script.Has(world, entity));
-    CHECK(world.Get<RegistryHealth>(entity)->hp == 9);
+    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 9);
 
     int32_t readBack = 0;
     script.FindField("hp")->Read(script.Get(world, entity), &readBack);

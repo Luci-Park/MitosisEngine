@@ -24,7 +24,7 @@ namespace mts
      * non-affine or sheared state the way a hand-edited matrix can.
      *
      * Members are private and reached through mutators only so that Version()
-     * cannot fall behind the data. World::Get<T> hands out a raw T*, so there
+     * cannot fall behind the data. World::GetComponent<T> hands out a raw T*, so there
      * is no hook on the ECS side to stamp a write - the component is the last
      * place the invariant can be enforced rather than remembered. That version
      * is what lets WorldTransform detect staleness in O(1) instead of the

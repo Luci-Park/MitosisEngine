@@ -18,7 +18,7 @@ namespace mts
 
     const AssetBlobView *AssetCache::Load(AssetId id)
     {
-        if (const AssetBlobView *cached = Get(id))
+        if (const AssetBlobView *cached = GetComponent(id))
             return cached;
 
         if (mFailedLoads.contains(id.value))
@@ -58,7 +58,7 @@ namespace mts
         return &mLoaded.emplace(id.value, std::move(cacheEntry)).first->second.view;
     }
 
-    const AssetBlobView *AssetCache::Get(AssetId id) const
+    const AssetBlobView *AssetCache::GetComponent(AssetId id) const
     {
         auto it = mLoaded.find(id.value);
         if (it == mLoaded.end())

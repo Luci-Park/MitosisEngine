@@ -62,14 +62,14 @@ TEST_CASE("AssetCache loads a cooked blob through the manifest", "[assets][cache
     REQUIRE(manifest.has_value());
 
     mts::AssetCache cache(&*manifest, dir.path);
-    REQUIRE(cache.Get(id) == nullptr);
+    REQUIRE(cache.GetComponent(id) == nullptr);
 
     const mts::AssetBlobView *view = cache.Load(id);
     REQUIRE(view != nullptr);
     REQUIRE(view->content.size() == content.size());
     CHECK(std::memcmp(view->content.data(), content.data(), content.size()) == 0);
 
-    CHECK(cache.Get(id) == view);
+    CHECK(cache.GetComponent(id) == view);
     CHECK(cache.Load(id) == view);
 }
 

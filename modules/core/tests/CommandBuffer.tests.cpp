@@ -55,13 +55,13 @@ TEST_CASE("Add is deferred until Flush", "[ecs][commands]")
     commands.Add(entity, CHealth{5});
 
     REQUIRE_FALSE(commands.Empty());
-    REQUIRE(world.Get<CHealth>(entity) == nullptr);
+    REQUIRE(world.GetComponent<CHealth>(entity) == nullptr);
 
     commands.Flush(world);
 
     REQUIRE(commands.Empty());
-    REQUIRE(world.Get<CHealth>(entity) != nullptr);
-    REQUIRE(world.Get<CHealth>(entity)->hp == 5);
+    REQUIRE(world.GetComponent<CHealth>(entity) != nullptr);
+    REQUIRE(world.GetComponent<CHealth>(entity)->hp == 5);
 }
 
 TEST_CASE("Add recorded inside a ForEach applies after the walk", "[ecs][commands]")
@@ -87,7 +87,7 @@ TEST_CASE("Add recorded inside a ForEach applies after the walk", "[ecs][command
 
     for (int i = 0; i < 4; ++i)
     {
-        const CHealth *health = world.Get<CHealth>(entities[static_cast<std::size_t>(i)]);
+        const CHealth *health = world.GetComponent<CHealth>(entities[static_cast<std::size_t>(i)]);
         REQUIRE(health != nullptr);
         REQUIRE(health->hp == i);
     }
@@ -111,16 +111,17 @@ TEST_CASE("An entity spawned during iteration is visible after the flush", "[ecs
                                  commands.Add(spawned, CPosition{position.x + 1.0f, 0.0f}); });
 
     REQUIRE_FALSE(spawned.IsNull());
-    REQUIRE(world.IsAlive(spawned));          // handle is live immediately
-    REQUIRE(world.Get<CPosition>(spawned) == nullptr); // data is not
+    REQUIRE(world.IsAlive(spawned));                            // handle is live immediately
+    REQUIRE(world.GetComponent<CPosition>(spawned) == nullptr); // data is not
 
     commands.Flush(world);
 
-    REQUIRE(world.Get<CPosition>(spawned) != nullptr);
-    REQUIRE(world.Get<CPosition>(spawned)->x == 11.0f);
+    REQUIRE(world.GetComponent<CPosition>(spawned) != nullptr);
+    REQUIRE(world.GetComponent<CPosition>(spawned)->x == 11.0f);
 
     std::vector<float> seen;
-    world.ForEach<CPosition>([&](Entity, CPosition &position) { seen.push_back(position.x); });
+    world.ForEach<CPosition>([&](Entity, CPosition &position)
+                             { seen.push_back(position.x); });
     std::sort(seen.begin(), seen.end());
     REQUIRE(seen == std::vector<float>{10.0f, 11.0f});
 }
@@ -138,7 +139,7 @@ TEST_CASE("Destroy then Add on the same entity is a no-op, not an assert", "[ecs
     commands.Flush(world);
 
     REQUIRE_FALSE(world.IsAlive(entity));
-    REQUIRE(world.Get<CHealth>(entity) == nullptr);
+    REQUIRE(world.GetComponent<CHealth>(entity) == nullptr);
 }
 
 TEST_CASE("Remove is deferred until Flush", "[ecs][commands]")
@@ -172,8 +173,8 @@ TEST_CASE("Adding the same component twice keeps the last value", "[ecs][command
     commands.Add(entity, CHealth{7});
     commands.Flush(world);
 
-    REQUIRE(world.Get<CHealth>(entity) != nullptr);
-    REQUIRE(world.Get<CHealth>(entity)->hp == 7);
+    REQUIRE(world.GetComponent<CHealth>(entity) != nullptr);
+    REQUIRE(world.GetComponent<CHealth>(entity)->hp == 7);
 }
 
 TEST_CASE("Interleaved payloads of different alignment survive the flush", "[ecs][commands]")
@@ -198,11 +199,11 @@ TEST_CASE("Interleaved payloads of different alignment survive the flush", "[ecs
 
     for (int i = 0; i < 3; ++i)
     {
-        const CSmall *small = world.Get<CSmall>(entities[static_cast<std::size_t>(i) * 2]);
+        const CSmall *small = world.GetComponent<CSmall>(entities[static_cast<std::size_t>(i) * 2]);
         REQUIRE(small != nullptr);
         REQUIRE(small->v == static_cast<int16_t>(i));
 
-        const CWide *wide = world.Get<CWide>(entities[static_cast<std::size_t>(i) * 2 + 1]);
+        const CWide *wide = world.GetComponent<CWide>(entities[static_cast<std::size_t>(i) * 2 + 1]);
         REQUIRE(wide != nullptr);
         REQUIRE(wide->m[0] == static_cast<float>(i));
         REQUIRE(wide->m[3] == 3.0f);

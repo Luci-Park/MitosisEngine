@@ -26,8 +26,8 @@ namespace mts
         void Add(Entity entity, const T &value);
         void Remove(Entity entity);
         bool Has(Entity entity) const;
-        T *Get(Entity entity);
-        const T *Get(Entity entity) const;
+        T *GetComponent(Entity entity);
+        const T *GetComponent(Entity entity) const;
 
     private:
         std::vector<T> mDense;              // component in mSparse[entity.mIndex]
@@ -79,13 +79,13 @@ namespace mts
     }
 
     template <typename T>
-    T *SparseSetStorage<T>::Get(Entity entity)
+    T *SparseSetStorage<T>::GetComponent(Entity entity)
     {
         return Has(entity) ? &mDense[mSparse[entity.mIndex]] : nullptr;
     }
 
     template <typename T>
-    const T *SparseSetStorage<T>::Get(Entity entity) const
+    const T *SparseSetStorage<T>::GetComponent(Entity entity) const
     {
         return Has(entity) ? &mDense[mSparse[entity.mIndex]] : nullptr;
     }

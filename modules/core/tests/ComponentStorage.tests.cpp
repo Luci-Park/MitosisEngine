@@ -30,7 +30,7 @@ TEST_CASE("SparseSetStorage starts empty", "[ecs][storage]")
 {
     Storage storage;
     REQUIRE_FALSE(storage.Has(MakeEntity(0)));
-    REQUIRE(storage.Get(MakeEntity(0)) == nullptr);
+    REQUIRE(storage.GetComponent(MakeEntity(0)) == nullptr);
 }
 
 TEST_CASE("SparseSetStorage Add makes the component visible", "[ecs][storage]")
@@ -41,9 +41,9 @@ TEST_CASE("SparseSetStorage Add makes the component visible", "[ecs][storage]")
     storage.Add(entity, Position{1.0f, 2.0f});
 
     REQUIRE(storage.Has(entity));
-    REQUIRE(storage.Get(entity) != nullptr);
-    CHECK(storage.Get(entity)->x == 1.0f);
-    CHECK(storage.Get(entity)->y == 2.0f);
+    REQUIRE(storage.GetComponent(entity) != nullptr);
+    CHECK(storage.GetComponent(entity)->x == 1.0f);
+    CHECK(storage.GetComponent(entity)->y == 2.0f);
 }
 
 TEST_CASE("SparseSetStorage Remove clears the component", "[ecs][storage]")
@@ -55,7 +55,7 @@ TEST_CASE("SparseSetStorage Remove clears the component", "[ecs][storage]")
     storage.Remove(entity);
 
     REQUIRE_FALSE(storage.Has(entity));
-    REQUIRE(storage.Get(entity) == nullptr);
+    REQUIRE(storage.GetComponent(entity) == nullptr);
 }
 
 TEST_CASE("SparseSetStorage keeps unrelated entities independent", "[ecs][storage]")
@@ -77,8 +77,8 @@ TEST_CASE("SparseSetStorage keeps unrelated entities independent", "[ecs][storag
     REQUIRE(storage.Has(c));
     REQUIRE_FALSE(storage.Has(b));
 
-    CHECK(storage.Get(a)->x == 1.0f);
-    CHECK(storage.Get(c)->x == 3.0f);
+    CHECK(storage.GetComponent(a)->x == 1.0f);
+    CHECK(storage.GetComponent(c)->x == 3.0f);
 }
 
 TEST_CASE("SparseSetStorage Add after Remove reuses the entity index", "[ecs][storage]")
@@ -91,5 +91,5 @@ TEST_CASE("SparseSetStorage Add after Remove reuses the entity index", "[ecs][st
     storage.Add(entity, Position{9.0f, 9.0f});
 
     REQUIRE(storage.Has(entity));
-    CHECK(storage.Get(entity)->x == 9.0f);
+    CHECK(storage.GetComponent(entity)->x == 9.0f);
 }

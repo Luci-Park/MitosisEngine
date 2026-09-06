@@ -78,7 +78,7 @@ TEST_CASE("SaveScene then LoadScene round-trips a Transform", "[scene]")
     REQUIRE(loaded.mEntities.size() == 1);
     Entity loadedEntity = loaded.mEntities.at(1);
 
-    const Transform *transform = loadedWorld.Get<Transform>(loadedEntity);
+    const Transform *transform = loadedWorld.GetComponent<Transform>(loadedEntity);
     REQUIRE(transform != nullptr);
     CHECK(transform->Position() == glm::vec3(1.0f, 2.0f, 3.0f));
     CHECK(transform->Rotation() == glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
@@ -185,7 +185,7 @@ TEST_CASE("LoadScene skips a component name it does not recognise", "[scene]")
 
     REQUIRE(loaded.mEntities.size() == 1);
     Entity loadedEntity = loaded.mEntities.at(1);
-    const Transform *transform = loadedWorld.Get<Transform>(loadedEntity);
+    const Transform *transform = loadedWorld.GetComponent<Transform>(loadedEntity);
     REQUIRE(transform != nullptr);
     CHECK(transform->Position() == glm::vec3(4.0f, 5.0f, 6.0f));
 }
@@ -240,8 +240,8 @@ TEST_CASE("LoadScene's nextId survives a save, even past a deleted entity's id",
 
     World world;
     LoadedScene scene = NewScene("test");
-    Entity first = CreateSceneEntity(world, scene);  // id 1
-    CreateSceneEntity(world, scene);                 // id 2, kept
+    Entity first = CreateSceneEntity(world, scene); // id 1
+    CreateSceneEntity(world, scene);                // id 2, kept
 
     scene.mEntities.erase(1);
     world.DestroyEntity(first);
