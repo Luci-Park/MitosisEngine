@@ -9,6 +9,12 @@
         "vulkan",
         "volk",
         "vulkan-memory-allocator",
+        "luajit",
+        {
+            "name": "pkgconf",
+            "host": true
+        },
+        "sol2",
         "catch2"
     ],
     "$comment": "builtin-baseline = SHA of vcpkg"

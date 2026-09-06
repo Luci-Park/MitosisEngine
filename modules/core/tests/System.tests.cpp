@@ -178,6 +178,47 @@ TEST_CASE("A spawn is not visible to systems in its own phase", "[ecs][system]")
     REQUIRE(counter.seen == std::vector<std::size_t>{0, 1});
 }
 
+TEST_CASE("A system removes its destroy hook in OnStop, so Reset leaves none behind", "[ecs][system]")
+{
+    World world;
+    CommandBuffer commands;
+    int hookCalls = 0;
+
+    class HookSystem final : public ISystem
+    {
+    public:
+        explicit HookSystem(int &calls) : mCalls(calls) {}
+        void OnStart(SystemContext &context) override { context.world.AddDestroyHook(&Fire, this); }
+        void OnUpdate(SystemContext &) override {}
+        void OnStop(SystemContext &context) override { context.world.RemoveDestroyHook(&Fire, this); }
+
+    private:
+        static void Fire(World &, Entity, void *user) { ++static_cast<HookSystem *>(user)->mCalls; }
+        int &mCalls;
+    };
+
+    {
+        SystemScheduler scheduler;
+        scheduler.Add<HookSystem>(SystemPhase::PreUpdate, hookCalls);
+
+        SystemContext context{world, commands};
+        scheduler.Start(context);
+
+        const Entity a = world.CreateEntity();
+        world.DestroyEntity(a);
+        REQUIRE(hookCalls == 1);
+
+        scheduler.Stop(context);
+        scheduler.Reset(); // the HookSystem instance is destroyed here
+    }
+
+    // If OnStop had not removed the hook, this would call through a
+    // dangling `this` - instead the count simply stops moving.
+    const Entity b = world.CreateEntity();
+    world.DestroyEntity(b);
+    REQUIRE(hookCalls == 1);
+}
+
 TEST_CASE("The context carries frame timing through to systems", "[ecs][system]")
 {
     World world;

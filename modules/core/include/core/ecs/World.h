@@ -203,6 +203,21 @@ namespace mts
             mDestroyHooks.push_back(hook);
         }
 
+        /**
+         * Undoes a matching AddDestroyHook. Symmetric with it, and for the
+         * same reason a system needs it: a system that installs a hook in
+         * OnStart and is later torn down (SystemScheduler::Reset, or an
+         * App::Shutdown followed by another Initialize) leaves a dangling
+         * `user` in mDestroyHooks forever if it never removes what it added -
+         * the next entity destroyed after teardown calls back into whatever
+         * used to live there. A no-op if the hook isn't present.
+         */
+        void RemoveDestroyHook(void (*fn)(World &, Entity, void *), void *user = nullptr)
+        {
+            const EntityDestroyHook hook{fn, user};
+            std::erase(mDestroyHooks, hook);
+        }
+
         // reset record, remove from both storages, remove from pool
         void DestroyEntity(Entity entity)
         {

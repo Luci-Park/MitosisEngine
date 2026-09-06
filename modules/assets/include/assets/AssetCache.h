@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -48,6 +49,10 @@ namespace mts
 
         const AssetBlobView *Load(AssetId id);
         const AssetBlobView *Get(AssetId id) const;
+
+        void Invalidate(AssetId id);
+
+        std::optional<std::filesystem::path> ResolvedPath(AssetId id) const;
 
     private:
         const AssetManifest *mManifest;
