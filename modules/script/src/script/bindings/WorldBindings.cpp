@@ -142,7 +142,7 @@ namespace mts
             }
             case FieldKind::Int:
             {
-                if (!value.is<double>())
+                if (value.get_type() != sol::type::number)
                     return false;
                 scratch.asInt = static_cast<int32_t>(value.as<double>());
                 return true;

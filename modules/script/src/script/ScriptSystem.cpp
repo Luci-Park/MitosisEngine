@@ -61,6 +61,8 @@ namespace mts
                 RunIsolated(entity, "OnStop", [&]
                             { mHost.CallOnStop(context.world, context.commands, entity, ref.instanceRef); });
             });
+
+        context.world.RemoveDestroyHook(&ScriptSystem::OnEntityDestroyed, this);
     }
 
     void ScriptSystem::OnEntityDestroyed(World &world, Entity entity, void *user)

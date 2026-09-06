@@ -60,8 +60,34 @@ namespace mts
             }
 
             const int32_t ref = mNextInstanceRef++;
-            mInstances.emplace(ref, ScriptInstance{std::string(scriptName), mLua.create_table()});
+            mInstances.emplace(ref, ScriptInstance{std::string(scriptName), NewInstanceData(it->second.as<sol::table>(), scriptName)});
             return ref;
+        }
+
+        sol::table NewInstanceData(const sol::table &scriptClass, std::string_view scriptName)
+        {
+            const sol::object ctor = scriptClass["NewInstanceData"];
+            if (!ctor.is<sol::protected_function>())
+                return mLua.create_table();
+
+            const sol::protected_function_result result = ctor.as<sol::protected_function>()();
+            if (!result.valid())
+            {
+                const sol::error err = result;
+                MTS_LOG_ERROR("script: '{}'.NewInstanceData() failed: {}; using an empty instance", scriptName,
+                              err.what());
+                return mLua.create_table();
+            }
+
+            const sol::object data = result.get<sol::object>();
+            if (!data.is<sol::table>())
+            {
+                MTS_LOG_ERROR("script: '{}'.NewInstanceData() did not return a table; using an empty instance",
+                              scriptName);
+                return mLua.create_table();
+            }
+
+            return data.as<sol::table>();
         }
 
         void DestroyInstance(int32_t instanceRef)
