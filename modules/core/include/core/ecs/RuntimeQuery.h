@@ -59,7 +59,7 @@ namespace mts
         RuntimeQuery &With(TypeId type);
         RuntimeQuery &Without(TypeId type);
 
-        /// At least one of `types` must be present. Clauses AND together, so
+        /// GetComponent least one of `types` must be present. Clauses AND together, so
         /// two calls mean (a|b) AND (c|d).
         RuntimeQuery &WithAny(std::span<const TypeId> types);
 
@@ -104,7 +104,7 @@ namespace mts
                 for (uint32_t index = 0; index < rows && index < table.RowCount(); ++index)
                 {
                     for (std::size_t term = 0; term < terms; ++term)
-                        row[term] = columns[term]->At(index);
+                        row[term] = columns[term]->GetComponent(index);
 
                     fn(table.EntityAt(index), std::span<void *const>(row));
                 }

@@ -19,8 +19,8 @@ namespace mts
     template <typename... Ts>
     class Query;
 
-    // filter terms: type-only carriers, passed as empty instances so the
-    // pack can be deduced from a call argument list
+    // distingushed by type so can be empty structs
+
     template <typename... Es>
     struct With
     {
@@ -31,6 +31,7 @@ namespace mts
     {
     };
 
+    // sparse components cannot have or filter
     template <typename... Es>
     struct Or
     {
@@ -42,7 +43,7 @@ namespace mts
         template <typename T>
         using Bare = std::remove_const_t<T>;
 
-        // groups the data terms so a query key can never be mistaken for a filter pack
+        // groups the data terms, distinguishes it from filters
         template <typename... Ts>
         struct TypeList
         {
@@ -60,7 +61,7 @@ namespace mts
             return counter.fetch_add(1, std::memory_order_relaxed);
         }
 
-        // distinct integer per Component + Filter<Component> combinations
+        // distinct id per component + filter combination
         template <typename... Key>
         uint32_t QueryKeyOf()
         {
@@ -68,13 +69,12 @@ namespace mts
             return id;
         }
 
-        // a sparse filter member is erased at Query construction (filters are not
-        // Query's template parameters), so the Has() call is bound through a thunk
+        // Saves Filter for sparse components
         struct SparseFilterCheck
         {
             bool (*has)(const void *storage, Entity entity);
             const void *storage;
-            bool wantPresent; // With -> must be present, Without -> must be absent
+            bool wantPresent; // = With / Without
         };
     }
 }

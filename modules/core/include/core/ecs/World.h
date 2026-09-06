@@ -132,13 +132,12 @@ namespace mts
             T mValue;
         };
 
-        // table bitmask
+        // bitmask for archetypes
+        // Sparse components and const is stripped
         template <typename... Ts>
         Signature TableSignatureOf()
         {
             Signature signature;
-
-            // strip const to have clean bitmask
             ((kIsSparseComponent<Bare<Ts>> ? void() : void(signature.set(ComponentBit<Bare<Ts>>()))), ...);
             return signature;
         }
@@ -250,8 +249,8 @@ namespace mts
 
         std::size_t ArchetypeCount() const { return mArchetypes.size(); }
 
-        // bumped once per archetype creation
-        // a query whose seen this generation needs no rescan
+        // archetype generation
+        // bumps every time new archetype component is added
         std::size_t Generation() const { return mArchetypeGeneration; }
 
         template <typename T>
@@ -285,7 +284,7 @@ namespace mts
             {
                 const EntityRecord &record = mRecords[entity.mIndex];
                 ComponentColumn *column = record.archetype->FindColumn(TypeIdOf<T>());
-                return column ? static_cast<T *>(column->At(record.row)) : nullptr;
+                return column ? static_cast<T *>(column->GetComponent(record.row)) : nullptr;
             }
         }
 
@@ -304,7 +303,7 @@ namespace mts
             {
                 const EntityRecord &record = mRecords[entity.mIndex];
                 const ComponentColumn *column = record.archetype->FindColumn(TypeIdOf<T>());
-                return column ? static_cast<const T *>(column->At(record.row)) : nullptr;
+                return column ? static_cast<const T *>(column->GetComponent(record.row)) : nullptr;
             }
         }
 
@@ -369,7 +368,7 @@ namespace mts
 
             const EntityRecord &record = mRecords[entity.mIndex];
             ComponentColumn *column = record.archetype->FindColumn(type);
-            return column ? column->At(record.row) : nullptr;
+            return column ? column->GetComponent(record.row) : nullptr;
         }
 
         const void *GetRaw(Entity entity, TypeId type) const
@@ -381,7 +380,7 @@ namespace mts
 
             const EntityRecord &record = mRecords[entity.mIndex];
             const ComponentColumn *column = record.archetype->FindColumn(type);
-            return column ? column->At(record.row) : nullptr;
+            return column ? column->GetComponent(record.row) : nullptr;
         }
 
         bool HasRaw(Entity entity, TypeId type) const
@@ -515,12 +514,9 @@ namespace mts
             return mResources.erase(detail::ResourceKeyOf<T>()) != 0;
         }
 
-        // returns the world-owned query for this exact term + filter shape,
-        // use queries to iterate over storages
         template <typename... Ts, typename... Filters>
         Query<Ts...> &GetOrCreateQuery(Filters... filters);
 
-        // Use with GetOrCreateQuery<Ts...>().ForEach(cb); defined in Query.h.
         template <typename... Ts, typename Fn>
         void ForEach(Fn &&cb);
 
@@ -611,7 +607,7 @@ namespace mts
             const uint32_t row = target.AddRow(entity);
             CopySharedColumns(*from.archetype, from.row, target, row);
 
-            void *slot = target.FindColumn(type)->At(row);
+            void *slot = target.FindColumn(type)->GetComponent(row);
             std::memcpy(slot, value, size);
 
             RemoveRow(*from.archetype, from.row);
@@ -699,7 +695,7 @@ namespace mts
 
                 if (fromSeq == toSeq)
                 {
-                    std::memcpy(toColumns[j].At(toRow), fromColumns[i].At(fromRow), fromColumns[i].ElementSize());
+                    std::memcpy(toColumns[j].GetComponent(toRow), fromColumns[i].GetComponent(fromRow), fromColumns[i].ElementSize());
                     ++i;
                     ++j;
                 }
@@ -793,8 +789,5 @@ namespace mts
     };
 }
 
-// Query needs a complete World, and World's query members need a complete Query.
-// Both headers are #pragma once, so whichever is included first pulls in the
-// other and this trailing include is a no-op on the way back up.
-// this needs to be here,
+// Template complications
 #include "Query.h"

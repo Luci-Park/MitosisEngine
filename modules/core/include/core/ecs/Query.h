@@ -64,39 +64,19 @@ namespace mts
             World &mWorld;
         };
 
-        /**
-         * The archetype-level match test and its generation cache, shared by
-         * Query<Ts...> and RuntimeQuery.
-         *
-         * Both need the same three things - fold the terms into signature
-         * masks once, reject whole tables by mask, and rescan only when the
-         * world grew an archetype - and the two differ only in what they cache
-         * per match (a fixed std::array of columns against a runtime-sized
-         * one). Keeping the test here means a fix to the Or-clause semantics or
-         * the rescan trigger lands in one place rather than in two copies that
-         * drift.
-         *
-         * This is also the only walker of World::Archetypes, which is why that
-         * accessor can stay protected.
-         */
+        // Checks if given archetype matches query requirement
         class ArchetypeMatcher
         {
         public:
-            /// Every listed bit must be present. Data terms and With members
-            /// impose the identical test, so they share one mask.
+            /// Every listed bit must be present (With)
             void RequireAll(const Signature &signature) { mAll |= signature; }
 
-            /// No listed bit may be present.
+            /// No listed bit may be present (Without)
             void RequireNone(const Signature &signature) { mNone |= signature; }
 
-            /// One clause: at least one of its bits must be present. Members
-            /// within a clause OR together, clauses AND together, so (A|B) AND
-            /// (C|D) is two calls. Merging them into one mask would silently
-            /// widen that to any-of-all-four.
+            /// (And), (Or)
             void RequireAny(const Signature &clause) { mOrClauses.push_back(clause); }
 
-            /// A sparse component has no signature bit, so its filter becomes a
-            /// per-row test instead of being dropped.
             void AddSparseCheck(const SparseFilterCheck &check) { mSparseChecks.push_back(check); }
 
             bool MatchesSignature(const Signature &signature) const
@@ -155,14 +135,6 @@ namespace mts
         };
     }
 
-    /**
-     * A query over data terms Ts..., narrowed by With/Without/Or filters.
-     *
-     * Owned by World (see World::GetOrCreateQuery) for caching.
-     * Reused until a new archetype appears, updates after world generation is bumped
-     *
-     * May request const T, which yields a const T& in the callback.
-     */
     template <typename... Ts>
     class Query final : public detail::IQuery
     {
@@ -182,7 +154,6 @@ namespace mts
         };
 
     public:
-        // calls fn(Entity, Ts&...) for every live entity in this query.
         // no order guaranteed.
         template <typename Fn>
         void ForEach(Fn &&fn)
@@ -198,20 +169,17 @@ namespace mts
 
     private:
         friend class World;
-
+#pragma region Query Creation
         template <typename... Filters>
         explicit Query(World &world, Filters... filters)
             : mWorld(&world)
         {
+            // ArchetypeMatcher builds mask once
             mMatcher.RequireAll(detail::TableSignatureOf<Ts...>());
 
-            // filters are fixed for the life of a Query instance, so fold them
-            // into the masks here rather than on every ForEach call
             (ApplyFilter(filters), ...);
             ResolveSparseStorages(std::index_sequence_for<Ts...>{});
         }
-
-        // -- archetype-level match ----------------------------------------------
 
         template <typename... Es>
         void ApplyFilter(With<Es...>)
@@ -227,21 +195,12 @@ namespace mts
             (AddSparseFilter<Es>(false), ...);
         }
 
-        // Each Or term is its own clause. Members within a clause OR together,
-        // clauses AND together, so (A|B) AND (C|D) is Or<A, B>{}, Or<C, D>{}.
-        // Merging every term into one mask instead would silently widen that to
-        // any-of-all-four.
         template <typename... Es>
         void ApplyFilter(Or<Es...>)
         {
-            // a zero clause signature makes the none() test below always fire,
-            // which would reject every archetype
             static_assert(sizeof...(Es) > 0,
                           "Query: Or<> needs at least one component - an empty clause can never be satisfied");
 
-            // a sparse member has no bit, so it could never make the mask test
-            // pass; honouring it would mean demoting the clause to a per-row
-            // test. Rejected loudly rather than silently dropped.
             static_assert((!kIsSparseComponent<detail::Bare<Es>> && ...),
                           "Query: Or<> members must be dense components - a sparse component has no "
                           "signature bit, so it cannot take part in an archetype-level or-test");
@@ -249,8 +208,6 @@ namespace mts
             mMatcher.RequireAny(detail::TableSignatureOf<Es...>());
         }
 
-        // dense members are already covered by the masks; a sparse member has no
-        // bit, so it becomes a per-row Has() test instead of being dropped
         template <typename E>
         void AddSparseFilter(bool wantPresent)
         {
@@ -261,9 +218,9 @@ namespace mts
                     &detail::SparseHasThunk<BareE>, &mWorld->SparseStorageFor<BareE>(), wantPresent});
             }
         }
+#pragma endregion
 
-        // -- cache --------------------------------------------------------------
-
+#pragma region Query Match Caching
         void EnsureFresh()
         {
             if (!mMatcher.NeedsRefresh(*mWorld))
@@ -297,18 +254,16 @@ namespace mts
             if constexpr (kIsSparseComponent<detail::Bare<T>>)
                 std::get<I>(mSparseStorages) = &mWorld->SparseStorageFor<detail::Bare<T>>();
         }
+#pragma endregion
 
-        // -- iteration ----------------------------------------------------------
+#pragma region Query Iteration
 
-        // table walk, split from the row walk so a ForEachChunk can be added as a
-        // sibling later without touching ForEach. Internal only.
         template <typename Fn>
         void ForEachMatchedTable(Fn &&fn)
         {
             EnsureFresh();
 
-            // index rather than iterator, and the guard makes a rebuild under the
-            // walk a loud failure instead of a dangling reference
+            // index rather than iterator in case of structural change
             const detail::QueryIterationGuard guard(mIterationDepth, *mWorld);
             for (std::size_t i = 0; i < mMatches.size(); ++i)
             {
@@ -324,22 +279,13 @@ namespace mts
         {
             ForEachMatchedTable([&](Archetype &table, Columns &columns)
                                 {
-                                    // Clamped against both the count at entry
-                                    // and the live one. The first stops a
-                                    // callback that spawns entities from
-                                    // walking rows it just created - CreateEntity
-                                    // stays legal mid-walk. The second stops a
-                                    // release build, where the structural-change
-                                    // assert is compiled out, from running past
-                                    // the end of a table something shortened.
+                                    // limit iteration to current entities
                                     const uint32_t rows = table.RowCount();
                                     for (uint32_t row = 0; row < rows && row < table.RowCount(); ++row)
                                     {
                                         const Entity entity = table.EntityAt(row);
 
-                                        // sparse data terms are not in the signature, so presence is
-                                        // a per-row test. The || short-circuits for dense terms,
-                                        // whose storage pointer is null.
+                                        // check sparse for each row
                                         if (!((!kIsSparseComponent<detail::Bare<Ts>> ||
                                                std::get<Is>(mSparseStorages)->Has(entity)) &&
                                               ...))
@@ -353,17 +299,16 @@ namespace mts
                                     } });
         }
 
-        // table -> the cached column row slot; sparse -> dense lookup by entity.
-        // Storage lookups use Bare<T>; the cast and the return type keep T, so a
-        // const T term hands the callback a const T& with no extra machinery.
+        // Return target components
         template <typename T, typename Storage>
         static T &ResolveRef(ComponentColumn *column, Storage storage, Entity entity, uint32_t row)
         {
             if constexpr (kIsSparseComponent<detail::Bare<T>>)
                 return *storage->GetComponent(entity);
             else
-                return *static_cast<T *>(column->At(row));
+                return *static_cast<T *>(column->GetComponent(row));
         }
+#pragma endregion
 
         World *mWorld;
         detail::ArchetypeMatcher mMatcher;
