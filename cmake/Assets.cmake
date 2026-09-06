@@ -80,12 +80,20 @@ function(engine_cook_assets target)
     add_custom_target(${cook_target} DEPENDS "${stamp}")
     add_dependencies(${target} ${cook_target})
 
-    add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E make_directory
-                "$<TARGET_FILE_DIR:${target}>/cooked"
+    set(copy_stamp "${CMAKE_BINARY_DIR}/${target}_assets_copied.stamp")
+
+    add_custom_command(
+        OUTPUT "${copy_stamp}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:${target}>/cooked"
         COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different
                 "${out_dir}" "$<TARGET_FILE_DIR:${target}>/cooked"
-        COMMENT "Copying cooked assets next to ${target}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${copy_stamp}"
+        DEPENDS "${stamp}"
+        COMMENT "Copying cooked assets for ${target}"
         VERBATIM
         COMMAND_EXPAND_LISTS)
+
+    set(copy_target ${target}_copy_assets)
+    add_custom_target(${copy_target} DEPENDS "${copy_stamp}")
+    add_dependencies(${target} ${copy_target})
 endfunction()

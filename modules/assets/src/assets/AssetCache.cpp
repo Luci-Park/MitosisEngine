@@ -65,4 +65,18 @@ namespace mts
             return nullptr;
         return &it->second.view;
     }
+
+    void AssetCache::Invalidate(AssetId id)
+    {
+        mLoaded.erase(id.value);
+        mFailedLoads.erase(id.value);
+    }
+
+    std::optional<std::filesystem::path> AssetCache::ResolvedPath(AssetId id) const
+    {
+        const AssetManifestEntry *entry = mManifest->Find(id);
+        if (entry == nullptr)
+            return std::nullopt;
+        return mCookedRoot / mManifest->PathOf(*entry);
+    }
 }
