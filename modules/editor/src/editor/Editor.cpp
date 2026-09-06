@@ -157,7 +157,7 @@ namespace mts
         ImGui::End();
     }
 
-    SceneMenuAction Editor::DrawLayout(bool enableLayout, bool showDemoWindow)
+    SceneMenuAction Editor::DrawLayout(bool enableLayout)
     {
         SceneMenuAction sceneAction = SceneMenuAction::None;
 
@@ -232,9 +232,6 @@ namespace mts
         {
             mSceneViewportRect = VkRect2D{};
         }
-
-        if (showDemoWindow)
-            ImGui::ShowDemoWindow();
 
         return sceneAction;
     }

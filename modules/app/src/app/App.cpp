@@ -183,7 +183,7 @@ namespace mts
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
             {
-                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo))
+                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout))
                 {
                 case SceneMenuAction::New:
                     NewScene();
