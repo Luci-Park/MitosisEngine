@@ -38,14 +38,8 @@ namespace mts
         struct QueryIterationGuard;
     }
 
-    /**
-     * Called just before an entity is torn down, while all of its components
-     * are still readable. Registered with World::AddDestroyHook.
-     *
-     * A hook may destroy further entities - that is the point of it, and how
-     * the scene hierarchy cascades - so it must tolerate being re-entered.
-     * It must not add or remove hooks.
-     */
+    // Fn called before an entity is torn down.
+    // Fn should not add or destroy hooks
     struct EntityDestroyHook
     {
         void (*fn)(World &world, Entity entity, void *user);
@@ -478,7 +472,6 @@ namespace mts
             auto holder = std::make_unique<detail::ResourceHolder<T>>(std::forward<Args>(args)...);
             T &value = holder->mValue;
 
-
             // The value lives inside a heap-allocated holder, so rehashing the
             // map moves the unique_ptr and never the resource itself: a
             // pointer taken here survives any number of later emplacements of
@@ -830,4 +823,5 @@ namespace mts
 // Query needs a complete World, and World's query members need a complete Query.
 // Both headers are #pragma once, so whichever is included first pulls in the
 // other and this trailing include is a no-op on the way back up.
+// this needs to be here,
 #include "Query.h"
