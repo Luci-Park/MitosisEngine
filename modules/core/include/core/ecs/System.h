@@ -22,6 +22,7 @@ namespace mts
         Update,
         PostUpdate,
         Render,
+        kCount
     };
 
     /// Everything a system is handed for one tick.

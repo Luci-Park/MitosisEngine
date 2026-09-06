@@ -9,6 +9,8 @@
         "vulkan",
         "volk",
         "vulkan-memory-allocator",
+        "catch2",
+        "nlohmann-json",
         "luajit",
         {
             "name": "pkgconf",

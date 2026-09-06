@@ -17,6 +17,7 @@ target_link_libraries(engine_script
 )
 
 target_sources(engine_script PRIVATE
+    src/script/ComponentRegistration.cpp
     src/script/ScriptHost.cpp
     src/script/ScriptReloadWatcher.cpp
     src/script/ScriptSystem.cpp

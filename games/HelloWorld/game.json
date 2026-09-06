@@ -1,0 +1,6 @@
+{
+    "name": "HelloWorld",
+    "title": "MitosisEngine - HelloWorld",
+    "assetsRoot": "games/HelloWorld/assets",
+    "sceneDir": "games/HelloWorld/scenes/default"
+}

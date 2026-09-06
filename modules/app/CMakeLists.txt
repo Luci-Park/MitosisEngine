@@ -6,6 +6,7 @@ target_link_libraries(engine_app
            mts::window
            mts::renderer
            mts::editor
+           mts::scene
            mts::script
 )
 

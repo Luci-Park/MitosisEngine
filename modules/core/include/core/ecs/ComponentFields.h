@@ -48,7 +48,22 @@ namespace mts
         /// core never has to know what a Handle points at; a future asset or
         /// texture handle reuses this kind as long as it keeps the same shape.
         Handle,
+
+        /// A fixed-capacity, null-terminated byte buffer (kFieldStringCapacity
+        /// bytes, always including the terminator) rather than a dynamically
+        /// sized string - the whole field system stores fields at a fixed
+        /// offset with a fixed size known at registration, so a component
+        /// carrying a String field is exactly as trivially copyable and
+        /// relocatable as one carrying a Vec3. A name that doesn't fit is
+        /// truncated by whoever writes it (see JsonToField/LuaValueToField),
+        /// not by this type.
+        String,
     };
+
+    /// Bytes reserved for a FieldKind::String, terminator included. Matches
+    /// SceneIO's FieldBuffer (64 bytes, its largest field already) exactly,
+    /// so a String field costs that path nothing extra.
+    inline constexpr uint32_t kFieldStringCapacity = 64;
 
     constexpr uint32_t FieldSize(FieldKind kind)
     {
@@ -72,6 +87,8 @@ namespace mts
             return sizeof(Entity);
         case FieldKind::Handle:
             return 2 * sizeof(uint32_t);
+        case FieldKind::String:
+            return kFieldStringCapacity;
         }
         return 0;
     }
@@ -98,6 +115,8 @@ namespace mts
             return alignof(Entity);
         case FieldKind::Handle:
             return alignof(uint32_t);
+        case FieldKind::String:
+            return alignof(char);
         }
         return 1;
     }
@@ -124,6 +143,8 @@ namespace mts
             return "entity";
         case FieldKind::Handle:
             return "handle";
+        case FieldKind::String:
+            return "string";
         }
         return "?";
     }

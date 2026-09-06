@@ -22,7 +22,7 @@ namespace mts
     class ComponentColumn
     {
     public:
-        // build from a T /w size/alignment/id to distinguish type
+        // ComponentColumn factory that creates type erased column for archetype
         template <typename T>
         static ComponentColumn For()
         {
@@ -33,11 +33,7 @@ namespace mts
         ComponentColumn(TypeId type, uint32_t elementSize, uint32_t alignment)
             : mType(type), mElementSize(elementSize), mAlignment(alignment)
         {
-            // vector<std::byte> allocates through plain operator new, which
-            // guarantees __STDCPP_DEFAULT_NEW_ALIGNMENT__ (16 on x64). Not
-            // max_align_t: that is 8 on MSVC and 16 on GCC/Clang, so it would
-            // reject an alignas(16) component on Windows only.
-            // over-aligned components need a custom allocator
+            // max_align_t is different between MSVC & GCC/Clang => use __STDCPP_DEFAULT_NEW_ALIGNMENT(16)
             MTS_ASSERT(alignment <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                        "ComponentColumn: component \"{}\" is over-aligned ({}), unsupported", type.name, alignment);
         }
@@ -50,21 +46,23 @@ namespace mts
         // for table creation
         ComponentColumn CloneEmpty() const { return ComponentColumn(mType, mElementSize, mAlignment); }
 
-        // address of component at row(entity's component)
+        // component of row's entity
+        // casting to T should be done outside of this class
         void *At(uint32_t row)
         {
             MTS_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
             return mBytes.data() + static_cast<std::size_t>(row) * mElementSize;
         }
 
-        // address of component at row(entity's component)
+        // component of row's entity
+        // casting to T should be done outside of this class
         const void *At(uint32_t row) const
         {
             MTS_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
             return mBytes.data() + static_cast<std::size_t>(row) * mElementSize;
         }
 
-        // grow by one row with undefined contents
+        // push new unitialized row
         uint32_t PushBackUninitialized()
         {
             const uint32_t row = Count();
@@ -72,6 +70,7 @@ namespace mts
             return row;
         }
 
+        // push new row with value
         uint32_t PushBackFrom(const void *value)
         {
             const uint32_t row = PushBackUninitialized();
