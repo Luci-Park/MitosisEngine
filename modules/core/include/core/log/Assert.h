@@ -32,6 +32,7 @@
         }                                                                   \
     } while (0)
 
+// Assert that works on release
 #define MTS_CHECK(cond, ...)                                                \
     do                                                                      \
     {                                                                       \
