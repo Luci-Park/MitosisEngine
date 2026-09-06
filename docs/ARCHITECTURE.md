@@ -130,7 +130,7 @@ Font Awesome 6, merged into one atlas), theme application, the GLFW+Vulkan
 backend, and the Slate editor shell - a dockspace with `Hierarchy`/
 `Inspector`/`Output` panels docked around a passthru center, a `Debug` menu,
 and a Style Editor toggle. `App` drives it through `BeginFrame` ->
-`DrawLayout(enableLayout, showDemo)` -> `EndFrame() -> ImDrawData*`, and reads
+`DrawLayout(enableLayout)` -> `EndFrame() -> ImDrawData*`, and reads
 `SceneViewportRect()` for `VulkanRenderer::SetSceneViewport`.
 
 *Current state:* one fixed layout, not user-editable or serialized beyond

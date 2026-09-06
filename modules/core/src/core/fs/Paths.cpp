@@ -54,6 +54,11 @@ namespace mts
         return ExecutableDir() / "fonts" / name;
     }
 
+    std::filesystem::path BrandingPath(std::string_view name)
+    {
+        return ExecutableDir() / "branding" / name;
+    }
+
     std::filesystem::path CookedAssetsDir()
     {
         return ExecutableDir() / "cooked";

@@ -1,0 +1,16 @@
+/**
+ * @file EngineVersion.h
+ * @brief Generated from EngineVersion.h.in by CMake - do not edit the
+ * generated copy directly, edit this template (or project()'s VERSION in
+ * the root CMakeLists.txt) instead.
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
+#pragma once
+
+namespace mts
+{
+    inline constexpr const char *kEngineVersion = "@PROJECT_VERSION@";
+    inline constexpr const char *kEngineCopyright = "Copyright (c) 2026 DigiPen (USA) Corporation";
+}

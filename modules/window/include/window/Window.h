@@ -16,6 +16,8 @@
 
 namespace mts
 {
+    void EnsureDpiAware();
+
     struct WindowDesc
     {
         uint32_t mWidth = 1280;
@@ -24,6 +26,8 @@ namespace mts
         bool mResizable = true;
         bool mMaximized = false;
         bool mCustomTitleBar = false;
+
+        bool mStartHidden = false;
     };
 
     class Window : public ISurfaceProvider
@@ -56,6 +60,8 @@ namespace mts
         virtual void ToggleMaximize() {}
         virtual bool IsMaximized() const { return false; }
         virtual void RequestClose() {}
+
+        virtual void Show() {}
 
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 

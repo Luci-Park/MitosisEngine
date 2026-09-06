@@ -286,13 +286,22 @@ int main()
     // when it fails, so this can't silently double up entities either way.
     if (app.LoadScene())
     {
+        app.Splash().SetProgress("Resolving scripts...", 0.93f);
         ResolveSceneScripts(app, project);
+
+        app.Splash().SetProgress("Resolving meshes...", 0.97f);
         ResolveSceneMeshes(app, project);
     }
     else
     {
+        app.Splash().SetProgress("Building scene...", 0.95f);
         BuildScene(app, project);
     }
+
+    // Only now is startup actually done - close explicitly rather than
+    // leaning on WS_EX_TOPMOST z-order to hide the swap.
+    app.Splash().SetProgress("Ready", 1.0f);
+    app.Splash().Close();
 
     app.Run();
     app.Shutdown();

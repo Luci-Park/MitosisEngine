@@ -15,6 +15,8 @@
 
 namespace mts
 {
+    void EnsureDpiAware() {}
+
     NativeWindowHandle GLFWWindow::NativeWindow() const
     {
         if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)

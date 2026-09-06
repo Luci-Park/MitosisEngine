@@ -1,5 +1,6 @@
 #include <app/App.h>
 
+#include <core/EngineVersion.h>
 #include <core/ecs/ComponentRegistry.h>
 #include <core/ecs/DeferredAccess.h>
 #include <core/ecs/TransformHierarchy.h>
@@ -25,12 +26,24 @@ namespace mts
     {
         mDesc = desc;
 
+        EnsureDpiAware();
+
+        if (!mSplash.Show({.mEngineName = desc.mAppName,
+                           .mVersion = kEngineVersion,
+                           .mCopyright = kEngineCopyright,
+                           .mStatus = "Creating window...",
+                           .mProgress = 0.0f}))
+        {
+            MTS_LOG_WARN("Splash screen failed to show, continuing without it");
+        }
+
         WindowDesc windowDesc{};
         windowDesc.mWidth = desc.mWidth;
         windowDesc.mHeight = desc.mHeight;
         windowDesc.mTitle = desc.mTitle;
         windowDesc.mMaximized = true;
         windowDesc.mCustomTitleBar = desc.mEnableEditorLayout;
+        windowDesc.mStartHidden = true;
 
         mWindow = Window::Create(windowDesc);
         if (!mWindow)
@@ -39,6 +52,7 @@ namespace mts
             return false;
         }
 
+        mSplash.SetProgress("Initializing renderer...", 0.2f);
         if (!mRenderer.Initialize({.window = mWindow.get(),
                                    .appName = desc.mAppName,
                                    .enableValidation = desc.mEnableValidation}))
@@ -48,6 +62,7 @@ namespace mts
             return false;
         }
 
+        mSplash.SetProgress("Initializing editor...", 0.5f);
         if (!mEditor.Initialize(*mWindow, mRenderer))
         {
             MTS_LOG_ERROR("Editor initialization failed");
@@ -57,6 +72,8 @@ namespace mts
         }
 
         mInitialized = true;
+
+        mSplash.SetProgress("Registering components...", 0.75f);
 
         // scene graph + install destroy hook
         InstallHierarchy(mWorld);
@@ -81,7 +98,10 @@ namespace mts
         // already current for this frame - see RenderSystem's own comment.
         mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
 
+        mSplash.SetProgress("Loading scene...", 0.9f);
         mScene = mts::NewScene("untitled");
+
+        mWindow->Show();
 
         return true;
     }
@@ -168,7 +188,7 @@ namespace mts
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
             {
-                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo))
+                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout))
                 {
                 case SceneMenuAction::New:
                     NewScene();

@@ -59,7 +59,7 @@ namespace mts
         /// the Slate editor shell. Pass enableLayout = false to keep ImGui
         /// running (e.g. a caller's own UI) without this shell.
         /// Returns the SceneMenuAction picked from the File menu this frame.
-        SceneMenuAction DrawLayout(bool enableLayout, bool showDemoWindow);
+        SceneMenuAction DrawLayout(bool enableLayout);
 
         /// Ends this frame's ImGui state and returns its draw data, which
         /// the caller hands to VulkanRenderer::SetImGuiDrawData. Always
