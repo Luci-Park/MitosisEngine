@@ -40,9 +40,9 @@ namespace mts
 
         void Close();
 
-        bool IsShowing() const { return mHandle != nullptr; }
+        bool IsShowing() const { return mImpl != nullptr; }
 
     private:
-        void *mHandle = nullptr;
+        void *mImpl = nullptr;
     };
 }

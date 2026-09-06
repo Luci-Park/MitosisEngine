@@ -20,13 +20,18 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <future>
+#include <mutex>
 #include <string>
+#include <thread>
 
 namespace mts
 {
     namespace
     {
         constexpr wchar_t kClassName[] = L"MtsSplashWindow";
+
+        constexpr UINT kUpdateMessage = WM_APP + 1;
 
         // Bottom strip: status text + progress bar + version/copyright.
         constexpr int kStripHeight = 100;
@@ -45,13 +50,19 @@ namespace mts
             float mProgress = 0.0f;
         };
 
+        struct SplashImpl
+        {
+            std::thread mThread;
+            HWND mWindow = nullptr;
+            std::mutex mMutex;
+            PaintState mState;
+        };
+
         void DrawSplash(HWND hwnd, HDC dc, const PaintState &state)
         {
             RECT client{};
             ::GetClientRect(hwnd, &client);
 
-            // Artwork placeholder: solid fill until real art is dropped in -
-            // swapping it for an image blit later does not touch layout.
             RECT artRect{0, 0, client.right, client.bottom - kStripHeight};
             HBRUSH artBrush = ::CreateSolidBrush(RGB(30, 30, 36));
             ::FillRect(dc, &artRect, artBrush);
@@ -121,11 +132,18 @@ namespace mts
             {
             case WM_PAINT:
             {
-                auto *state = reinterpret_cast<PaintState *>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                auto *impl = reinterpret_cast<SplashImpl *>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
                 PAINTSTRUCT ps{};
                 HDC dc = ::BeginPaint(hwnd, &ps);
-                if (state != nullptr)
-                    DrawSplash(hwnd, dc, *state);
+                if (impl != nullptr)
+                {
+                    PaintState snapshot;
+                    {
+                        std::lock_guard<std::mutex> lock(impl->mMutex);
+                        snapshot = impl->mState;
+                    }
+                    DrawSplash(hwnd, dc, snapshot);
+                }
                 ::EndPaint(hwnd, &ps);
                 return 0;
             }
@@ -133,6 +151,13 @@ namespace mts
                 // DrawSplash repaints the whole client area every time -
                 // skip the default erase so there is no white flash first.
                 return 1;
+            case kUpdateMessage:
+                ::InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+            case WM_DESTROY:
+                // Ends this thread's GetMessageW loop in Close().
+                ::PostQuitMessage(0);
+                return 0;
             default:
                 return ::DefWindowProcW(hwnd, msg, wParam, lParam);
             }
@@ -140,18 +165,54 @@ namespace mts
 
         void RegisterSplashClassOnce()
         {
-            static bool registered = false;
-            if (registered)
-                return;
+            static std::once_flag once;
+            std::call_once(once, [] {
+                WNDCLASSEXW wc{};
+                wc.cbSize = sizeof(wc);
+                wc.lpfnWndProc = &SplashWndProc;
+                wc.hInstance = ::GetModuleHandleW(nullptr);
+                wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+                wc.lpszClassName = kClassName;
+                ::RegisterClassExW(&wc);
+            });
+        }
 
-            WNDCLASSEXW wc{};
-            wc.cbSize = sizeof(wc);
-            wc.lpfnWndProc = &SplashWndProc;
-            wc.hInstance = ::GetModuleHandleW(nullptr);
-            wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
-            wc.lpszClassName = kClassName;
-            ::RegisterClassExW(&wc);
-            registered = true;
+        void SplashThreadMain(SplashImpl *impl, SplashDesc desc, std::promise<HWND> ready)
+        {
+            RegisterSplashClassOnce();
+
+            const int screenW = ::GetSystemMetrics(SM_CXSCREEN);
+            const int screenH = ::GetSystemMetrics(SM_CYSCREEN);
+            const int x = (screenW - SplashScreen::kWidth) / 2;
+            const int y = (screenH - SplashScreen::kHeight) / 2;
+
+            HWND hwnd = ::CreateWindowExW(
+                WS_EX_TOPMOST, kClassName, L"", WS_POPUP,
+                x, y, SplashScreen::kWidth, SplashScreen::kHeight,
+                nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+            if (hwnd == nullptr)
+            {
+                ready.set_value(nullptr);
+                return;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(impl->mMutex);
+                impl->mState = PaintState{desc.mEngineName, desc.mVersion, desc.mCopyright, desc.mStatus, desc.mProgress};
+            }
+
+            ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(impl));
+            ::ShowWindow(hwnd, SW_SHOW);
+            ::UpdateWindow(hwnd);
+
+            ready.set_value(hwnd);
+
+            MSG msg{};
+            while (::GetMessageW(&msg, nullptr, 0, 0) > 0)
+            {
+                ::TranslateMessage(&msg);
+                ::DispatchMessageW(&msg);
+            }
         }
     }
 
@@ -164,65 +225,49 @@ namespace mts
     {
         Close();
 
-        RegisterSplashClassOnce();
+        auto *impl = new SplashImpl();
 
-        const int screenW = ::GetSystemMetrics(SM_CXSCREEN);
-        const int screenH = ::GetSystemMetrics(SM_CYSCREEN);
-        const int x = (screenW - kWidth) / 2;
-        const int y = (screenH - kHeight) / 2;
+        std::promise<HWND> ready;
+        std::future<HWND> readyFuture = ready.get_future();
+        impl->mThread = std::thread(&SplashThreadMain, impl, desc, std::move(ready));
 
-        HWND hwnd = ::CreateWindowExW(
-            WS_EX_TOPMOST, kClassName, L"", WS_POPUP,
-            x, y, kWidth, kHeight,
-            nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+        HWND hwnd = readyFuture.get();
         if (hwnd == nullptr)
+        {
+            impl->mThread.join();
+            delete impl;
             return false;
+        }
 
-        auto *state = new PaintState{desc.mEngineName, desc.mVersion, desc.mCopyright, desc.mStatus, desc.mProgress};
-        ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
-
-        ::ShowWindow(hwnd, SW_SHOW);
-        // Forces WM_PAINT synchronously, so the splash is actually on screen
-        // before Initialize goes on to block the thread with real work.
-        ::UpdateWindow(hwnd);
-
-        mHandle = hwnd;
+        impl->mWindow = hwnd;
+        mImpl = impl;
         return true;
     }
 
     void SplashScreen::SetProgress(const char *status, float progress)
     {
-        if (mHandle == nullptr)
+        if (mImpl == nullptr)
             return;
 
-        HWND hwnd = static_cast<HWND>(mHandle);
-        auto *state = reinterpret_cast<PaintState *>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-        if (state == nullptr)
-            return;
-
-        state->mStatus = status;
-        state->mProgress = progress;
-
-        ::InvalidateRect(hwnd, nullptr, FALSE);
-        ::UpdateWindow(hwnd); // synchronous repaint, same as Show()
-
-        MSG msg{};
-        while (::PeekMessageW(&msg, hwnd, 0, 0, PM_REMOVE))
+        auto *impl = static_cast<SplashImpl *>(mImpl);
         {
-            ::TranslateMessage(&msg);
-            ::DispatchMessageW(&msg);
+            std::lock_guard<std::mutex> lock(impl->mMutex);
+            impl->mState.mStatus = status;
+            impl->mState.mProgress = progress;
         }
+
+        ::PostMessageW(impl->mWindow, kUpdateMessage, 0, 0);
     }
 
     void SplashScreen::Close()
     {
-        if (mHandle == nullptr)
+        if (mImpl == nullptr)
             return;
 
-        HWND hwnd = static_cast<HWND>(mHandle);
-        auto *state = reinterpret_cast<PaintState *>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-        delete state;
-        ::DestroyWindow(hwnd);
-        mHandle = nullptr;
+        auto *impl = static_cast<SplashImpl *>(mImpl);
+        ::PostMessageW(impl->mWindow, WM_CLOSE, 0, 0);
+        impl->mThread.join();
+        delete impl;
+        mImpl = nullptr;
     }
 }
