@@ -137,6 +137,12 @@ namespace mir
     {
         InputMap map;
 
+        if (!std::filesystem::exists(path))
+        {
+            MIR_LOG_INFO("InputMap::LoadFile: no '{}' yet, starting with an empty input map", path.string());
+            return map;
+        }
+
         std::ifstream in(path);
         if (!in)
         {
