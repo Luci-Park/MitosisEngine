@@ -40,39 +40,25 @@ namespace mir
         Editor(Editor &&) = delete;
         Editor &operator=(Editor &&) = delete;
 
-        // Creates the ImGui context, loads fonts/theme, and wires up the
-        // GLFW + Vulkan backends. renderer's Vulkan backend must be ready
-        // to accept InitImGuiVulkanBackend (device/render target created).
+        // `renderer`'s device and render target must already be created.
         bool Initialize(Window &window, VulkanRenderer &renderer);
 
-        // Reverse of Initialize. Vulkan backend teardown needs renderer's
-        // device still alive, so this must run before renderer.Shutdown();
-        // the GLFW backend needs the window still alive, so before it is
-        // destroyed too. Safe to call when not initialized (no-op).
+        // Must run before renderer.Shutdown() and before the window is
+        // destroyed. No-op when not initialized.
         void Shutdown(VulkanRenderer &renderer);
 
-        // Starts this frame's ImGui state. Call once per iteration before
-        // any other ImGui-facing call (including DrawLayout).
+        // Call once per frame, before DrawLayout or any editor drawing.
         void BeginFrame();
 
-        /// Builds the dockspace, the default Hierarchy/Inspector/Output
-        /// split, the Debug menu, and (if requested) the style editor -
-        /// the Slate editor shell. Pass enableLayout = false to keep ImGui
-        /// running (e.g. a caller's own UI) without this shell.
-        /// Returns the SceneMenuAction picked from the File menu this frame.
+        // Draws the editor shell and returns the File menu action picked this frame.
+        // enableLayout = false disables editor
         SceneMenuAction DrawLayout(bool enableLayout);
 
-        // Ends this frame's ImGui state and returns its draw data, which
-        // the caller hands to VulkanRenderer::SetImGuiDrawData. Always
-        // pair with BeginFrame, even on a frame DrawLayout was skipped -
-        // ImGui's NewFrame/Render calls must still come in pairs.
+        // Returns draw data for VulkanRenderer::SetImGuiDrawData.
+        // BeginFrame is needed regardless of skipping layout
         ImDrawData *EndFrame();
 
-        // The dockspace's central passthru node - where the 3D scene
-        // shows through, since ImGuiDockNodeFlags_PassthruCentralNode
-        // leaves it undocked. Valid after DrawLayout(true); zero extent
-        // (the default, and what DrawLayout(false) leaves it at) means
-        // "use the full swapchain" to VulkanRenderer.
+        // The dockspace's central node, where the 3D scene shows through.
         VkRect2D SceneViewportRect() const { return mSceneViewportRect; }
 
         bool IsInitialized() const { return mInitialized; }

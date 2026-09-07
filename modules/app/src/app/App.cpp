@@ -1,3 +1,12 @@
+/**
+ * @file App.cpp
+ * @author Sumin Park
+ * @brief Owns the engine subsystems and drives the main loop.
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
+
 #include <app/App.h>
 
 #include <core/EngineVersion.h>

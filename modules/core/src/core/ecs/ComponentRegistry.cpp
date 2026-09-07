@@ -87,7 +87,7 @@ namespace mir
         return mInternedNames.back();
     }
 
-    ComponentOps *ComponentRegistry::FindChecked(uint32_t hash, std::string_view name)
+    ComponentOps *ComponentRegistry::FindComponentOps(uint32_t hash, std::string_view name)
     {
         const auto it = mByHash.find(hash);
         if (it == mByHash.end())
@@ -103,7 +103,7 @@ namespace mir
 
     uint32_t ComponentRegistry::SeqForHash(uint32_t hash, std::string_view name)
     {
-        if (const ComponentOps *existing = FindChecked(hash, name))
+        if (const ComponentOps *existing = FindComponentOps(hash, name))
             return existing->mType.seq;
 
         const uint32_t seq = NextSeq();
@@ -116,7 +116,7 @@ namespace mir
 
     const ComponentOps &ComponentRegistry::InsertNative(const ComponentOps &ops, const void *defaultValue)
     {
-        if (ComponentOps *existing = FindChecked(ops.mType.hash, ops.mType.name))
+        if (ComponentOps *existing = FindComponentOps(ops.mType.hash, ops.mType.name))
         {
             MIR_CHECK(!existing->mRuntime,
                       "ComponentRegistry: \"{}\" was already declared by a script. Register the C++ "
@@ -169,7 +169,7 @@ namespace mir
 
         const uint32_t hash = Fnv1a32(name);
 
-        if (ComponentOps *existing = FindChecked(hash, name))
+        if (ComponentOps *existing = FindComponentOps(hash, name))
         {
             MIR_CHECK(existing->mRuntime,
                       "ComponentRegistry: \"{}\" is a C++ component; a script may not redeclare it", name);

@@ -1,3 +1,12 @@
+/**
+ * @file LogPanel.cpp
+ * @author Rahul Nair
+ * @brief Renders core::LogHistory - the editor's "Output" dock panel.
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
+
 #include <editor/panels/LogPanel.h>
 
 #include <core/log/LogHistory.h>

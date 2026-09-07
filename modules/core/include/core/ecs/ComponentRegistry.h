@@ -177,9 +177,7 @@ namespace mir
 
         std::string_view Intern(std::string_view name);
 
-        /// The entry for `hash`, after checking that it really is `name` and
-        /// not a different name that hashes the same.
-        ComponentOps *FindChecked(uint32_t hash, std::string_view name);
+        ComponentOps *FindComponentOps(uint32_t hash, std::string_view name);
 
         std::deque<ComponentOps> mOps; // for pointer/reference stability on insert
         std::deque<std::string> mInternedNames;

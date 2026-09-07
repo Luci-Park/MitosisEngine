@@ -1,3 +1,12 @@
+/**
+ * @file CameraMath.cpp
+ * @author Rahul Nair
+ * @brief Builds the view-projection matrix RenderSystem premultiplies into
+ *        every draw item.
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
 
 // GLM set to Vulkan clip space (0 ~ 1) vs OpenGL(-1 ~ 1)
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
