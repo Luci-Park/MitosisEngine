@@ -1,5 +1,6 @@
 /**
  * @file InputMap.tests.cpp
+ * @author Rahul Nair
  * @brief Tests for input/InputMap.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
