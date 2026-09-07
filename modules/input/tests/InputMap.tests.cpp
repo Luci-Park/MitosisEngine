@@ -40,6 +40,20 @@ TEST_CASE("AddAction then Find returns the same action", "[input]")
     REQUIRE(found->type == mir::InputActionType::Button);
 }
 
+TEST_CASE("AddAction with an existing name returns the existing action instead of duplicating it", "[input]")
+{
+    mir::InputMap map;
+    mir::InputAction &first = map.AddAction("Jump", mir::InputActionType::Button);
+    first.bindings.push_back(mir::InputBinding{.device = mir::DeviceKind::Keyboard, .key = mir::Key::Space});
+
+    mir::InputAction &second = map.AddAction("Jump", mir::InputActionType::Axis1D);
+
+    REQUIRE(&second == &first);
+    REQUIRE(map.Actions().size() == 1);
+    REQUIRE(second.type == mir::InputActionType::Button); // unchanged - not overwritten by the second call
+    REQUIRE(second.bindings.size() == 1);
+}
+
 TEST_CASE("Find on an unknown action returns nullptr", "[input]")
 {
     mir::InputMap map;

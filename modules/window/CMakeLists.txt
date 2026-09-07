@@ -18,3 +18,7 @@ if(ENGINE_FAMILY_DESKTOP)
 endif()
 
 target_sources(engine_window PRIVATE src/window/InputCodes.cpp)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
