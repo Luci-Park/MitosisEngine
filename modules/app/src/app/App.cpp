@@ -6,6 +6,9 @@
 #include <core/ecs/TransformHierarchy.h>
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
+#include <input/InputMap.h>
+#include <input/InputState.h>
+#include <input/InputSystem.h>
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
 #include <scene/SceneIO.h>
@@ -88,6 +91,11 @@ namespace mir
 
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
+
+        mWorld.EmplaceResource<InputMap>();
+        mWorld.EmplaceResource<InputState>();
+
+        mScheduler.AddSystem<InputSystem>(SystemPhase::PreUpdate, *mWindow);
 
         mScheduler.AddSystem<ScriptSystem>(SystemPhase::PreUpdate, mScriptHost);
 

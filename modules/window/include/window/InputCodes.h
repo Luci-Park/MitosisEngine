@@ -9,6 +9,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <string_view>
 
 namespace mir
 {
@@ -193,4 +195,16 @@ namespace mir
     inline constexpr int kGamepadAxisCount = 6;
 
     inline constexpr int kGamepadSlotCount = 16;
+
+    std::string_view KeyName(Key key);
+    Key ParseKey(std::string_view name); // returns Key::Unknown, not optional - Key already has that sentinel
+
+    std::string_view MouseButtonName(MouseButton button);
+    std::optional<MouseButton> ParseMouseButton(std::string_view name);
+
+    std::string_view GamepadButtonName(GamepadButton button);
+    std::optional<GamepadButton> ParseGamepadButton(std::string_view name);
+
+    std::string_view GamepadAxisName(GamepadAxis axis);
+    std::optional<GamepadAxis> ParseGamepadAxis(std::string_view name);
 }

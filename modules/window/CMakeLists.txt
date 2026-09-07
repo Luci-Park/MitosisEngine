@@ -2,6 +2,8 @@ engine_add_module(window)
 
 target_link_libraries(engine_window PUBLIC mir::core)
 
+target_sources(engine_window PRIVATE src/window/InputCodes.cpp)
+
 if(ENGINE_FAMILY_DESKTOP)
     target_sources(engine_window PRIVATE src/window/glfw/GLFWWindow.cpp)
 
