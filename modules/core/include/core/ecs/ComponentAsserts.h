@@ -10,7 +10,7 @@
 #pragma once
 #include <type_traits>
 
-namespace mts
+namespace mir
 {
     // component with no fields
     template <typename T>

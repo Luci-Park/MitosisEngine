@@ -43,7 +43,7 @@ namespace mir
         template <typename T>
         void AddTag(Entity entity)
         {
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
             static_assert(kIsTagComponent<T>,
                           "CommandBuffer::AddTag: T has fields, so it needs a value. Use Add<T>.");
 

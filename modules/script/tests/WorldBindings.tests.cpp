@@ -19,14 +19,14 @@
 
 namespace
 {
-    using mts::CommandBuffer;
-    using mts::ComponentOps;
-    using mts::ComponentRegistry;
-    using mts::Entity;
-    using mts::FieldKind;
-    using mts::RuntimeFieldDecl;
-    using mts::ScriptHost;
-    using mts::World;
+    using mir::CommandBuffer;
+    using mir::ComponentOps;
+    using mir::ComponentRegistry;
+    using mir::Entity;
+    using mir::FieldKind;
+    using mir::RuntimeFieldDecl;
+    using mir::ScriptHost;
+    using mir::World;
 
     // Distinct from every other test's runtime components: the registry is
     // process-wide (0022).
@@ -84,7 +84,7 @@ TEST_CASE("world:each rejects a tag term instead of aborting", "[script]")
     const int32_t instance = host.CreateInstance("each_tag");
     REQUIRE(instance != -1);
 
-    // a tag term used to reach RuntimeQuery's MTS_CHECK, which aborts the
+    // a tag term used to reach RuntimeQuery's MIR_CHECK, which aborts the
     // process; it must be answered by a logged error and an early return
     host.CallOnStart(world, commands, entity, instance);
     commands.Flush(world);

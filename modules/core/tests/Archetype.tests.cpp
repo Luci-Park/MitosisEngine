@@ -182,7 +182,7 @@ TEST_CASE("World tags an entity without giving the archetype a column", "[ecs][a
     // does not do is add a column, which is where the per-row cost would be
     CHECK(world.ArchetypeOf(a) != world.ArchetypeOf(b));
     CHECK(world.ArchetypeOf(a)->Columns().size() == 1);
-    CHECK(world.ArchetypeOf(a)->FindColumn(mts::TypeIdOf<Frozen>()) == nullptr);
+    CHECK(world.ArchetypeOf(a)->FindColumn(mir::TypeIdOf<Frozen>()) == nullptr);
 
     REQUIRE(world.Has<Frozen>(a));
     REQUIRE_FALSE(world.Has<Frozen>(b));
@@ -225,14 +225,14 @@ TEST_CASE("World clears tags on destroy", "[ecs][archetype][tag]")
 
 TEST_CASE("A tagged row survives a swap-remove", "[ecs][archetype][tag]")
 {
-    mts::World world;
+    mir::World world;
 
     // three entities in one tagged table, so removing the first swaps the
     // last into its row - the path that walks every column of a table that
     // has one fewer column than it has signature bits
-    const mts::Entity a = world.CreateEntity();
-    const mts::Entity b = world.CreateEntity();
-    const mts::Entity c = world.CreateEntity();
+    const mir::Entity a = world.CreateEntity();
+    const mir::Entity b = world.CreateEntity();
+    const mir::Entity c = world.CreateEntity();
 
     for (const auto &[entity, x] : {std::pair{a, 1.0f}, std::pair{b, 2.0f}, std::pair{c, 3.0f}})
     {

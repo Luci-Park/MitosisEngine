@@ -424,7 +424,7 @@ namespace mir
                 }
                 if (ops->mSize == 0)
                 {
-                    MTS_LOG_ERROR("script: world:each - '{}' is a tag and has no value to hand back", name);
+                    MIR_LOG_ERROR("script: world:each - '{}' is a tag and has no value to hand back", name);
                     return;
                 }
 

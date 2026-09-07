@@ -48,7 +48,7 @@ namespace mir
         AssetCache &operator=(AssetCache &&) = default;
 
         const AssetBlobView *Load(AssetId id);
-        const AssetBlobView *GetComponent(AssetId id) const;
+        const AssetBlobView *Get(AssetId id) const;
 
         void Invalidate(AssetId id);
 

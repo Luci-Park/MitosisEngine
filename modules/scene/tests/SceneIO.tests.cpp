@@ -291,7 +291,7 @@ TEST_CASE("LoadScene's nextId survives a save, even past a deleted entity's id",
 
 TEST_CASE("SaveScene then LoadScene round-trips a tag", "[scene]")
 {
-    mts::RegisterCoreComponents();
+    mir::RegisterCoreComponents();
     const ComponentOps &tag = SceneTagOps();
 
     World world;
@@ -304,10 +304,10 @@ TEST_CASE("SaveScene then LoadScene round-trips a tag", "[scene]")
     REQUIRE_FALSE(tag.Has(world, plain));
 
     TempSceneDir dir("tag_roundtrip");
-    REQUIRE(mts::SaveScene(world, dir.mPath, scene));
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
 
     World loadedWorld;
-    LoadedScene loaded = mts::LoadScene(loadedWorld, dir.mPath);
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
 
     Entity loadedTagged = loaded.mEntities.at(1);
     Entity loadedPlain = loaded.mEntities.at(2);
