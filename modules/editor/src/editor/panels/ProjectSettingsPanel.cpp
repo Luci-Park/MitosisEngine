@@ -6,23 +6,6 @@ namespace mir
 {
     namespace
     {
-        const char *ActionTypeName(InputActionType type)
-        {
-            switch (type)
-            {
-            case InputActionType::Button:
-                return "Button";
-            case InputActionType::Axis1D:
-                return "Axis1D";
-            case InputActionType::Axis2D:
-                return "Axis2D";
-            }
-            return "Button";
-        }
-
-        // Only digital sources are auto-detectable this way - an analog
-        // gamepad axis has no clean "just moved" edge, so it's assigned via
-        // the axis combo instead (see DrawBinding).
         bool AnyGamepadButtonJustPressed(const RawInputSnapshot &raw, const RawInputSnapshot &previous,
                                          GamepadButton &outButton)
         {
@@ -49,10 +32,8 @@ namespace mir
     bool ProjectSettingsPanel::TryCaptureBinding(InputBinding &binding, const RawInputSnapshot &raw)
     {
         if (raw.IsDown(Key::Escape) && !mPreviousRaw.IsDown(Key::Escape))
-            return true; // cancelled - binding left unchanged
+            return true;
 
-        // Gap slots in RawInputSnapshot::keys are never set true (GLFWWindow
-        // only writes the named keys), so scanning the full range is safe.
         for (int i = 0; i < kKeyCount; ++i)
         {
             if (raw.keys[static_cast<size_t>(i)] && !mPreviousRaw.keys[static_cast<size_t>(i)])
@@ -106,7 +87,14 @@ namespace mir
         int deviceIndex = static_cast<int>(binding.device);
         const char *deviceItems[] = {"Keyboard", "Mouse", "Gamepad"};
         if (ImGui::Combo("##Device", &deviceIndex, deviceItems, IM_ARRAYSIZE(deviceItems)))
+        {
             binding.device = static_cast<DeviceKind>(deviceIndex);
+            mListeningAction = actionIndex;
+            mListeningBinding = bindingIndex;
+            mPreviousRaw = raw;
+            ImGui::PopID();
+            return false;
+        }
 
         ImGui::SameLine();
 
@@ -153,8 +141,6 @@ namespace mir
             {
                 mListeningAction = actionIndex;
                 mListeningBinding = bindingIndex;
-                // Baseline at the moment of clicking, so a key already held
-                // (e.g. the mouse click itself) can't immediately "capture".
                 mPreviousRaw = raw;
             }
         }
@@ -193,7 +179,7 @@ namespace mir
         {
             ImGui::Indent();
 
-            ImGui::TextDisabled("%s", ActionTypeName(action.type));
+            ImGui::TextDisabled("%s", ActionTypeName(action.type).data());
             ImGui::SameLine();
             if (ImGui::SmallButton("Remove Action"))
                 removeAction = true;
@@ -205,10 +191,20 @@ namespace mir
                     removeBindingIndex = i;
             }
             if (removeBindingIndex >= 0)
+            {
                 action.bindings.erase(action.bindings.begin() + removeBindingIndex);
 
+                if (mListeningAction == actionIndex)
+                    CancelListening();
+            }
+
             if (ImGui::SmallButton("+ Binding"))
+            {
                 action.bindings.push_back(InputBinding{});
+                mListeningAction = actionIndex;
+                mListeningBinding = static_cast<int>(action.bindings.size()) - 1;
+                mPreviousRaw = raw;
+            }
 
             ImGui::Unindent();
         }
@@ -257,7 +253,10 @@ namespace mir
                 pendingRemove = actions[static_cast<size_t>(i)].name;
         }
         if (!pendingRemove.empty())
+        {
             inputMap.RemoveAction(pendingRemove);
+            CancelListening();
+        }
 
         mPreviousRaw = raw;
     }

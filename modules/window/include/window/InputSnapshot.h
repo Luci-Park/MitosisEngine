@@ -39,7 +39,16 @@ namespace mir
 
         std::array<GamepadState, kGamepadSlotCount> gamepads{};
 
-        bool IsDown(Key key) const { return keys[static_cast<size_t>(key)]; }
-        bool IsDown(MouseButton button) const { return mouseButtons[static_cast<size_t>(button)]; }
+        bool IsDown(Key key) const
+        {
+            const size_t index = static_cast<size_t>(key);
+            return index < keys.size() && keys[index];
+        }
+
+        bool IsDown(MouseButton button) const
+        {
+            const size_t index = static_cast<size_t>(button);
+            return index < mouseButtons.size() && mouseButtons[index];
+        }
     };
 }

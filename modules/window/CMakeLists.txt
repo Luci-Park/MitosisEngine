@@ -2,8 +2,6 @@ engine_add_module(window)
 
 target_link_libraries(engine_window PUBLIC mir::core)
 
-target_sources(engine_window PRIVATE src/window/InputCodes.cpp)
-
 if(ENGINE_FAMILY_DESKTOP)
     target_sources(engine_window PRIVATE src/window/glfw/GLFWWindow.cpp)
 
@@ -18,3 +16,5 @@ if(ENGINE_FAMILY_DESKTOP)
         message(FATAL_ERROR "No native window backend for ${ENGINE_PLATFORM}")
     endif()
 endif()
+
+target_sources(engine_window PRIVATE src/window/InputCodes.cpp)

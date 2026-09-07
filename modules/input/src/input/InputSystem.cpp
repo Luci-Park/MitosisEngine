@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace mir
 {
@@ -15,17 +16,16 @@ namespace mir
     {
         constexpr float kDeviceSwitchDeadzone = 0.2f;
 
-        // First connected pad only - couch-co-op multi-pad support is a
-        // later addition (see the input-system plan's open questions).
-        float ReadBinding(const InputBinding &binding, const RawInputSnapshot &raw)
+        float ReadBinding(const InputBinding &binding, const RawInputSnapshot &raw, bool suppressKeyboard,
+                           bool suppressMouse)
         {
             switch (binding.device)
             {
             case DeviceKind::Keyboard:
-                return raw.IsDown(binding.key) ? 1.0f : 0.0f;
+                return !suppressKeyboard && raw.IsDown(binding.key) ? 1.0f : 0.0f;
 
             case DeviceKind::Mouse:
-                return raw.IsDown(binding.mouseButton) ? 1.0f : 0.0f;
+                return !suppressMouse && raw.IsDown(binding.mouseButton) ? 1.0f : 0.0f;
 
             case DeviceKind::Gamepad:
                 for (const GamepadState &pad : raw.gamepads)
@@ -47,17 +47,21 @@ namespace mir
 
         // scale only applies to a digital source composited into an axis
         // (e.g. D:+1/A:-1) - an analog gamepad axis is already signed.
-        float ReadAxisContribution(const InputBinding &binding, const RawInputSnapshot &raw)
+        float ReadAxisContribution(const InputBinding &binding, const RawInputSnapshot &raw, bool suppressKeyboard,
+                                    bool suppressMouse)
         {
-            const float sourceValue = ReadBinding(binding, raw);
+            const float sourceValue = ReadBinding(binding, raw, suppressKeyboard, suppressMouse);
             return binding.useGamepadAxis ? sourceValue : sourceValue * binding.scale;
         }
 
-        bool AnyKeyboardOrMouseActive(const RawInputSnapshot &raw)
+        bool AnyKeyActive(const RawInputSnapshot &raw)
         {
-            if (std::any_of(raw.keys.begin(), raw.keys.end(), [](bool down)
-                             { return down; }))
-                return true;
+            return std::any_of(raw.keys.begin(), raw.keys.end(), [](bool down)
+                                { return down; });
+        }
+
+        bool AnyMouseActive(const RawInputSnapshot &raw)
+        {
             if (std::any_of(raw.mouseButtons.begin(), raw.mouseButtons.end(), [](bool down)
                              { return down; }))
                 return true;
@@ -87,13 +91,16 @@ namespace mir
         const InputMap &map = context.world.Resource<InputMap>();
         InputState &state = context.world.Resource<InputState>();
 
-        // Seamless device switching: whichever device produced meaningful
-        // input most recently is "active". No qualifying input this frame
-        // leaves the last active device as-is, rather than flip-flopping.
+        const bool suppressKeyboard = state.UiCapturesKeyboard();
+        const bool suppressMouse = state.UiCapturesMouse();
+
+
         if (AnyGamepadActive(raw))
             state.SetActiveDevice(DeviceKind::Gamepad);
-        else if (AnyKeyboardOrMouseActive(raw))
+        else if (AnyKeyActive(raw))
             state.SetActiveDevice(DeviceKind::Keyboard);
+        else if (AnyMouseActive(raw))
+            state.SetActiveDevice(DeviceKind::Mouse);
 
         for (const InputAction &action : map.Actions())
         {
@@ -106,7 +113,7 @@ namespace mir
             {
                 bool down = false;
                 for (const InputBinding &binding : action.bindings)
-                    down = down || ReadBinding(binding, raw) != 0.0f;
+                    down = down || ReadBinding(binding, raw, suppressKeyboard, suppressMouse) != 0.0f;
 
                 value.down = down;
                 value.x = down ? 1.0f : 0.0f;
@@ -117,7 +124,7 @@ namespace mir
             {
                 float total = 0.0f;
                 for (const InputBinding &binding : action.bindings)
-                    total += ReadAxisContribution(binding, raw);
+                    total += ReadAxisContribution(binding, raw, suppressKeyboard, suppressMouse);
 
                 value.x = std::clamp(total, -1.0f, 1.0f);
                 value.down = value.x != 0.0f;
@@ -131,7 +138,7 @@ namespace mir
                 for (const InputBinding &binding : action.bindings)
                 {
                     float &target = binding.channel == AxisChannel::Y ? totalY : totalX;
-                    target += ReadAxisContribution(binding, raw);
+                    target += ReadAxisContribution(binding, raw, suppressKeyboard, suppressMouse);
                 }
 
                 value.x = std::clamp(totalX, -1.0f, 1.0f);
@@ -144,5 +151,8 @@ namespace mir
             value.justPressed = value.down && !wasDown;
             value.justReleased = !value.down && wasDown;
         }
+
+        std::erase_if(state.Actions(), [&](const auto &entry)
+                      { return map.Find(entry.first) == nullptr; });
     }
 }

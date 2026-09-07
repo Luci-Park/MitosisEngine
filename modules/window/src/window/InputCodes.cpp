@@ -2,6 +2,7 @@
 
 #include <array>
 #include <utility>
+#include <vector>
 
 namespace mir
 {
@@ -90,6 +91,18 @@ namespace mir
 
     std::string_view KeyName(Key key) { return NameOf(kKeyNames, key); }
     Key ParseKey(std::string_view name) { return ParseOf(kKeyNames, name).value_or(Key::Unknown); }
+
+    std::span<const Key> AllKeys()
+    {
+        static const std::vector<Key> all = [] {
+            std::vector<Key> keys;
+            keys.reserve(std::size(kKeyNames));
+            for (const auto &[key, name] : kKeyNames)
+                keys.push_back(key);
+            return keys;
+        }();
+        return all;
+    }
 
     std::string_view MouseButtonName(MouseButton button) { return NameOf(kMouseButtonNames, button); }
     std::optional<MouseButton> ParseMouseButton(std::string_view name) { return ParseOf(kMouseButtonNames, name); }

@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 
 namespace mir
@@ -198,6 +199,8 @@ namespace mir
 
     std::string_view KeyName(Key key);
     Key ParseKey(std::string_view name); // returns Key::Unknown, not optional - Key already has that sentinel
+
+    std::span<const Key> AllKeys();
 
     std::string_view MouseButtonName(MouseButton button);
     std::optional<MouseButton> ParseMouseButton(std::string_view name);

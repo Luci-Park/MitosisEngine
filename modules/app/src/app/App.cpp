@@ -212,6 +212,8 @@ namespace mir
             mRenderer.SetImGuiDrawData(mEditor.EndFrame());
             mRenderer.SetSceneViewport(mEditor.SceneViewportRect());
 
+            mWorld.Resource<InputState>().SetUiCapture(mEditor.WantsCaptureKeyboard(), mEditor.WantsCaptureMouse());
+
             mScriptReloadWatcher.Poll(Assets(), dt);
 
             SystemContext context = MakeContext(dt);

@@ -243,7 +243,13 @@ namespace mir
             {
                 if (ImGui::Begin("Project Settings", &mShowProjectSettings))
                     mProjectSettingsPanel.Draw(inputMap, mWindow->RawInput(), mProjectSettingsPath);
+                else
+                    mProjectSettingsPanel.CancelListening();
                 ImGui::End();
+            }
+            else
+            {
+                mProjectSettingsPanel.CancelListening();
             }
         }
         else
@@ -259,4 +265,7 @@ namespace mir
         ImGui::Render();
         return ImGui::GetDrawData();
     }
+
+    bool Editor::WantsCaptureKeyboard() const { return ImGui::GetIO().WantCaptureKeyboard; }
+    bool Editor::WantsCaptureMouse() const { return ImGui::GetIO().WantCaptureMouse; }
 }

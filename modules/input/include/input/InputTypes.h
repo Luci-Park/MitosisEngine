@@ -11,6 +11,7 @@
 #include <window/InputCodes.h>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mir
@@ -29,19 +30,12 @@ namespace mir
         Axis2D,
     };
 
-    // Which axis a binding feeds - meaningless for Button/Axis1D actions
-    // (Axis1D always reads X). A gamepad stick bound to an Axis2D action is
-    // two bindings, one per channel, same as a WASD-style Axis1D composite -
-    // no separate "2D binding" shape needed.
     enum class AxisChannel
     {
         X,
         Y,
     };
 
-    // One physical source contributing to an action. Only the fields
-    // relevant to `device` (and, for Gamepad, to `useGamepadAxis`) matter;
-    // the rest sit at their default and are ignored.
     struct InputBinding
     {
         DeviceKind device = DeviceKind::Keyboard;
@@ -54,10 +48,6 @@ namespace mir
         GamepadButton gamepadButton = GamepadButton::A;
         GamepadAxis gamepadAxis = GamepadAxis::LeftX;
         float deadzone = 0.15f; // only applies when useGamepadAxis is true
-
-        // Sign/magnitude this binding contributes to an Axis1D/Axis2D action
-        // when it's a digital source (e.g. D: +1.0, A: -1.0 both feeding
-        // "Move"). Ignored for Button actions and for an analog gamepad axis.
         float scale = 1.0f;
     };
 
@@ -67,4 +57,7 @@ namespace mir
         InputActionType type = InputActionType::Button;
         std::vector<InputBinding> bindings;
     };
+
+    std::string_view ActionTypeName(InputActionType type);
+    InputActionType ParseActionType(std::string_view name); // unrecognised name -> Button
 }

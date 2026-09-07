@@ -22,6 +22,8 @@ namespace mir
     public:
         void Draw(InputMap &inputMap, const RawInputSnapshot &raw, const std::filesystem::path &savePath);
 
+        void CancelListening() { mListeningAction = mListeningBinding = -1; }
+
     private:
         bool DrawAction(InputAction &action, int actionIndex, const RawInputSnapshot &raw);
 

@@ -46,29 +46,6 @@ namespace mir
             return name == "Y" ? AxisChannel::Y : AxisChannel::X;
         }
 
-        std::string_view ToString(InputActionType type)
-        {
-            switch (type)
-            {
-            case InputActionType::Button:
-                return "Button";
-            case InputActionType::Axis1D:
-                return "Axis1D";
-            case InputActionType::Axis2D:
-                return "Axis2D";
-            }
-            return "Button";
-        }
-
-        InputActionType ParseActionType(std::string_view name)
-        {
-            if (name == "Axis1D")
-                return InputActionType::Axis1D;
-            if (name == "Axis2D")
-                return InputActionType::Axis2D;
-            return InputActionType::Button;
-        }
-
         json ToJson(const InputBinding &binding)
         {
             return json{
@@ -100,8 +77,34 @@ namespace mir
         }
     }
 
+    std::string_view ActionTypeName(InputActionType type)
+    {
+        switch (type)
+        {
+        case InputActionType::Button:
+            return "Button";
+        case InputActionType::Axis1D:
+            return "Axis1D";
+        case InputActionType::Axis2D:
+            return "Axis2D";
+        }
+        return "Button";
+    }
+
+    InputActionType ParseActionType(std::string_view name)
+    {
+        if (name == "Axis1D")
+            return InputActionType::Axis1D;
+        if (name == "Axis2D")
+            return InputActionType::Axis2D;
+        return InputActionType::Button;
+    }
+
     InputAction &InputMap::AddAction(std::string name, InputActionType type)
     {
+        if (InputAction *existing = Find(name))
+            return *existing;
+
         InputAction &action = mActions.emplace_back();
         action.name = std::move(name);
         action.type = type;
@@ -183,7 +186,7 @@ namespace mir
         {
             json actionNode{
                 {"name", action.name},
-                {"type", ToString(action.type)},
+                {"type", ActionTypeName(action.type)},
                 {"bindings", json::array()},
             };
 
@@ -201,6 +204,12 @@ namespace mir
         }
 
         out << root.dump(2);
+        if (!out)
+        {
+            MIR_LOG_ERROR("InputMap::SaveFile: write to '{}' failed", path.string());
+            return false;
+        }
+
         return true;
     }
 }

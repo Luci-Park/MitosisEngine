@@ -83,6 +83,9 @@ namespace mir
 
         bool IsInitialized() const { return mInitialized; }
 
+        bool WantsCaptureKeyboard() const;
+        bool WantsCaptureMouse() const;
+
     private:
         void DrawTitleBar();
 
