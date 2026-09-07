@@ -24,7 +24,7 @@ namespace mir
      * reused, mGeneration guards against reading a stale one. Neither survives
      * a process restart with the same meaning, so a scene file cannot
      * reference entities by Entity. StableId is assigned once, at authoring
-     * time, and never reused - see docs/decisions/0030-scene-file-layout.md.
+     * time, and never reused - see docs/modules/scene.md.
      */
     using StableId = uint64_t;
 

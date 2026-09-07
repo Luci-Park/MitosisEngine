@@ -185,7 +185,7 @@ namespace mir
         }
 
         // Entity -> StableId, so parent and EntityRef fields can be written
-        // as ids instead of runtime handles (0030). Entity has no std::hash,
+        // as ids instead of runtime handles. Entity has no std::hash,
         // so it is keyed by PackEntity - the same encoding Entity.h names as
         // the one for handing an Entity to a save file.
         std::unordered_map<uint64_t, StableId> toStableId;
@@ -337,7 +337,7 @@ namespace mir
                 if (ops == nullptr)
                 {
                     MIR_LOG_WARN("LoadScene: unknown component '{}', skipped", typeName);
-                    continue; // forward compatibility (0031): a name this build doesn't know
+                    continue; // forward compatibility: a name this build doesn't know
                 }
 
                 ops->AddCopy(world, entity, ops->mDefaultValue.data());
@@ -408,7 +408,7 @@ namespace mir
     {
         for (const auto &[id, entity] : loaded.mEntities)
         {
-            // Destroying a parent cascades to its children (0020), so a child
+            // Destroying a parent cascades to its children, so a child
             // reached later in this map may already be dead - guard, don't
             // assert.
             if (world.IsAlive(entity))

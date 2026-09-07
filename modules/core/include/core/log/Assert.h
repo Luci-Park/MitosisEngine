@@ -47,14 +47,6 @@
 
 #ifdef NDEBUG
 #define MIR_ASSERT(cond, ...) ((void)0)
-#define MIR_VARIFY(cond, ...) \
-    {                         \
-        do                    \
-        {                     \
-            (void)(cond);     \
-        } while (0)           \
-    }
 #else
 #define MIR_ASSERT(cond, ...) MIR_ASSERT_FAIL(cond, __VA_ARGS__)
-#define MIR_VARIFY(cond, ...) MIR_ASSERT_FAIL(cond, __VA_ARGS__)
 #endif

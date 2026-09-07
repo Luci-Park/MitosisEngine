@@ -19,8 +19,8 @@ namespace mir
 
     /**
      * Writes `sceneDir` as scene.json plus entities/<id>.json, one file per
-     * entity in `scene.mEntities`. See docs/decisions/0030-scene-file-layout.md
-     * and 0031-component-serialization.md.
+     * entity in `scene.mEntities`. See docs/modules/scene.md
+     * for the layout and the load passes.
      *
      * `scene.mEntities`' StableId assignment is exactly what gets written, in
      * id order (see LoadedScene) - `scene.mNextId` goes into the manifest too,
@@ -49,7 +49,7 @@ namespace mir
      *     Entity until every entity in the file exists.
      *  2. Parent - resolve each entity's parent StableId through the map
      *     pass 1 built, via mir::SetParent. Safe after every AddCopy in pass
-     *     1: hierarchy is a World resource (0020), so this never moves an
+     *     1: hierarchy is a World resource, not a component, so this never moves an
      *     entity between archetypes.
      *  3. EntityRef patch - resolve every recorded EntityRef field's stored
      *     StableId and write it into the now-stable component pointer.

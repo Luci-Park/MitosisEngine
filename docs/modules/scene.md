@@ -1,0 +1,126 @@
+# scene
+
+Saves and loads a scene as data. It owns the save-file identity, `StableId`, and
+the three-pass load. It owns no runtime state and no authoring UI.
+
+`mir::scene` · depends `mir::core` (public); `nlohmann_json` (private) · API `modules/scene/include/scene/` · maintainer Sumin Park · reviewed 2026-09-06
+
+## Model
+
+A scene is a directory, not a file.
+
+```
+scenes/<scene>/
+  scene.json              manifest: ordered StableId array, mNextId, scene settings
+  entities/
+    <id>-<name>.json      one entity: {id, name, parent, components[]}
+```
+
+Splitting by entity keeps a diff proportional to what changed. Adding or removing
+an entity is a file add or delete, and two people editing different entities
+touch disjoint files, so their edits merge.
+
+Components round-trip generically. Save walks every registered `ComponentOps`,
+asks `Has`, and writes one value per `FieldDesc`. Load looks the type name up in
+`ComponentRegistry` and writes each field back.
+
+Giving a component a field table is therefore the entire serialization cost of
+that component. It works the same way for a script-declared component, which has
+no C++ type to hang a hand-written `ToJson`/`FromJson` pair on.
+
+Load runs in three passes, because an `EntityRef` cannot resolve until every
+entity in the file exists. First spawn every entity and write every
+non-`EntityRef` field, building the `StableId` to `Entity` map. Then resolve every
+`parent` through that map via `SetParent`. Then patch the recorded `EntityRef`
+fields.
+
+## API
+
+| Type | Header | Role |
+|---|---|---|
+| `StableId`, `kNullStableId` | `scene/SceneAsset.h` | `uint64_t` save-file identity, distinct from `Entity` |
+| `LoadedScene` | `scene/SceneAsset.h` | `{mName, std::map<StableId, Entity>, mNextId}` |
+| `NewScene`, `AllocateStableId`, `CreateSceneEntity` | `scene/SceneAsset.h` | Authoring entry points |
+| `SaveScene`, `LoadScene`, `UnloadScene` | `scene/SceneIO.h` | Directory in, directory out, scoped destroy |
+
+`CreateSceneEntity` is the one call an editor's "add entity" needs, so allocation
+and registration cannot happen for one without the other.
+
+## Rules
+
+**Never reference an entity by `Entity` in a file.** `Entity::mIndex` is a slot
+that gets reused, and `mGeneration` guards against reading a stale one. Neither
+survives a restart with the same meaning, so `parent` and every `EntityRef` are
+written as `StableId`.
+
+**A `StableId` is never reused, not even after its entity is deleted.** `mNextId`
+is a high-water mark persisted in the manifest.
+
+A stale reference in a file that has not been resaved therefore resolves to
+"gone" rather than to whatever new entity took the id. `LoadScene` clamps
+`mNextId` above every id actually present, in case the file was hand-edited.
+
+**`LoadedScene::mEntities` is a `std::map`, not an `unordered_map`.** The manifest
+is written in key order, and an unordered map's iteration order is not stable
+between runs, so writing from one would reshuffle the manifest on every save even
+with no real change.
+
+Sorted order also means a new entity, which always has a higher id, appends to
+the array instead of reordering it.
+
+**An unknown component name on load is skipped with a warning, not a load
+failure.** That is forward compatibility for a file written by a newer build.
+
+**A component with no `FieldDesc` table round-trips as present but empty.** It
+keeps its existence and loses all its data, silently, and nothing enforces that a
+field-bearing component carries a table.
+
+**A `StableId` is scene-local.** An `EntityRef` pointing outside the scene being
+saved is written as `kNullStableId` and loads back null, so cross-scene
+references are not representable.
+
+**`UnloadScene` destroys exactly what that load created**, each entity guarded by
+`IsAlive` since destroying a parent already cascades. It never touches entities
+that another loaded scene owns.
+
+**`SaveScene` overwrites the directory** and returns `false` on any I/O failure.
+
+The entity filename carries a name for humans, but the loader trusts only the
+`id` inside the file, so a file renamed on disk still loads correctly.
+
+## State
+
+*As of 2026-09-06.* Save, load and unload work end to end, including the generic
+field-table round trip and the `EntityRef` patch pass.
+
+Tests in `modules/scene/tests/SceneIO.tests.cpp`.
+
+Resolving names back into live handles after a load is not done here — a
+`ScriptRef.scriptName` into an `instanceRef`, or a mesh name into a `MeshHandle`.
+`main.cpp` does that, in `ResolveSceneScripts` and `ResolveSceneMeshes`, because
+it needs the renderer and the script host that this module does not link.
+
+## Backlog
+
+1. **A defined failure mode for a missing entity file** whose `StableId` is still
+   listed in the manifest. Skip with a warning, or abort the load — undecided.
+2. **`StableId` assignment tooling.** Nothing generates or garbage-collects ids
+   outside `CreateSceneEntity`, and that is authoring tooling that does not
+   exist.
+3. **Cross-scene references.** They need either a global id namespace or an
+   explicit external-reference `FieldKind`, decided before any save file starts
+   relying on today's silent-null behaviour.
+4. **A home for the resolve passes** currently in `main.cpp`, once a second
+   consumer would otherwise duplicate them.
+5. **Load is O(entities × registered components)** for the `Has` sweep. If that
+   shows up in a profile on a large scene, have each entity file list its
+   component names ahead of the blobs, so load can call `Find` per name instead
+   of sweeping the whole registry per entity.
+
+## Changed
+
+*2026-09-03* — **`EntityRef` fields stopped being written as bytes.** Was: the
+generic path would have written every `FieldDesc` value directly, and an
+`EntityRef` reads back a raw `Entity`, which is what a save file cannot store.
+Now: translated through the same `Entity` to `StableId` map the entity writer
+already builds, and patched in a third load pass.
