@@ -31,6 +31,8 @@ namespace mir
 
         if (mDesc.mSceneDir.is_relative())
             mDesc.mSceneDir = ExecutableDir() / mDesc.mSceneDir;
+        if (mDesc.mProjectSettingsPath.is_relative())
+            mDesc.mProjectSettingsPath = ExecutableDir() / mDesc.mProjectSettingsPath;
 
         EnsureDpiAware();
 
@@ -69,7 +71,7 @@ namespace mir
         }
 
         mSplash.SetProgress("Initializing editor...", 0.5f);
-        if (!mEditor.Initialize(*mWindow, mRenderer))
+        if (!mEditor.Initialize(*mWindow, mRenderer, mDesc.mProjectSettingsPath))
         {
             MIR_LOG_ERROR("Editor initialization failed");
             mRenderer.Shutdown();
@@ -92,7 +94,7 @@ namespace mir
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
 
-        mWorld.EmplaceResource<InputMap>();
+        mWorld.EmplaceResource<InputMap>(InputMap::LoadFile(mDesc.mProjectSettingsPath));
         mWorld.EmplaceResource<InputState>();
 
         mScheduler.AddSystem<InputSystem>(SystemPhase::PreUpdate, *mWindow);
@@ -191,7 +193,7 @@ namespace mir
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
             {
-                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout))
+                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout, mWorld.Resource<InputMap>()))
                 {
                 case SceneMenuAction::New:
                     NewScene();

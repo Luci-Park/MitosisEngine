@@ -42,6 +42,9 @@ namespace mir
 
         // temp default path for scenes
         std::filesystem::path mSceneDir = "scenes/default";
+
+        // Where the Project Settings window's Save button writes
+        std::filesystem::path mProjectSettingsPath = "project_settings.json";
     };
 
     class App

@@ -29,6 +29,8 @@ namespace mir
 
         const std::vector<InputAction> &Actions() const { return mActions; }
 
+        std::vector<InputAction> &MutableActions() { return mActions; }
+
         // Malformed/missing files load as an empty map (logged, not fatal) -
         // same rationale as LoadGameProject: a bad config is a content
         // problem, not a reason anything downstream should stop working.
