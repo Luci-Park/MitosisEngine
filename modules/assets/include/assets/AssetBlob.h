@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     inline constexpr uint32_t kAssetBlobMagic = 0x4D545341u;
     inline constexpr uint32_t kAssetBlobFormatVersion = 1u;

@@ -6,7 +6,7 @@
 
 #include <cstring>
 
-namespace mts
+namespace mir
 {
     std::vector<std::byte> BuildAssetManifestBlob(std::span<const AssetManifestSourceEntry> entries)
     {
@@ -52,7 +52,7 @@ namespace mts
 
         if (blob->header.typeTag != kAssetManifestTypeTag)
         {
-            MTS_LOG_ERROR("AssetManifest::Parse: type tag mismatch, expected {}, got {}",
+            MIR_LOG_ERROR("AssetManifest::Parse: type tag mismatch, expected {}, got {}",
                           kAssetManifestTypeTag, blob->header.typeTag);
             return std::nullopt;
         }
@@ -63,7 +63,7 @@ namespace mts
         // layout into the current struct and yields garbage ids and offsets.
         if (blob->header.contentVersion != kAssetManifestContentVersion)
         {
-            MTS_LOG_ERROR("AssetManifest::Parse: unsupported content version {}, expected {}",
+            MIR_LOG_ERROR("AssetManifest::Parse: unsupported content version {}, expected {}",
                           blob->header.contentVersion, kAssetManifestContentVersion);
             return std::nullopt;
         }
@@ -71,7 +71,7 @@ namespace mts
         const std::span<const std::byte> content = blob->content;
         if (content.size() < sizeof(uint64_t))
         {
-            MTS_LOG_ERROR("AssetManifest::Parse: content too small for entry count");
+            MIR_LOG_ERROR("AssetManifest::Parse: content too small for entry count");
             return std::nullopt;
         }
 
@@ -82,7 +82,7 @@ namespace mts
         const std::size_t maxEntries = availableForEntries / sizeof(AssetManifestEntry);
         if (entryCount > maxEntries)
         {
-            MTS_LOG_ERROR("AssetManifest::Parse: content too small for {} entries", entryCount);
+            MIR_LOG_ERROR("AssetManifest::Parse: content too small for {} entries", entryCount);
             return std::nullopt;
         }
 
@@ -102,7 +102,7 @@ namespace mts
             const AssetManifestEntry &entry = manifest.mEntries[i];
             if (static_cast<std::size_t>(entry.pathOffset) + entry.pathLength > manifest.mPathTable.size())
             {
-                MTS_LOG_ERROR("AssetManifest::Parse: entry {} path range out of bounds", i);
+                MIR_LOG_ERROR("AssetManifest::Parse: entry {} path range out of bounds", i);
                 return std::nullopt;
             }
             // emplace does not overwrite, so a duplicate would leave the second
@@ -110,7 +110,7 @@ namespace mts
             // what an id collision looks like. Reject instead.
             if (!manifest.mIndex.emplace(entry.id.value, i).second)
             {
-                MTS_LOG_ERROR("AssetManifest::Parse: duplicate asset id {:#x} at entry {}", entry.id.value, i);
+                MIR_LOG_ERROR("AssetManifest::Parse: duplicate asset id {:#x} at entry {}", entry.id.value, i);
                 return std::nullopt;
             }
         }

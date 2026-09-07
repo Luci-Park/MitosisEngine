@@ -1,5 +1,6 @@
 #include <app/App.h>
 
+#include <core/EngineVersion.h>
 #include <core/ecs/ComponentRegistry.h>
 #include <core/ecs/DeferredAccess.h>
 #include <core/ecs/TransformHierarchy.h>
@@ -14,7 +15,7 @@
 #include <algorithm>
 #include <chrono>
 
-namespace mts
+namespace mir
 {
     App::~App()
     {
@@ -25,38 +26,57 @@ namespace mts
     {
         mDesc = desc;
 
+        if (mDesc.mSceneDir.is_relative())
+            mDesc.mSceneDir = ExecutableDir() / mDesc.mSceneDir;
+
+        EnsureDpiAware();
+
+        if (!mSplash.Show({.mEngineName = desc.mAppName,
+                           .mVersion = kEngineVersion,
+                           .mCopyright = kEngineCopyright,
+                           .mStatus = "Creating window...",
+                           .mProgress = 0.0f}))
+        {
+            MIR_LOG_WARN("Splash screen failed to show, continuing without it");
+        }
+
         WindowDesc windowDesc{};
         windowDesc.mWidth = desc.mWidth;
         windowDesc.mHeight = desc.mHeight;
         windowDesc.mTitle = desc.mTitle;
         windowDesc.mMaximized = true;
         windowDesc.mCustomTitleBar = desc.mEnableEditorLayout;
+        windowDesc.mStartHidden = true;
 
         mWindow = Window::Create(windowDesc);
         if (!mWindow)
         {
-            MTS_LOG_ERROR("Window creation failed");
+            MIR_LOG_ERROR("Window creation failed");
             return false;
         }
 
+        mSplash.SetProgress("Initializing renderer...", 0.2f);
         if (!mRenderer.Initialize({.window = mWindow.get(),
                                    .appName = desc.mAppName,
                                    .enableValidation = desc.mEnableValidation}))
         {
-            MTS_LOG_ERROR("Renderer initialization failed");
+            MIR_LOG_ERROR("Renderer initialization failed");
             mWindow.reset();
             return false;
         }
 
+        mSplash.SetProgress("Initializing editor...", 0.5f);
         if (!mEditor.Initialize(*mWindow, mRenderer))
         {
-            MTS_LOG_ERROR("Editor initialization failed");
+            MIR_LOG_ERROR("Editor initialization failed");
             mRenderer.Shutdown();
             mWindow.reset();
             return false;
         }
 
         mInitialized = true;
+
+        mSplash.SetProgress("Registering components...", 0.75f);
 
         // scene graph + install destroy hook
         InstallHierarchy(mWorld);
@@ -76,7 +96,10 @@ namespace mts
 
         mScheduler.AddSystem<RenderSystem>(SystemPhase::Render, mRenderer);
 
-        mScene = mts::NewScene("untitled");
+        mSplash.SetProgress("Loading scene...", 0.9f);
+        mScene = mir::NewScene("untitled");
+
+        mWindow->Show();
 
         return true;
     }
@@ -84,12 +107,12 @@ namespace mts
     void App::NewScene(std::string name)
     {
         UnloadScene(mWorld, mScene);
-        mScene = mts::NewScene(std::move(name));
+        mScene = mir::NewScene(std::move(name));
     }
 
     bool App::SaveScene()
     {
-        return mts::SaveScene(mWorld, mDesc.mSceneDir, mScene);
+        return mir::SaveScene(mWorld, mDesc.mSceneDir, mScene);
     }
 
     bool App::LoadScene()
@@ -97,12 +120,12 @@ namespace mts
         // scene hardcoded at the moment
         if (!std::filesystem::exists(mDesc.mSceneDir / "scene.json"))
         {
-            MTS_LOG_ERROR("App::LoadScene: no scene.json in '{}'", mDesc.mSceneDir.string());
+            MIR_LOG_ERROR("App::LoadScene: no scene.json in '{}'", mDesc.mSceneDir.string());
             return false;
         }
 
         UnloadScene(mWorld, mScene);
-        mScene = mts::LoadScene(mWorld, mDesc.mSceneDir);
+        mScene = mir::LoadScene(mWorld, mDesc.mSceneDir);
         return true;
     }
 
@@ -118,7 +141,7 @@ namespace mts
         mAssetManifest = AssetManifest::LoadFile(manifestPath);
         if (!mAssetManifest.has_value())
         {
-            MTS_LOG_ERROR("Asset manifest load failed, assets unavailable: {}", manifestPath.string());
+            MIR_LOG_ERROR("Asset manifest load failed, assets unavailable: {}", manifestPath.string());
             mAssetLoadFailed = true;
             return nullptr;
         }
@@ -160,7 +183,7 @@ namespace mts
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
             {
-                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo))
+                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout))
                 {
                 case SceneMenuAction::New:
                     NewScene();
@@ -211,6 +234,6 @@ namespace mts
         mRenderer.Shutdown();
         mWindow.reset();
         mInitialized = false;
-        MTS_LOG_INFO("App shut down");
+        MIR_LOG_INFO("App shut down");
     }
 }

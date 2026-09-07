@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <glm/mat4x4.hpp>
 
-namespace mts
+namespace mir
 {
     namespace detail
     {
@@ -52,7 +52,7 @@ namespace mts
         bool mDirty = true;
     };
 
-    MTS_ASSERT_COMPONENT(WorldTransform);
+    MIR_ASSERT_COMPONENT(WorldTransform);
 
     // only getter, set is only to be done by Hierarchy System
     inline constexpr FieldDesc kWorldTransformFields[] = {

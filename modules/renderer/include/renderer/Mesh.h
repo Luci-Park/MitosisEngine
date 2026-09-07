@@ -12,7 +12,7 @@
 
 #include <cstdint>
 
-namespace mts
+namespace mir
 {
     struct Vertex
     {

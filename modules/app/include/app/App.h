@@ -18,6 +18,7 @@
 #include <scene/SceneAsset.h>
 #include <script/ScriptHost.h>
 #include <script/ScriptReloadWatcher.h>
+#include <window/Splash.h>
 #include <window/Window.h>
 
 #include <cstdint>
@@ -25,21 +26,16 @@
 #include <memory>
 #include <optional>
 
-namespace mts
+namespace mir
 {
     struct AppDesc
     {
         uint32_t mWidth = 1280;
         uint32_t mHeight = 720;
-        const char *mTitle = "MitosisEngine";
-        const char *mAppName = "MitosisEngine";
+        const char *mTitle = "MjolnirEngine";
+        const char *mAppName = "MjolnirEngine";
         bool mEnableValidation = true;
 
-#ifdef NDEBUG
-        bool mShowImGuiDemo = false;
-#else
-        bool mShowImGuiDemo = true;
-#endif
         bool mEnableEditorLayout = true;
 
         float mMaxDeltaSeconds = 0.25f;
@@ -71,8 +67,10 @@ namespace mts
         // Temporary seam
         VulkanRenderer &Renderer() { return mRenderer; }
 
-        // The asset cache, loading the manifest on first use.
-        // Returns nullptr when no manifest is available
+        // Startup splash
+        SplashScreen &Splash() { return mSplash; }
+
+        // The asset cache, loading the manifest on first use
         AssetCache *Assets();
 
         // The scene currently in the World
@@ -92,6 +90,7 @@ namespace mts
         // context is rebuilt per tick
         SystemContext MakeContext(float dt);
 
+        SplashScreen mSplash;
         std::unique_ptr<Window> mWindow;
         VulkanRenderer mRenderer;
         Editor mEditor;

@@ -13,7 +13,7 @@
 #include "Entity.h"
 #include "World.h"
 
-namespace mts
+namespace mir
 {
     // CommandBuffer used for each frame
     struct FrameCommands

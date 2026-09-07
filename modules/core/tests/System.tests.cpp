@@ -15,7 +15,7 @@
 
 #include <vector>
 
-using namespace mts;
+using namespace mir;
 
 namespace
 {

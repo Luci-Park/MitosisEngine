@@ -16,10 +16,10 @@
 
 namespace
 {
-    using mts::Entity;
-    using mts::PackEntity;
-    using mts::UnpackEntity;
-    using mts::World;
+    using mir::Entity;
+    using mir::PackEntity;
+    using mir::UnpackEntity;
+    using mir::World;
 }
 
 TEST_CASE("Packing an entity round-trips both halves")
@@ -27,7 +27,7 @@ TEST_CASE("Packing an entity round-trips both halves")
     const Entity entity{7, 3};
 
     CHECK(UnpackEntity(PackEntity(entity)) == entity);
-    CHECK(UnpackEntity(PackEntity(mts::kNullEntity)) == mts::kNullEntity);
+    CHECK(UnpackEntity(PackEntity(mir::kNullEntity)) == mir::kNullEntity);
 }
 
 TEST_CASE("Packing keeps the generation that a truncated encoding would lose")

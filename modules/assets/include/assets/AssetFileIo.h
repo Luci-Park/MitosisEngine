@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     std::optional<std::vector<std::byte>> ReadFileBytes(const std::filesystem::path &path);
 

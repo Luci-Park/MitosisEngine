@@ -8,8 +8,18 @@
  */
 #pragma once
 
-namespace mts
+struct ImVec4;
+
+namespace mir
 {
+    enum class StatusColor
+    {
+        Muted,
+        Info,
+        Warning,
+        Danger,
+    };
+
     class EditorTheme
     {
     public:
@@ -17,5 +27,6 @@ namespace mts
 
         static void Apply();
         static void ScaleForDpi(float scale);
+        static ImVec4 Color(StatusColor status, float alpha = 1.0f);
     };
 }

@@ -11,12 +11,13 @@
 #include <filesystem>
 #include <string_view>
 
-namespace mts
+namespace mir
 {
     const std::filesystem::path &ExecutableDir();
 
     std::filesystem::path ShaderPath(std::string_view name);
     std::filesystem::path FontPath(std::string_view name);
+    std::filesystem::path BrandingPath(std::string_view name);
 
     std::filesystem::path CookedAssetsDir();
 }

@@ -17,8 +17,18 @@
 #include <GLFW/glfw3native.h>
 #include <windowsx.h>
 
-namespace mts
+#include <mutex>
+
+namespace mir
 {
+    void EnsureDpiAware()
+    {
+        static std::once_flag once;
+        std::call_once(once, [] {
+            ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        });
+    }
+
     NativeWindowHandle GLFWWindow::NativeWindow() const
     {
         return {WindowBackend::Win32, nullptr, glfwGetWin32Window(mHandle)};
@@ -26,7 +36,7 @@ namespace mts
 
     namespace
     {
-        constexpr wchar_t kTitleBarPropName[] = L"MtsTitleBarHook";
+        constexpr wchar_t kTitleBarPropName[] = L"MirTitleBarHook";
 
         struct TitleBarHookState
         {

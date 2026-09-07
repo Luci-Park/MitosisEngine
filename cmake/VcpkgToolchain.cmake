@@ -11,9 +11,9 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE)
     return()
 endif()
 
-set(_mts_vcpkg_root "$ENV{VCPKG_ROOT}")
+set(_mir_vcpkg_root "$ENV{VCPKG_ROOT}")
 
-if(_mts_vcpkg_root STREQUAL "")
+if(_mir_vcpkg_root STREQUAL "")
     message(FATAL_ERROR
         "VCPKG_ROOT is not set.\n"
         "This project uses vcpkg in manifest mode but does not vendor it.\n"
@@ -26,23 +26,23 @@ if(_mts_vcpkg_root STREQUAL "")
         "Full instructions: docs/SETUP.md")
 endif()
 
-file(TO_CMAKE_PATH "${_mts_vcpkg_root}" _mts_vcpkg_root)
-set(_mts_toolchain "${_mts_vcpkg_root}/scripts/buildsystems/vcpkg.cmake")
+file(TO_CMAKE_PATH "${_mir_vcpkg_root}" _mir_vcpkg_root)
+set(_mir_toolchain "${_mir_vcpkg_root}/scripts/buildsystems/vcpkg.cmake")
 
-if(NOT EXISTS "${_mts_toolchain}")
+if(NOT EXISTS "${_mir_toolchain}")
     message(FATAL_ERROR
-        "VCPKG_ROOT points at '${_mts_vcpkg_root}', but no vcpkg toolchain was "
+        "VCPKG_ROOT points at '${_mir_vcpkg_root}', but no vcpkg toolchain was "
         "found there.\n"
-        "Expected: ${_mts_toolchain}\n"
+        "Expected: ${_mir_toolchain}\n"
         "Either the path is wrong, or the clone was never bootstrapped:\n"
-        "    ${_mts_vcpkg_root}/bootstrap-vcpkg.bat\n"
+        "    ${_mir_vcpkg_root}/bootstrap-vcpkg.bat\n"
         "Full instructions: docs/SETUP.md")
 endif()
 
-set(CMAKE_TOOLCHAIN_FILE "${_mts_toolchain}"
+set(CMAKE_TOOLCHAIN_FILE "${_mir_toolchain}"
     CACHE STRING "vcpkg toolchain, resolved from VCPKG_ROOT")
 
-message(STATUS "vcpkg root: ${_mts_vcpkg_root}")
+message(STATUS "vcpkg root: ${_mir_vcpkg_root}")
 
-unset(_mts_vcpkg_root)
-unset(_mts_toolchain)
+unset(_mir_vcpkg_root)
+unset(_mir_toolchain)

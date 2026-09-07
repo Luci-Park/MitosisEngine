@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // payload = data
     class CommandBuffer
@@ -27,9 +27,7 @@ namespace mts
         template <typename T>
         void Add(Entity entity, const T &value)
         {
-            MTS_ASSERT_COMPONENT(T);
-            static_assert(!kIsTagComponent<T>,
-                          "CommandBuffer::Add: T is a tag - there is no value to record. Use AddTag<T>.");
+            MIR_ASSERT_COMPONENT(T);
 
             static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                           "CommandBuffer: over-aligned component - the payload buffer only "
@@ -65,7 +63,7 @@ namespace mts
 
         void AddRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
         {
-            MTS_ASSERT(align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+            MIR_ASSERT(align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                        "CommandBuffer::AddRaw: over-aligned component \"{}\" ({})", type.name, align);
 
             const std::size_t headerOffset = AlignUp(mStorage.size(), alignof(RawHeader));

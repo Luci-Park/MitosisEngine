@@ -15,7 +15,7 @@
 #include <cstddef>
 #include <glm/vec4.hpp>
 
-namespace mts
+namespace mir
 {
     // the mesh render component
     // null mesh is skipped
@@ -43,7 +43,7 @@ namespace mts
         char materialShader[kFieldStringCapacity] = {};
     };
 
-    MTS_ASSERT_COMPONENT(MeshRenderer);
+    MIR_ASSERT_COMPONENT(MeshRenderer);
 
     // Fields for scripts, inspectors, and scene serialization. mesh/material
     // are deliberately left out - see the comment on them above.

@@ -38,12 +38,12 @@ Its installer sets `VULKAN_SDK`. The build finds `slangc` under
 
 ## 3. Optional: your name in generated files
 
-Author resolution: `-Author`, then `MITOSIS_AUTHOR`, then `git config user.name`,
+Author resolution: `-Author`, then `MJOLNIR_AUTHOR`, then `git config user.name`,
 then the OS user.
 
 ```
-setx MITOSIS_AUTHOR "Your Name"
-setx MITOSIS_ORG "DigiPen (USA) Corporation"
+setx MJOLNIR_AUTHOR "Your Name"
+setx MJOLNIR_ORG "DigiPen (USA) Corporation"
 ```
 
 ## 4. Build and run

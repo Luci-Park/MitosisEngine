@@ -15,7 +15,7 @@
 
 #include <algorithm>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -93,7 +93,7 @@ namespace mts
         if (it == mByHash.end())
             return nullptr;
 
-        MTS_CHECK(it->second->mType.name == name,
+        MIR_CHECK(it->second->mType.name == name,
                   "ComponentRegistry: name hash collision - \"{}\" and \"{}\" both hash to {}; "
                   "component names must be globally unique",
                   it->second->mType.name, name, hash);
@@ -107,7 +107,7 @@ namespace mts
             return existing->mType.seq;
 
         const uint32_t seq = NextSeq();
-        MTS_CHECK(seq < kMaxComponentTypes,
+        MIR_CHECK(seq < kMaxComponentTypes,
                   "ComponentRegistry: \"{}\" would be component type {}, past kMaxComponentTypes ({}). "
                   "Raise kMaxComponentTypes in Signature.h, or declare fewer component types.",
                   name, seq, kMaxComponentTypes);
@@ -118,12 +118,12 @@ namespace mts
     {
         if (ComponentOps *existing = FindChecked(ops.mType.hash, ops.mType.name))
         {
-            MTS_CHECK(!existing->mRuntime,
+            MIR_CHECK(!existing->mRuntime,
                       "ComponentRegistry: \"{}\" was already declared by a script. Register the C++ "
                       "components before loading any script.",
                       ops.mType.name);
 
-            MTS_CHECK(existing->mType.seq == ops.mType.seq && existing->mSize == ops.mSize,
+            MIR_CHECK(existing->mType.seq == ops.mType.seq && existing->mSize == ops.mSize,
                       "ComponentRegistry: two different components are both named \"{}\". TypeId hashes "
                       "the bare name, so component names must be unique across namespaces.",
                       ops.mType.name);
@@ -136,7 +136,7 @@ namespace mts
             }
             else
             {
-                MTS_CHECK(ops.mFields.empty() || ops.mFields.data() == existing->mFields.data(),
+                MIR_CHECK(ops.mFields.empty() || ops.mFields.data() == existing->mFields.data(),
                           "ComponentRegistry: \"{}\" registered twice with different field tables",
                           ops.mType.name);
             }
@@ -144,7 +144,7 @@ namespace mts
             return *existing;
         }
 
-        MTS_CHECK(ops.mType.seq < kMaxComponentTypes,
+        MIR_CHECK(ops.mType.seq < kMaxComponentTypes,
                   "ComponentRegistry: \"{}\" is component type {}, past kMaxComponentTypes ({}). "
                   "Raise kMaxComponentTypes in Signature.h.",
                   ops.mType.name, ops.mType.seq, kMaxComponentTypes);
@@ -165,16 +165,16 @@ namespace mts
     const ComponentOps &ComponentRegistry::RegisterRuntime(std::string_view name,
                                                            std::span<const RuntimeFieldDecl> fields)
     {
-        MTS_CHECK(!name.empty(), "ComponentRegistry::RegisterRuntime: component name is empty");
+        MIR_CHECK(!name.empty(), "ComponentRegistry::RegisterRuntime: component name is empty");
 
         const uint32_t hash = Fnv1a32(name);
 
         if (ComponentOps *existing = FindChecked(hash, name))
         {
-            MTS_CHECK(existing->mRuntime,
+            MIR_CHECK(existing->mRuntime,
                       "ComponentRegistry: \"{}\" is a C++ component; a script may not redeclare it", name);
 
-            MTS_CHECK(SameLayout(*existing, fields),
+            MIR_CHECK(SameLayout(*existing, fields),
                       "ComponentRegistry: \"{}\" is already declared with a different field list. "
                       "Live archetypes hold rows of the old layout, and migrating them is not "
                       "implemented - restart the world to change a component's fields.",
@@ -191,10 +191,10 @@ namespace mts
 
         for (const RuntimeFieldDecl &decl : fields)
         {
-            MTS_CHECK(!decl.mName.empty(), "ComponentRegistry: \"{}\" has a field with an empty name", name);
+            MIR_CHECK(!decl.mName.empty(), "ComponentRegistry: \"{}\" has a field with an empty name", name);
             for (const FieldDesc &seen : descs)
             {
-                MTS_CHECK(seen.mName != decl.mName, "ComponentRegistry: \"{}\" declares field \"{}\" twice", name,
+                MIR_CHECK(seen.mName != decl.mName, "ComponentRegistry: \"{}\" declares field \"{}\" twice", name,
                           decl.mName);
             }
 

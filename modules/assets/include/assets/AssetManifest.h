@@ -13,7 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     inline constexpr uint32_t kAssetManifestTypeTag = 0x4D414E46u;
     inline constexpr uint32_t kAssetManifestContentVersion = 1u;

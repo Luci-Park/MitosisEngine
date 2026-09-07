@@ -66,7 +66,7 @@ function Copy-Template {
 
 <#
     Values shared by every template: who is generating the file, and the copyright line.
-    Author resolution: -Author argument, then $env:MITOSIS_AUTHOR, then git user.name,
+    Author resolution: -Author argument, then $env:MJOLNIR_AUTHOR, then git user.name,
     then the OS user name - so each teammate gets their own without editing anything.
 #>
 function Get-CommonValues {
@@ -75,7 +75,7 @@ function Get-CommonValues {
         [string]$Organization
     )
 
-    if (-not $Author) { $Author = $env:MITOSIS_AUTHOR }
+    if (-not $Author) { $Author = $env:MJOLNIR_AUTHOR }
     if (-not $Author) {
         $gitName = (& git config user.name 2>$null)
         if ($LASTEXITCODE -eq 0 -and $gitName) { $Author = $gitName.Trim() }
@@ -83,7 +83,7 @@ function Get-CommonValues {
     if (-not $Author) { $Author = $env:USERNAME }
     if (-not $Author) { $Author = 'unknown' }
 
-    if (-not $Organization) { $Organization = $env:MITOSIS_ORG }
+    if (-not $Organization) { $Organization = $env:MJOLNIR_ORG }
     if (-not $Organization) { $Organization = 'DigiPen (USA) Corporation' }
 
     return @{

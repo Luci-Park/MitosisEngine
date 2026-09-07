@@ -46,7 +46,7 @@ namespace
     };
 }
 
-using namespace mts;
+using namespace mir;
 
 TEST_CASE("Add is deferred until Flush", "[ecs][commands]")
 {

@@ -10,6 +10,7 @@
 #pragma once
 
 #include <core/platform/Surface.h>
+#include <editor/panels/LogPanel.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
@@ -18,7 +19,7 @@
 
 struct ImDrawData;
 
-namespace mts
+namespace mir
 {
     enum class SceneMenuAction
     {
@@ -54,12 +55,12 @@ namespace mts
         // any other ImGui-facing call (including DrawLayout).
         void BeginFrame();
 
-        // Builds the dockspace, the default Hierarchy/Inspector/Output
-        // split, the Debug menu, and (if requested) the style editor -
-        // the Slate editor shell. Pass enableLayout = false to keep ImGui
-        // running (e.g. a caller's own UI) without this shell.
-        // Returns the SceneMenuAction picked from the File menu this frame.
-        SceneMenuAction DrawLayout(bool enableLayout, bool showDemoWindow);
+        /// Builds the dockspace, the default Hierarchy/Inspector/Output
+        /// split, the Debug menu, and (if requested) the style editor -
+        /// the Slate editor shell. Pass enableLayout = false to keep ImGui
+        /// running (e.g. a caller's own UI) without this shell.
+        /// Returns the SceneMenuAction picked from the File menu this frame.
+        SceneMenuAction DrawLayout(bool enableLayout);
 
         // Ends this frame's ImGui state and returns its draw data, which
         // the caller hands to VulkanRenderer::SetImGuiDrawData. Always
@@ -85,5 +86,6 @@ namespace mts
         VkRect2D mSceneViewportRect{};
         Window *mWindow = nullptr;
         std::vector<PixelRect> mTitleBarInteractiveRects;
+        LogPanel mLogPanel;
     };
 }

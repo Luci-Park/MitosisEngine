@@ -15,7 +15,7 @@
 #include <map>
 #include <string>
 
-namespace mts
+namespace mir
 {
     /**
      * Save-file-only identity for an entity, distinct from Entity.

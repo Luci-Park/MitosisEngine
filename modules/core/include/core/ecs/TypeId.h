@@ -17,7 +17,7 @@
 #include <string_view>
 #include <unordered_map>
 
-namespace mts
+namespace mir
 {
     struct TypeId
     {
@@ -60,11 +60,11 @@ namespace mts
         constexpr std::string_view TrimTypeNameRaw()
         {
 #if defined(_MSC_VER)
-            // __FUNCSIG__ = std::string_view __cdecl mts::detail::TrimTypeNameRaw<struct T>(void)
+            // __FUNCSIG__ = std::string_view __cdecl mir::detail::TrimTypeNameRaw<struct T>(void)
             std::string_view sig = __FUNCSIG__;
             std::string_view marker = "TrimTypeNameRaw<";
 #elif defined(__clang__) || defined(__GNUC__)
-            // __PRETTY_FUNCTION__ = constexpr std::string_view mts::detail::TrimTypeNameRaw() [with T = {T}; std::string_view = std::basic_string_view<char>]
+            // __PRETTY_FUNCTION__ = constexpr std::string_view mir::detail::TrimTypeNameRaw() [with T = {T}; std::string_view = std::basic_string_view<char>]
             std::string_view sig = __PRETTY_FUNCTION__;
             std::string_view marker = "T = ";
 #else
@@ -197,7 +197,7 @@ namespace mts
             }
             else
             {
-                MTS_ASSERT(it->second == rawSignature,
+                MIR_ASSERT(it->second == rawSignature,
                            "TypeId collision: \"{}\" and \"{}\" produce the same name hash {}; "
                            "type names must be globally unique across namespaces",
                            it->second, rawSignature, hash);

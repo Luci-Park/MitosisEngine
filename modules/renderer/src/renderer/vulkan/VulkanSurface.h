@@ -11,7 +11,7 @@
 #include <volk.h>
 #include <core/platform/Surface.h>
 
-namespace mts::vk
+namespace mir::vk
 {
     // extensions per backend
     const char *PlatformSurfaceExtension(WindowBackend backend);

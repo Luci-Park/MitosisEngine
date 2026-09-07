@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     namespace detail
     {
@@ -173,7 +173,7 @@ namespace mts
             if (!mMatcher.NeedsRefresh(*mWorld))
                 return;
 
-            MTS_ASSERT(mIterationDepth == 0,
+            MIR_ASSERT(mIterationDepth == 0,
                        "Query::EnsureFresh: archetypes changed while this query is iterating; a "
                        "ForEach callback must not create archetypes and then re-run the same query");
 

@@ -22,13 +22,13 @@ A typical frame from `App::Run`:
 mEditor.BeginFrame();                                             // ImGui NewFrame trio
 
 if (windowVisible)
-    mEditor.DrawLayout(mDesc.mEnableEditorLayout, mDesc.mShowImGuiDemo);
+    mEditor.DrawLayout(mDesc.mEnableEditorLayout);
 
 mRenderer.SetImGuiDrawData(mEditor.EndFrame());                   // ImGui::Render, hand off draw data
 mRenderer.SetSceneViewport(mEditor.SceneViewportRect());
 ```
 
-`DrawLayout(true, ...)` builds the dockspace once (`DockBuilderSplitNode` into
+`DrawLayout(true)` builds the dockspace once (`DockBuilderSplitNode` into
 left/right/bottom, `ImGuiDockNodeFlags_PassthruCentralNode` keeping the
 center undocked), docks `Hierarchy`/`Inspector`/`Output` into it, draws the
 `Debug` menu bar, and - if toggled from that menu - `ImGui::ShowStyleEditor()`.
@@ -42,7 +42,7 @@ bool Initialize(Window &window, VulkanRenderer &renderer);
 void Shutdown(VulkanRenderer &renderer);
 
 void BeginFrame();
-void DrawLayout(bool enableLayout, bool showDemoWindow);
+void DrawLayout(bool enableLayout);
 ImDrawData *EndFrame();
 
 VkRect2D SceneViewportRect() const;

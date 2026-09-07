@@ -12,7 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // view.content is a span into this entry's own raw buffer, so the two must
     // travel together. Moving is safe - vector's move steals the buffer, so the

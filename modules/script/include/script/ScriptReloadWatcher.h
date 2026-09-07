@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace mts
+namespace mir
 {
     class IScriptHost;
     class AssetCache;

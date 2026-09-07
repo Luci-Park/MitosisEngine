@@ -15,7 +15,7 @@
 #include <cstddef>
 #include <type_traits>
 
-namespace mts
+namespace mir
 {
     // because we use bitset, we need limited number of componentTypes.
     inline constexpr std::size_t kMaxComponentTypes = 256;
@@ -24,7 +24,7 @@ namespace mts
     // check seq -> bitset idx (< kMaxComponentTypes)
     inline std::size_t ComponentBitOf(uint32_t seq)
     {
-        MTS_CHECK(seq < kMaxComponentTypes,
+        MIR_CHECK(seq < kMaxComponentTypes,
                   "ComponentBitOf: component type {} is past kMaxComponentTypes ({}). Raise "
                   "kMaxComponentTypes in Signature.h, or declare fewer component types.",
                   seq, kMaxComponentTypes);

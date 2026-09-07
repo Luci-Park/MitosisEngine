@@ -8,9 +8,9 @@ find_package(glm CONFIG REQUIRED)
 
 target_link_libraries(engine_renderer
     PUBLIC volk::volk_headers
-            mts::core
+            mir::core
             # glm is PUBLIC: VulkanRenderer::DrawFrame takes glm::mat4 in the
-            # public header. mts::core already carries glm publicly, but this
+            # public header. mir::core already carries glm publicly, but this
             # target's own interface needs it, so it is declared here too.
             glm::glm
     PRIVATE GPUOpen::VulkanMemoryAllocator

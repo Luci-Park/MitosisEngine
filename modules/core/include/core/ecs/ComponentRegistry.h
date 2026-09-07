@@ -27,7 +27,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // per-component-type vtable of function pointers for all component interaction
     struct ComponentOps
@@ -98,7 +98,7 @@ namespace mts
         template <typename T>
         const ComponentOps &Register(std::span<const FieldDesc> fields = {})
         {
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
             static_assert(std::is_default_constructible_v<T>,
                           "ComponentRegistry::Register: T must be default constructible - the registry "
                           "captures a default value so a script can add the component without supplying one");

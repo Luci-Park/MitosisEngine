@@ -13,7 +13,7 @@
 
 #include <GLFW/glfw3.h>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -23,7 +23,7 @@ namespace mts
 
         void OnGLFWError(int code, const char *description)
         {
-            MTS_LOG_ERROR("GLFW error {}: {}", code, description);
+            MIR_LOG_ERROR("GLFW error {}: {}", code, description);
         }
     }
 
@@ -37,20 +37,21 @@ namespace mts
         if (g_windowCount == 0)
         {
             glfwSetErrorCallback(&OnGLFWError);
-            MTS_CHECK(glfwInit() == GLFW_TRUE, "glfwInit failed");
+            MIR_CHECK(glfwInit() == GLFW_TRUE, "glfwInit failed");
         }
 
         // No OpenGL context. The renderer owns the graphics API.
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, desc.mResizable ? GLFW_TRUE : GLFW_FALSE);
         glfwWindowHint(GLFW_MAXIMIZED, desc.mMaximized ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(GLFW_VISIBLE, desc.mStartHidden ? GLFW_FALSE : GLFW_TRUE);
 
         mHandle = glfwCreateWindow(static_cast<int>(desc.mWidth),
                                     static_cast<int>(desc.mHeight),
                                     desc.mTitle,
                                     nullptr,
                                     nullptr);
-        MTS_CHECK(mHandle != nullptr, "glfwCreateWindow failed");
+        MIR_CHECK(mHandle != nullptr, "glfwCreateWindow failed");
         ++g_windowCount;
 
         mTitle = desc.mTitle;
@@ -68,7 +69,7 @@ namespace mts
         glfwSetWindowUserPointer(mHandle, this);
         glfwSetFramebufferSizeCallback(mHandle, &GLFWWindow::OnFramebufferSize);
 
-        MTS_LOG_INFO("Window created: {}x{} \"{}\"", mWidth, mHeight, desc.mTitle);
+        MIR_LOG_INFO("Window created: {}x{} \"{}\"", mWidth, mHeight, desc.mTitle);
     }
 
     GLFWWindow::~GLFWWindow()
@@ -130,10 +131,15 @@ namespace mts
         glfwSetWindowShouldClose(mHandle, GLFW_TRUE);
     }
 
+    void GLFWWindow::Show()
+    {
+        glfwShowWindow(mHandle);
+    }
+
     void GLFWWindow::OnFramebufferSize(GLFWwindow *handle, int width, int height)
     {
         auto *self = static_cast<GLFWWindow *>(glfwGetWindowUserPointer(handle));
-        MTS_ASSERT(self != nullptr, "framebuffer callback without a user pointer");
+        MIR_ASSERT(self != nullptr, "framebuffer callback without a user pointer");
 
         // Minimizing reports 0x0. Keep it; the renderer decides to skip frames.
         self->mWidth = static_cast<uint32_t>(width);

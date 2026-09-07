@@ -19,7 +19,7 @@ namespace mts
 
 // add to every component type, will check again in storage
 // forces pod for memcpy
-#define MTS_ASSERT_COMPONENT(T)                                                                       \
+#define MIR_ASSERT_COMPONENT(T)                                                                       \
     static_assert(std::is_trivially_copyable_v<T>, #T " must be trivially copyable (ECS component)"); \
     static_assert(std::is_standard_layout_v<T>, #T " must be standard layout (ECS component)");       \
     static_assert(std::is_nothrow_move_constructible_v<T>,                                            \

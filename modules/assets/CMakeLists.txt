@@ -8,7 +8,7 @@ target_sources(engine_assets PRIVATE
     src/assets/AssetManifest.cpp
 )
 
-target_link_libraries(engine_assets PUBLIC mts::core)
+target_link_libraries(engine_assets PUBLIC mir::core)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)

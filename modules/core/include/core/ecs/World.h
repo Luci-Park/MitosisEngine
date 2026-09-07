@@ -27,7 +27,7 @@
 #include <utility>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     class World;
 
@@ -143,7 +143,7 @@ namespace mts
         // reset record, remove from both storages, remove from pool
         void DestroyEntity(Entity entity)
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::DestroyEntity: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::DestroyEntity: entity is not alive");
             AssertSafeToMutate("DestroyEntity");
 
             // allowed to destroy other entities inside hooks
@@ -176,7 +176,7 @@ namespace mts
         // GetComponent table of entity
         const Archetype *ArchetypeOf(Entity entity) const
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::ArchetypeOf: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::ArchetypeOf: entity is not alive");
             return mRecords[entity.mIndex].archetype;
         }
 
@@ -190,7 +190,7 @@ namespace mts
         template <typename T>
         bool Has(Entity entity) const
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::Has: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::Has: entity is not alive");
             return mRecords[entity.mIndex].archetype->GetSignature().test(ComponentBit<T>());
         }
 
@@ -228,12 +228,12 @@ namespace mts
         template <typename T>
         T &AddComponent(Entity entity, const T &value)
         {
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
             static_assert(!kIsTagComponent<T>,
                           "World::AddComponent: T is a tag - there is no value to store and no reference "
                           "to return. Use AddTag<T>(entity).");
 
-            MTS_ASSERT(mPool.IsAlive(entity), "World::AddComponent: entity is not alive");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::AddComponent: entity is not alive");
             if (T *existing = GetComponent<T>(entity))
                 return *existing;
 
@@ -246,12 +246,12 @@ namespace mts
         void AddTag(Entity entity)
         {
             // no column is made for tag but saved inside Archetype's signature
-            MTS_ASSERT_COMPONENT(T);
+            MIR_ASSERT_COMPONENT(T);
             static_assert(kIsTagComponent<T>,
                           "World::AddTag: T has fields, so it needs a value. Use AddComponent<T>.");
 
-            MTS_ASSERT(mPool.IsAlive(entity), "World::AddTag: entity is not alive");
-            MTS_ASSERT(!Has<T>(entity), "World::AddTag: entity already has this tag");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::AddTag: entity is not alive");
+            MIR_ASSERT(!Has<T>(entity), "World::AddTag: entity already has this tag");
             AssertSafeToMutate("AddTag");
 
             AddTableComponentRaw(entity, TypeIdOf<T>(), 0, 0, nullptr);
@@ -260,8 +260,8 @@ namespace mts
         template <typename T>
         void RemoveComponent(Entity entity)
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::RemoveComponent: entity is not alive");
-            MTS_ASSERT(Has<T>(entity), "World::RemoveComponent: entity does not have this component");
+            MIR_ASSERT(mPool.IsAlive(entity), "World::RemoveComponent: entity is not alive");
+            MIR_ASSERT(Has<T>(entity), "World::RemoveComponent: entity does not have this component");
             AssertSafeToMutate("RemoveComponent");
 
             RemoveTableComponent<T>(entity);
@@ -298,8 +298,8 @@ namespace mts
         // only to be called by ComponentRegistry
         void *AddRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::AddRaw: entity is not alive");
-            MTS_ASSERT(!HasRaw(entity, type), "World::AddRaw: entity already has {}", type.name);
+            MIR_ASSERT(mPool.IsAlive(entity), "World::AddRaw: entity is not alive");
+            MIR_ASSERT(!HasRaw(entity, type), "World::AddRaw: entity already has {}", type.name);
             AssertSafeToMutate("AddRaw");
 
             return AddTableComponentRaw(entity, type, size, align, value);
@@ -308,8 +308,8 @@ namespace mts
         // only to be called by ComponentRegistry
         void RemoveRaw(Entity entity, TypeId type)
         {
-            MTS_ASSERT(mPool.IsAlive(entity), "World::RemoveRaw: entity is not alive");
-            MTS_ASSERT(HasRaw(entity, type), "World::RemoveRaw: entity does not have {}", type.name);
+            MIR_ASSERT(mPool.IsAlive(entity), "World::RemoveRaw: entity is not alive");
+            MIR_ASSERT(HasRaw(entity, type), "World::RemoveRaw: entity does not have {}", type.name);
             AssertSafeToMutate("RemoveRaw");
 
             RemoveTableComponentRaw(entity, type);
@@ -357,7 +357,7 @@ namespace mts
         {
             T *value = TryResource<T>();
 
-            MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
+            MIR_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
             return *value;
         }
 
@@ -365,7 +365,7 @@ namespace mts
         const T &Resource() const
         {
             const T *value = TryResource<T>();
-            MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
+            MIR_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
             return *value;
         }
 
@@ -400,14 +400,14 @@ namespace mts
 
         void EndQueryIteration()
         {
-            MTS_ASSERT(mQueryIterationDepth > 0, "World::EndQueryIteration: not iterating");
+            MIR_ASSERT(mQueryIterationDepth > 0, "World::EndQueryIteration: not iterating");
             --mQueryIterationDepth;
         }
 
         // place in every function that induces structual change
         void AssertSafeToMutate([[maybe_unused]] const char *what) const
         {
-            MTS_ASSERT(mQueryIterationDepth == 0,
+            MIR_ASSERT(mQueryIterationDepth == 0,
                        "World::{}: structural change while a Query is iterating. Record it into a "
                        "CommandBuffer instead - see World::IsIterating",
                        what);
@@ -434,7 +434,7 @@ namespace mts
             if (size != 0)
             {
                 ComponentColumn *column = target.FindColumn(type);
-                MTS_CHECK(column != nullptr,
+                MIR_CHECK(column != nullptr,
                           "World::AddTableComponentRaw: \"{}\" was registered with size {}, but the target "
                           "archetype has no column for it - it was added as a tag elsewhere.",
                           type.name, size);

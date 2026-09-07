@@ -12,7 +12,7 @@
 
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // Temporary for sending MeshData -> CreateMesh
     struct MeshData

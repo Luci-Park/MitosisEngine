@@ -8,15 +8,18 @@
  */
 #include "core/log/Log.h"
 #include "core/log/Assert.h"
+#include "core/log/LogHistory.h"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/base_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -44,11 +47,49 @@ namespace mts
             return spdlog::level::info;
         }
 
+        LogLevel FromSpd(spdlog::level::level_enum level)
+        {
+            switch (level)
+            {
+            case spdlog::level::trace:
+                return LogLevel::Trace;
+            case spdlog::level::debug:
+                return LogLevel::Debug;
+            case spdlog::level::info:
+                return LogLevel::Info;
+            case spdlog::level::warn:
+                return LogLevel::Warn;
+            case spdlog::level::err:
+                return LogLevel::Error;
+            case spdlog::level::critical:
+                return LogLevel::Critical;
+            default:
+                return LogLevel::Off;
+            }
+        }
+
         spdlog::source_loc ToSpdLoc(const std::source_location &loc)
         {
             return spdlog::source_loc{
                 loc.file_name(), static_cast<int>(loc.line()), loc.function_name()};
         }
+
+        class UiHistorySink : public spdlog::sinks::base_sink<std::mutex>
+        {
+        protected:
+            void sink_it_(const spdlog::details::log_msg &msg) override
+            {
+                LogHistory::Push(LogEntry{
+                    .level = FromSpd(msg.level),
+                    .message = std::string(msg.payload.begin(), msg.payload.end()),
+                    .file = msg.source.filename != nullptr ? msg.source.filename : "",
+                    .line = msg.source.line,
+                    .time = msg.time,
+                });
+            }
+
+            void flush_() override {}
+        };
     }
 
     void InitLog(const LogConfig &config)
@@ -60,8 +101,12 @@ namespace mts
             config.filePath, config.maxFileBytes, config.maxFiles);
         file->set_level(ToSpd(config.fileLevel));
 
+        auto uiHistory = std::make_shared<UiHistorySink>();
+        uiHistory->set_level(spdlog::level::trace);
+        LogHistory::SetCapacity(config.uiHistoryCapacity);
+
         auto logger = std::make_shared<spdlog::logger>(
-            "engine", spdlog::sinks_init_list{console, file});
+            "engine", spdlog::sinks_init_list{console, file, uiHistory});
 
         logger->set_level(std::min(ToSpd(config.consoleLevel), ToSpd(config.fileLevel)));
         logger->set_pattern("%^[%T] [%l] %v%$ (%s:%#)");

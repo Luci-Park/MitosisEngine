@@ -15,7 +15,7 @@
 #include "core/log/Assert.h"
 #include "core/log/Log.h"
 
-namespace mts
+namespace mir
 {
     namespace detail
     {
@@ -92,7 +92,7 @@ namespace mts
 
             for (const Entity child : children)
             {
-                MTS_ASSERT(world.IsAlive(child), "OnEntityDestroyed: dead entity left in the scene graph");
+                MIR_ASSERT(world.IsAlive(child), "OnEntityDestroyed: dead entity left in the scene graph");
 
                 if (world.IsAlive(child))
                     world.DestroyEntity(child);
@@ -143,7 +143,7 @@ namespace mts
 
         for (Entity cursor = entity; !cursor.IsNull(); cursor = LiveParentOf(world, index, cursor))
         {
-            MTS_ASSERT(depth < kMaxHierarchyDepth,
+            MIR_ASSERT(depth < kMaxHierarchyDepth,
                        "ResolveWorld: hierarchy deeper than {} - the graph should have refused this",
                        kMaxHierarchyDepth);
 
@@ -196,20 +196,20 @@ namespace mts
     {
         if (!world.IsAlive(child))
         {
-            MTS_LOG_WARN("SetParent: child is not alive");
+            MIR_LOG_WARN("SetParent: child is not alive");
             return false;
         }
 
         if (!parent.IsNull() && !world.IsAlive(parent))
         {
-            MTS_LOG_WARN("SetParent: parent is not alive");
+            MIR_LOG_WARN("SetParent: parent is not alive");
             return false;
         }
 
         HierarchyIndex &index = InstallHierarchy(world);
         if (!detail::HierarchyMutator::SetParent(index, child, parent))
         {
-            MTS_LOG_WARN("SetParent: refused - self-parenting, a cycle, or deeper than "
+            MIR_LOG_WARN("SetParent: refused - self-parenting, a cycle, or deeper than "
                          "kMaxHierarchyDepth ({})",
                          kMaxHierarchyDepth);
             return false;

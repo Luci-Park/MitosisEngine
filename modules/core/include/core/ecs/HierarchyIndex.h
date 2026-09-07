@@ -15,7 +15,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     namespace detail
     {

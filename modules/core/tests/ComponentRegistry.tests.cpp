@@ -24,15 +24,15 @@
 
 namespace
 {
-    using mts::CommandBuffer;
-    using mts::ComponentOps;
-    using mts::ComponentRegistry;
-    using mts::Entity;
-    using mts::FieldDesc;
-    using mts::FieldKind;
-    using mts::RuntimeFieldDecl;
-    using mts::Transform;
-    using mts::World;
+    using mir::CommandBuffer;
+    using mir::ComponentOps;
+    using mir::ComponentRegistry;
+    using mir::Entity;
+    using mir::FieldDesc;
+    using mir::FieldKind;
+    using mir::RuntimeFieldDecl;
+    using mir::Transform;
+    using mir::World;
 
     // Distinct from every other test's components: the registry is
     // process-wide, so a name registered here is visible to the whole binary.
@@ -153,7 +153,7 @@ TEST_CASE("A field write on Transform goes through the setter, not the bytes")
     // The reason FieldDesc carries thunks rather than offsets. An offset write
     // would move the transform and leave mVersion untouched, and every world
     // matrix built from it would keep looking current.
-    const ComponentOps &ops = ComponentRegistry::Instance().Register<Transform>(mts::kTransformFields);
+    const ComponentOps &ops = ComponentRegistry::Instance().Register<Transform>(mir::kTransformFields);
 
     World world;
     const Entity entity = world.CreateEntity();
@@ -178,13 +178,13 @@ TEST_CASE("A field write on Transform goes through the setter, not the bytes")
 
 TEST_CASE("A field with no setter refuses the write")
 {
-    const ComponentOps &ops = ComponentRegistry::Instance().Register<mts::WorldTransform>(mts::kWorldTransformFields);
+    const ComponentOps &ops = ComponentRegistry::Instance().Register<mir::WorldTransform>(mir::kWorldTransformFields);
 
     const FieldDesc *matrix = ops.FindField("matrix");
     REQUIRE(matrix != nullptr);
     CHECK(matrix->ReadOnly());
 
-    mts::WorldTransform value{};
+    mir::WorldTransform value{};
     const glm::mat4 attempt{2.0f};
     CHECK_FALSE(matrix->Write(&value, &attempt));
     CHECK(value.Matrix() == glm::mat4{1.0f});
@@ -420,7 +420,7 @@ TEST_CASE("A mutation during a walk is deferred, not applied")
 
     World world;
     CommandBuffer commands;
-    world.EmplaceResource<mts::FrameCommands>(mts::FrameCommands{&commands});
+    world.EmplaceResource<mir::FrameCommands>(mir::FrameCommands{&commands});
 
     const Entity entity = world.CreateEntity();
     world.AddComponent<Transform>(entity, Transform{});
@@ -433,7 +433,7 @@ TEST_CASE("A mutation during a walk is deferred, not applied")
 
             // the binding cannot know it is inside a walk; IsIterating can
             const RegistryHealth value{4};
-            CHECK(mts::AddComponentOrDefer(world, walked, ops, &value));
+            CHECK(mir::AddComponentOrDefer(world, walked, ops, &value));
 
             // still not visible: the add went to the buffer
             CHECK_FALSE(ops.Has(world, walked));
@@ -452,23 +452,23 @@ TEST_CASE("The same call mutates immediately outside a walk")
 
     World world;
     CommandBuffer commands;
-    world.EmplaceResource<mts::FrameCommands>(mts::FrameCommands{&commands});
+    world.EmplaceResource<mir::FrameCommands>(mir::FrameCommands{&commands});
 
     const Entity entity = world.CreateEntity();
 
     const RegistryHealth value{6};
-    REQUIRE(mts::AddComponentOrDefer(world, entity, ops, &value));
+    REQUIRE(mir::AddComponentOrDefer(world, entity, ops, &value));
     CHECK(ops.Has(world, entity));
 
-    REQUIRE(mts::RemoveComponentOrDefer(world, entity, ops));
+    REQUIRE(mir::RemoveComponentOrDefer(world, entity, ops));
     CHECK_FALSE(ops.Has(world, entity));
 
-    REQUIRE(mts::DestroyEntityOrDefer(world, entity));
+    REQUIRE(mir::DestroyEntityOrDefer(world, entity));
     CHECK_FALSE(world.IsAlive(entity));
 
     // a stale handle is answered, not asserted on
-    CHECK_FALSE(mts::DestroyEntityOrDefer(world, entity));
-    CHECK_FALSE(mts::AddComponentOrDefer(world, entity, ops, &value));
+    CHECK_FALSE(mir::DestroyEntityOrDefer(world, entity));
+    CHECK_FALSE(mir::AddComponentOrDefer(world, entity, ops, &value));
 }
 
 TEST_CASE("The erased CommandBuffer path defers a tag without clobbering the buffer")

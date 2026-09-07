@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <format>
 
-namespace mts
+namespace mir
 {
     enum class WindowBackend
     {
@@ -69,12 +69,12 @@ namespace mts
     };
 }
 
-// Lets WindowBackend be used directly in std::format / MTS_LOG_* calls.
+// Lets WindowBackend be used directly in std::format / MIR_LOG_* calls.
 template <>
-struct std::formatter<mts::WindowBackend> : std::formatter<const char *>
+struct std::formatter<mir::WindowBackend> : std::formatter<const char *>
 {
-    auto format(mts::WindowBackend backend, std::format_context &ctx) const
+    auto format(mir::WindowBackend backend, std::format_context &ctx) const
     {
-        return std::formatter<const char *>::format(mts::ToString(backend), ctx);
+        return std::formatter<const char *>::format(mir::ToString(backend), ctx);
     }
 };

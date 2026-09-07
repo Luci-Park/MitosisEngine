@@ -3,7 +3,7 @@
 # Must come before project(): CMAKE_TOOLCHAIN_FILE is only honoured there.
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/VcpkgToolchain.cmake)
 
-project(Mitosis
+project(Mjolnir
     VERSION 0.1.0
     DESCRIPTION "A modular 3D engine"
     # C is needed for volk.c
@@ -24,6 +24,7 @@ include(cmake/EngineModule.cmake)
 include(cmake/Shaders.cmake)
 include(cmake/Assets.cmake)
 include(cmake/Fonts.cmake)
+include(cmake/Branding.cmake)
 
 option(BUILD_TESTING "Build unit tests (per module, run via ctest)" ON)
 if(BUILD_TESTING)
@@ -47,8 +48,12 @@ add_subdirectory(modules/window)
 
 add_subdirectory(tools/AssetCooker)
 
-add_executable(HelloWorld)
+add_executable(HelloWorld WIN32)
 target_sources(HelloWorld PRIVATE main.cpp)
+
+if(MSVC)
+    set_target_properties(HelloWorld PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
+endif()
 
 engine_add_shaders(HelloWorld
     SOURCE assets/shaders/triangle.slang
@@ -63,14 +68,21 @@ engine_cook_assets(HelloWorld
     OUT_DIR ${CMAKE_BINARY_DIR}/cooked_assets)
 
 engine_copy_fonts(HelloWorld SOURCE_DIR fonts)
+engine_copy_branding(HelloWorld SOURCE_DIR branding)
+
+add_custom_command(TARGET HelloWorld POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different
+            "${CMAKE_SOURCE_DIR}/games" "$<TARGET_FILE_DIR:HelloWorld>/games"
+    COMMENT "Copying game projects next to HelloWorld"
+    VERBATIM)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 
 target_link_libraries(HelloWorld PRIVATE
-    mts::app
-    mts::assets
-    mts::core
-    mts::scene
-    mts::script
+    mir::app
+    mir::assets
+    mir::core
+    mir::scene
+    mir::script
     nlohmann_json::nlohmann_json
 )

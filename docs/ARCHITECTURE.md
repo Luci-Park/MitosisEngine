@@ -53,8 +53,8 @@ builds/             build trees, gitignored
 No engine dependencies. Links `spdlog` privately.
 
 - `ecs/` - see below, and [modules/core.md](modules/core.md) for detail.
-- `log/` - `MTS_LOG_*` over spdlog with a compile-time floor (Trace in Debug,
-  Info in Release); `MTS_ASSERT`/`MTS_VARIFY` (Debug) and `MTS_CHECK` (always).
+- `log/` - `MIR_LOG_*` over spdlog with a compile-time floor (Trace in Debug,
+  Info in Release); `MIR_ASSERT`/`MIR_VARIFY` (Debug) and `MIR_CHECK` (always).
 - `fs/Paths.h` - executable-relative paths, so a copied build tree runs.
 - `platform/Surface.h` - `NativeWindowHandle`, `ISurfaceProvider`.
 
@@ -131,7 +131,7 @@ Font Awesome 6, merged into one atlas), theme application, the GLFW+Vulkan
 backend, and the Slate editor shell - a dockspace with `Hierarchy`/
 `Inspector`/`Output` panels docked around a passthru center, a `Debug` menu,
 and a Style Editor toggle. `App` drives it through `BeginFrame` ->
-`DrawLayout(enableLayout, showDemo)` -> `EndFrame() -> ImDrawData*`, and reads
+`DrawLayout(enableLayout)` -> `EndFrame() -> ImDrawData*`, and reads
 `SceneViewportRect()` for `VulkanRenderer::SetSceneViewport`.
 
 *Current state:* one fixed layout, not user-editable or serialized beyond
@@ -174,7 +174,7 @@ phase). `App.cpp` has no ImGui calls of its own - all of that lives in
 
 ## Build system
 
-- `engine_add_module(<name>)` - target `engine_<name>`, alias `mts::<name>`,
+- `engine_add_module(<name>)` - target `engine_<name>`, alias `mir::<name>`,
   `include/` public. `engine_add_module_tests(<name> <sources>)` - Catch2 binary,
   one CTest case per `TEST_CASE`.
 - `EnginePlatform.cmake` - `ENGINE_PLATFORM` plus family flags, ordered so the

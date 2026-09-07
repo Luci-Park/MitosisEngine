@@ -1,8 +1,15 @@
 ﻿
 engine_add_module(core)
 
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/EngineVersion.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated_include/core/EngineVersion.h
+    @ONLY)
+target_include_directories(engine_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/generated_include)
+
 target_sources(engine_core PRIVATE
     src/core/log/Log.cpp
+    src/core/log/LogHistory.cpp
     src/core/fs/Paths.cpp
     src/core/ecs/TransformHierarchy.cpp
     src/core/ecs/HierarchyIndex.cpp

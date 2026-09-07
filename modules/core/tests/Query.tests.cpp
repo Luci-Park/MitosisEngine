@@ -40,7 +40,7 @@ namespace
     };
 }
 
-using namespace mts;
+using namespace mir;
 
 namespace
 {
@@ -570,7 +570,7 @@ TEST_CASE("A walk does not visit entities the callback spawns", "[ecs][query]")
 
     int visits = 0;
     query.ForEach([&](Entity, QPosition &)
-                        {
+                  {
                             ++visits;
                             world.CreateEntity(); });
 

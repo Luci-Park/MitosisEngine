@@ -12,7 +12,7 @@
 
 #include <algorithm>
 
-namespace mts
+namespace mir
 {
     Editor::~Editor()
     {
@@ -37,7 +37,7 @@ namespace mts
         const std::string fontPath = FontPath("Inter.ttf").string();
         if (io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 16.0f, &fontConfig) == nullptr)
         {
-            MTS_LOG_ERROR("Failed to load font: {}", fontPath);
+            MIR_LOG_ERROR("Failed to load font: {}", fontPath);
             io.Fonts->AddFontDefault();
         }
 
@@ -48,7 +48,7 @@ namespace mts
         iconConfig.GlyphMinAdvanceX = 16.0f;
         const std::string iconFontPath = FontPath(FONT_ICON_FILE_NAME_FAS).string();
         if (io.Fonts->AddFontFromFileTTF(iconFontPath.c_str(), 16.0f, &iconConfig, iconRanges) == nullptr)
-            MTS_LOG_ERROR("Failed to load icon font: {}", iconFontPath);
+            MIR_LOG_ERROR("Failed to load icon font: {}", iconFontPath);
 
         EditorTheme::Apply();
         EditorTheme::ScaleForDpi(window.ContentScale());
@@ -56,21 +56,21 @@ namespace mts
         void *nativeHandle = window.NativeHandleForImGui();
         if (nativeHandle == nullptr)
         {
-            MTS_LOG_ERROR("Window backend has no native handle for ImGui");
+            MIR_LOG_ERROR("Window backend has no native handle for ImGui");
             ImGui::DestroyContext();
             return false;
         }
 
         if (!ImGui_ImplGlfw_InitForVulkan(static_cast<GLFWwindow *>(nativeHandle), true))
         {
-            MTS_LOG_ERROR("ImGui_ImplGlfw_InitForVulkan failed");
+            MIR_LOG_ERROR("ImGui_ImplGlfw_InitForVulkan failed");
             ImGui::DestroyContext();
             return false;
         }
 
         if (!renderer.InitImGuiVulkanBackend())
         {
-            MTS_LOG_ERROR("ImGui Vulkan backend initialization failed");
+            MIR_LOG_ERROR("ImGui Vulkan backend initialization failed");
             ImGui_ImplGlfw_Shutdown();
             ImGui::DestroyContext();
             return false;
@@ -157,7 +157,7 @@ namespace mts
         ImGui::End();
     }
 
-    SceneMenuAction Editor::DrawLayout(bool enableLayout, bool showDemoWindow)
+    SceneMenuAction Editor::DrawLayout(bool enableLayout)
     {
         SceneMenuAction sceneAction = SceneMenuAction::None;
 
@@ -186,11 +186,15 @@ namespace mts
                 ImGui::DockBuilderFinish(dockspaceId);
             }
 
-            for (const char *name : {"Hierarchy", "Inspector", "Output"})
+            for (const char *name : {"Hierarchy", "Inspector"})
             {
                 ImGui::Begin(name);
                 ImGui::End();
             }
+
+            if (ImGui::Begin("Output"))
+                mLogPanel.Draw();
+            ImGui::End();
 
             if (const ImGuiDockNode *centralNode = ImGui::DockBuilderGetCentralNode(dockspaceId);
                 centralNode != nullptr)
@@ -232,9 +236,6 @@ namespace mts
         {
             mSceneViewportRect = VkRect2D{};
         }
-
-        if (showDemoWindow)
-            ImGui::ShowDemoWindow();
 
         return sceneAction;
     }

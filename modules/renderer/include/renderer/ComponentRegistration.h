@@ -8,7 +8,7 @@
  */
 #pragma once
 
-namespace mts
+namespace mir
 {
     void RegisterRendererComponents();
 }

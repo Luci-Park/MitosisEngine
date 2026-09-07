@@ -16,10 +16,10 @@ param(
     [ValidatePattern('^[a-z][a-z0-9_]*$')]
     [string]$Name,
 
-    # Defaults to $env:MITOSIS_AUTHOR, then git user.name, then the OS user name.
+    # Defaults to $env:MJOLNIR_AUTHOR, then git user.name, then the OS user name.
     [string]$Author,
 
-    # Defaults to $env:MITOSIS_ORG, then "DigiPen (USA) Corporation".
+    # Defaults to $env:MJOLNIR_ORG, then "DigiPen (USA) Corporation".
     [string]$Organization
 )
 
@@ -67,12 +67,12 @@ if (-not $exe.Success) {
 }
 $exeName = $exe.Groups[1].Value
 
-if (Add-SortedEntry -File $rootLists -Entry "mts::$Name" `
+if (Add-SortedEntry -File $rootLists -Entry "mir::$Name" `
         -BlockStart "^\s*target_link_libraries\(\s*$([regex]::Escape($exeName))\s+PRIVATE\b" `
         -BlockEnd '^\s*\)\s*$') {
-    Write-Host "linked: $exeName <- mts::$Name"
+    Write-Host "linked: $exeName <- mir::$Name"
 } else {
-    Write-Host "already linked: $exeName <- mts::$Name"
+    Write-Host "already linked: $exeName <- mir::$Name"
 }
 
 Write-Host "created module '$Name':"

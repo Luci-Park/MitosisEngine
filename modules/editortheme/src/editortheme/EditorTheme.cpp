@@ -10,7 +10,7 @@
 
 #include <imgui.h>
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -50,6 +50,10 @@ namespace mts
         constexpr uint32_t kTabDimmedSelected = 0x1E2128;
         constexpr uint32_t kAccent = 0x4C8DFF;
         constexpr uint32_t kAccentDim = 0x3665B3;
+
+        constexpr uint32_t kStatusInfo = 0x6FA8DC;
+        constexpr uint32_t kStatusWarning = 0xE0A63C;
+        constexpr uint32_t kStatusDanger = 0xE5555A;
 
         ImGuiStyle gBaseStyle;
     }
@@ -135,5 +139,21 @@ namespace mts
         style = gBaseStyle;
         style.ScaleAllSizes(scale);
         style.FontScaleDpi = scale;
+    }
+
+    ImVec4 EditorTheme::Color(StatusColor status, float alpha)
+    {
+        switch (status)
+        {
+        case StatusColor::Muted:
+            return FromHex(kTextDisabled, alpha);
+        case StatusColor::Info:
+            return FromHex(kStatusInfo, alpha);
+        case StatusColor::Warning:
+            return FromHex(kStatusWarning, alpha);
+        case StatusColor::Danger:
+            return FromHex(kStatusDanger, alpha);
+        }
+        return FromHex(kText, alpha);
     }
 }

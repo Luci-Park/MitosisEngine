@@ -8,7 +8,7 @@
  */
 #pragma once
 
-namespace mts
+namespace mir
 {
     // Mirrors core::RegisterCoreComponents / RegisterRendererComponents - core
     // cannot name ScriptRef, so script registers its own. Must run before any

@@ -16,7 +16,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
-namespace mts
+namespace mir
 {
     class Transform
     {
@@ -93,7 +93,7 @@ namespace mts
         uint32_t mVersion = 1;
     };
 
-    MTS_ASSERT_COMPONENT(Transform);
+    MIR_ASSERT_COMPONENT(Transform);
 
     // Transform as a script or inspector sees it
     // Accessor thunks

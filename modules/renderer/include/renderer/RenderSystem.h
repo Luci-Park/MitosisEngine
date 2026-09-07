@@ -21,7 +21,7 @@
 
 #include <vector>
 
-namespace mts
+namespace mir
 {
     class RenderSystem final : public ISystem
     {
@@ -64,7 +64,7 @@ namespace mts
             }
             else if (!mWarnedNoCamera)
             {
-                MTS_LOG_WARN("RenderSystem: no Camera entity in the world; nothing will be drawn");
+                MIR_LOG_WARN("RenderSystem: no Camera entity in the world; nothing will be drawn");
                 mWarnedNoCamera = true;
             }
 

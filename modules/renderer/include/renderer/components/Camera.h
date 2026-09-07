@@ -12,7 +12,7 @@
 
 #include <cstddef>
 
-namespace mts
+namespace mir
 {
 
     struct Camera
@@ -22,7 +22,7 @@ namespace mts
         float mFarZ = 100.0f;
     };
 
-    MTS_ASSERT_COMPONENT(Camera);
+    MIR_ASSERT_COMPONENT(Camera);
 
     inline constexpr FieldDesc kCameraFields[] = {
         {"fovYDegrees", FieldKind::Float, offsetof(Camera, mFovYDegrees)},

@@ -8,7 +8,7 @@
  */
 #include "renderer/Shapes.h"
 
-namespace mts
+namespace mir
 {
     MeshData MakeTriangle()
     {

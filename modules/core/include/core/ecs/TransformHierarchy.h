@@ -21,7 +21,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // World space matrix computation
     glm::mat4 ResolveWorld(World &world, Entity entity);

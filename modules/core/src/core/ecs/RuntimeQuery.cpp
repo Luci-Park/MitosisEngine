@@ -13,7 +13,7 @@
 #include "core/ecs/Signature.h"
 #include "core/log/Assert.h"
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -21,7 +21,7 @@ namespace mts
         {
             const ComponentOps *ops = ComponentRegistry::Instance().FindBySeq(type.seq);
 
-            MTS_CHECK(ops != nullptr,
+            MIR_CHECK(ops != nullptr,
                       "RuntimeQuery: \"{}\" is not registered. Runtime queries resolve through "
                       "ComponentRegistry, so every term must be registered first.",
                       type.name);
@@ -33,7 +33,7 @@ namespace mts
         {
             const ComponentOps &ops = CheckRegistered(type);
 
-            MTS_CHECK(ops.mSize != 0,
+            MIR_CHECK(ops.mSize != 0,
                       "RuntimeQuery: \"{}\" is a tag, so there is no component to hand back for it. "
                       "Pass it to With(), Without() or WithAny() instead.",
                       type.name);
@@ -41,7 +41,7 @@ namespace mts
 
         void CheckNotIterating(uint32_t depth, const char *what)
         {
-            MTS_ASSERT(depth == 0,
+            MIR_ASSERT(depth == 0,
                        "RuntimeQuery::{}: a filter cannot be added while this query is iterating - the "
                        "match list it would rebuild is what the walk is reading from",
                        what);
@@ -58,7 +58,7 @@ namespace mts
 
     RuntimeQuery::RuntimeQuery(World &world, std::span<const TypeId> terms) : mWorld(&world)
     {
-        MTS_CHECK(!terms.empty(), "RuntimeQuery: needs at least one component term");
+        MIR_CHECK(!terms.empty(), "RuntimeQuery: needs at least one component term");
 
         mTerms.reserve(terms.size());
         for (TypeId type : terms)
@@ -67,7 +67,7 @@ namespace mts
 
             for (TypeId seen : mTerms)
             {
-                MTS_CHECK(seen.seq != type.seq, "RuntimeQuery: \"{}\" listed twice as a data term", type.name);
+                MIR_CHECK(seen.seq != type.seq, "RuntimeQuery: \"{}\" listed twice as a data term", type.name);
             }
 
             mTerms.push_back(type);
@@ -97,7 +97,7 @@ namespace mts
     RuntimeQuery &RuntimeQuery::WithAny(std::span<const TypeId> types)
     {
         CheckNotIterating(mIterationDepth, "WithAny");
-        MTS_CHECK(!types.empty(),
+        MIR_CHECK(!types.empty(),
                   "RuntimeQuery::WithAny: an empty clause can never be satisfied, so it would reject "
                   "every archetype");
 
@@ -120,7 +120,7 @@ namespace mts
         if (!mMatcher.NeedsRefresh(*mWorld))
             return;
 
-        MTS_ASSERT(mIterationDepth == 0,
+        MIR_ASSERT(mIterationDepth == 0,
                    "RuntimeQuery::EnsureFresh: archetypes changed while this query is iterating; a "
                    "ForEach callback must not create archetypes and then re-run the same query");
 

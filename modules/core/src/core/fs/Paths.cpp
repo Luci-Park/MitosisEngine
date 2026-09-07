@@ -14,7 +14,7 @@
 #include <unistd.h>
 #endif
 
-namespace mts
+namespace mir
 {
     namespace
     {
@@ -52,6 +52,11 @@ namespace mts
     std::filesystem::path FontPath(std::string_view name)
     {
         return ExecutableDir() / "fonts" / name;
+    }
+
+    std::filesystem::path BrandingPath(std::string_view name)
+    {
+        return ExecutableDir() / "branding" / name;
     }
 
     std::filesystem::path CookedAssetsDir()

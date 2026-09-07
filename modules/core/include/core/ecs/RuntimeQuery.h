@@ -19,7 +19,7 @@
 #include <span>
 #include <vector>
 
-namespace mts
+namespace mir
 {
     // Caller must cache RuntimeQuery
     class RuntimeQuery
