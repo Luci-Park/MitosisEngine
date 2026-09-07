@@ -11,9 +11,11 @@
 
 #include <core/platform/Surface.h>
 #include <editor/panels/LogPanel.h>
+#include <editor/panels/ProjectSettingsPanel.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -41,7 +43,7 @@ namespace mir
         Editor &operator=(Editor &&) = delete;
 
         // `renderer`'s device and render target must already be created.
-        bool Initialize(Window &window, VulkanRenderer &renderer);
+        bool Initialize(Window &window, VulkanRenderer &renderer, std::filesystem::path projectSettingsPath);
 
         // Must run before renderer.Shutdown() and before the window is
         // destroyed. No-op when not initialized.
@@ -52,7 +54,7 @@ namespace mir
 
         // Draws the editor shell and returns the File menu action picked this frame.
         // enableLayout = false disables editor
-        SceneMenuAction DrawLayout(bool enableLayout);
+        SceneMenuAction DrawLayout(bool enableLayout, InputMap &inputMap);
 
         // Returns draw data for VulkanRenderer::SetImGuiDrawData.
         // BeginFrame is needed regardless of skipping layout
@@ -63,15 +65,21 @@ namespace mir
 
         bool IsInitialized() const { return mInitialized; }
 
+        bool WantsCaptureKeyboard() const;
+        bool WantsCaptureMouse() const;
+
     private:
         void DrawTitleBar();
 
         bool mInitialized = false;
         bool mShowStyleEditor = false;
+        bool mShowProjectSettings = false;
         std::string mImGuiIniPath;
+        std::filesystem::path mProjectSettingsPath;
         VkRect2D mSceneViewportRect{};
         Window *mWindow = nullptr;
         std::vector<PixelRect> mTitleBarInteractiveRects;
         LogPanel mLogPanel;
+        ProjectSettingsPanel mProjectSettingsPanel;
     };
 }

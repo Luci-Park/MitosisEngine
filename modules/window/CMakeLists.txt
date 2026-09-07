@@ -16,3 +16,9 @@ if(ENGINE_FAMILY_DESKTOP)
         message(FATAL_ERROR "No native window backend for ${ENGINE_PLATFORM}")
     endif()
 endif()
+
+target_sources(engine_window PRIVATE src/window/InputCodes.cpp)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

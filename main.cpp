@@ -273,6 +273,7 @@ int main()
     mir::AppDesc desc{};
     desc.mTitle = project.mTitle.c_str();
     desc.mSceneDir = project.mSceneDir;
+    desc.mProjectSettingsPath = "games/HelloWorld/project_settings.json";
 
     if (!app.Initialize(desc))
     {
