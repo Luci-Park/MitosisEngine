@@ -9,6 +9,7 @@
 #pragma once
 
 #include <core/platform/Surface.h>
+#include <window/InputSnapshot.h>
 
 #include <cstdint>
 #include <memory>
@@ -62,6 +63,12 @@ namespace mir
         virtual void RequestClose() {}
 
         virtual void Show() {}
+        
+        virtual const RawInputSnapshot &RawInput() const
+        {
+            static const RawInputSnapshot kEmpty{};
+            return kEmpty;
+        }
 
         static std::unique_ptr<Window> Create(const WindowDesc &desc);
 

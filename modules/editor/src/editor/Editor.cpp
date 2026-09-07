@@ -22,8 +22,10 @@ namespace mir
         // its own owned subsystems.
     }
 
-    bool Editor::Initialize(Window &window, VulkanRenderer &renderer)
+    bool Editor::Initialize(Window &window, VulkanRenderer &renderer, std::filesystem::path projectSettingsPath)
     {
+        mProjectSettingsPath = std::move(projectSettingsPath);
+
         ImGui::CreateContext();
 
         ImGuiIO &io = ImGui::GetIO();
@@ -157,7 +159,7 @@ namespace mir
         ImGui::End();
     }
 
-    SceneMenuAction Editor::DrawLayout(bool enableLayout)
+    SceneMenuAction Editor::DrawLayout(bool enableLayout, InputMap &inputMap)
     {
         SceneMenuAction sceneAction = SceneMenuAction::None;
 
@@ -217,6 +219,11 @@ namespace mir
                         sceneAction = SceneMenuAction::Load;
                     ImGui::EndMenu();
                 }
+                if (ImGui::BeginMenu("Project"))
+                {
+                    ImGui::MenuItem("Project Settings", nullptr, &mShowProjectSettings);
+                    ImGui::EndMenu();
+                }
                 if (ImGui::BeginMenu("Debug"))
                 {
                     ImGui::MenuItem("Style Editor", nullptr, &mShowStyleEditor);
@@ -230,6 +237,19 @@ namespace mir
                 if (ImGui::Begin("Style Editor", &mShowStyleEditor))
                     ImGui::ShowStyleEditor();
                 ImGui::End();
+            }
+
+            if (mShowProjectSettings)
+            {
+                if (ImGui::Begin("Project Settings", &mShowProjectSettings))
+                    mProjectSettingsPanel.Draw(inputMap, mWindow->RawInput(), mProjectSettingsPath);
+                else
+                    mProjectSettingsPanel.CancelListening();
+                ImGui::End();
+            }
+            else
+            {
+                mProjectSettingsPanel.CancelListening();
             }
         }
         else
@@ -245,4 +265,7 @@ namespace mir
         ImGui::Render();
         return ImGui::GetDrawData();
     }
+
+    bool Editor::WantsCaptureKeyboard() const { return ImGui::GetIO().WantCaptureKeyboard; }
+    bool Editor::WantsCaptureMouse() const { return ImGui::GetIO().WantCaptureMouse; }
 }

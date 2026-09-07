@@ -1,6 +1,6 @@
 /**
  * @file WorldBindings.tests.cpp
- * @author Sumin Park
+ * @author Rahul Nair
  * @brief Tests for the Lua world:* bindings.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation

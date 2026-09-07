@@ -8,6 +8,7 @@ target_link_libraries(engine_app
            mir::editor
            mir::scene
            mir::script
+    PRIVATE mir::input
 )
 
 target_sources(engine_app PRIVATE src/app/App.cpp)

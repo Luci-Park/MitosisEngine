@@ -6,6 +6,9 @@
 #include <core/ecs/TransformHierarchy.h>
 #include <core/fs/Paths.h>
 #include <core/log/Log.h>
+#include <input/InputMap.h>
+#include <input/InputState.h>
+#include <input/InputSystem.h>
 #include <renderer/ComponentRegistration.h>
 #include <renderer/RenderSystem.h>
 #include <scene/SceneIO.h>
@@ -28,6 +31,8 @@ namespace mir
 
         if (mDesc.mSceneDir.is_relative())
             mDesc.mSceneDir = ExecutableDir() / mDesc.mSceneDir;
+        if (mDesc.mProjectSettingsPath.is_relative())
+            mDesc.mProjectSettingsPath = ExecutableDir() / mDesc.mProjectSettingsPath;
 
         EnsureDpiAware();
 
@@ -66,7 +71,7 @@ namespace mir
         }
 
         mSplash.SetProgress("Initializing editor...", 0.5f);
-        if (!mEditor.Initialize(*mWindow, mRenderer))
+        if (!mEditor.Initialize(*mWindow, mRenderer, mDesc.mProjectSettingsPath))
         {
             MIR_LOG_ERROR("Editor initialization failed");
             mRenderer.Shutdown();
@@ -88,6 +93,11 @@ namespace mir
 
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
+
+        mWorld.EmplaceResource<InputMap>(InputMap::LoadFile(mDesc.mProjectSettingsPath));
+        mWorld.EmplaceResource<InputState>();
+
+        mScheduler.AddSystem<InputSystem>(SystemPhase::PreUpdate, *mWindow);
 
         mScheduler.AddSystem<ScriptSystem>(SystemPhase::PreUpdate, mScriptHost);
 
@@ -183,7 +193,7 @@ namespace mir
 
             if (mWindow->Width() != 0 && mWindow->Height() != 0)
             {
-                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout))
+                switch (mEditor.DrawLayout(mDesc.mEnableEditorLayout, mWorld.Resource<InputMap>()))
                 {
                 case SceneMenuAction::New:
                     NewScene();
@@ -201,6 +211,8 @@ namespace mir
 
             mRenderer.SetImGuiDrawData(mEditor.EndFrame());
             mRenderer.SetSceneViewport(mEditor.SceneViewportRect());
+
+            mWorld.Resource<InputState>().SetUiCapture(mEditor.WantsCaptureKeyboard(), mEditor.WantsCaptureMouse());
 
             mScriptReloadWatcher.Poll(Assets(), dt);
 

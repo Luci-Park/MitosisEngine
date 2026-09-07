@@ -11,9 +11,11 @@
 
 #include <core/platform/Surface.h>
 #include <editor/panels/LogPanel.h>
+#include <editor/panels/ProjectSettingsPanel.h>
 #include <renderer/VulkanRenderer.h>
 #include <window/Window.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -43,7 +45,9 @@ namespace mir
         // Creates the ImGui context, loads fonts/theme, and wires up the
         // GLFW + Vulkan backends. renderer's Vulkan backend must be ready
         // to accept InitImGuiVulkanBackend (device/render target created).
-        bool Initialize(Window &window, VulkanRenderer &renderer);
+        // projectSettingsPath is where the Project Settings window's Save
+        // button writes the InputMap DrawLayout is handed each frame.
+        bool Initialize(Window &window, VulkanRenderer &renderer, std::filesystem::path projectSettingsPath);
 
         // Reverse of Initialize. Vulkan backend teardown needs renderer's
         // device still alive, so this must run before renderer.Shutdown();
@@ -56,11 +60,13 @@ namespace mir
         void BeginFrame();
 
         /// Builds the dockspace, the default Hierarchy/Inspector/Output
-        /// split, the Debug menu, and (if requested) the style editor -
-        /// the Slate editor shell. Pass enableLayout = false to keep ImGui
-        /// running (e.g. a caller's own UI) without this shell.
+        /// split, the Debug menu, and (if requested) the style editor and
+        /// Project Settings window - the Slate editor shell. Pass
+        /// enableLayout = false to keep ImGui running (e.g. a caller's own
+        /// UI) without this shell. inputMap is the World's live InputMap
+        /// resource - the Project Settings window edits it directly.
         /// Returns the SceneMenuAction picked from the File menu this frame.
-        SceneMenuAction DrawLayout(bool enableLayout);
+        SceneMenuAction DrawLayout(bool enableLayout, InputMap &inputMap);
 
         // Ends this frame's ImGui state and returns its draw data, which
         // the caller hands to VulkanRenderer::SetImGuiDrawData. Always
@@ -77,15 +83,21 @@ namespace mir
 
         bool IsInitialized() const { return mInitialized; }
 
+        bool WantsCaptureKeyboard() const;
+        bool WantsCaptureMouse() const;
+
     private:
         void DrawTitleBar();
 
         bool mInitialized = false;
         bool mShowStyleEditor = false;
+        bool mShowProjectSettings = false;
         std::string mImGuiIniPath;
+        std::filesystem::path mProjectSettingsPath;
         VkRect2D mSceneViewportRect{};
         Window *mWindow = nullptr;
         std::vector<PixelRect> mTitleBarInteractiveRects;
         LogPanel mLogPanel;
+        ProjectSettingsPanel mProjectSettingsPanel;
     };
 }
