@@ -112,23 +112,62 @@ Ninja does it for you at build time, and cmake-tools can do it on save — see
 
 ## Tests
 
-Catch2 v3, one test executable per module, built under the `BUILD_TESTING`
-option.
+### Run every test
 
-`engine_add_module_tests` calls `catch_discover_tests`, so every `TEST_CASE`
-becomes its own CTest case and a failure names the behaviour that broke.
+Build first. Tests are built by the ordinary build, so `F7` or
+`cmake --build` is all the preparation there is.
 
-`core`, `assets`, `scene` and `script` have tests. `renderer`, `window` and
-`editor` need a device and a display, and are verified by running the engine.
+Terminal:
 
-One module's tests, without building everything:
+```
+cmake --build --preset {selected_preset}
+ctest --test-dir builds/{selected_preset} --output-on-failure
+```
+
+VS Code: `Ctrl+Shift+P` → **CMake: Run Tests**, or `F7` then the flask icon in
+the sidebar to get the Testing panel.
+
+The Testing panel is empty until the first build, because test cases are
+discovered after the executables link. Build once and they appear.
+
+Run the full `ctest` before pushing.
+
+### Run one module, or one test
 
 ```
 cmake --build builds/windows-msvc-debug --target engine_core_tests
 ctest --test-dir builds/windows-msvc-debug -R "archetype" --output-on-failure
 ```
 
-`-R` matches Catch2 test case names. Run the full `ctest` before pushing.
+`--target` picks the executable, and the targets are named
+`engine_<module>_tests`. `-R` then filters by Catch2 test case name, and takes a
+regex, so `-R "archetype"` runs every case with that word in its name.
+
+In the Testing panel the same thing is a click on one case or one file.
+
+### How it is wired
+
+Catch2 v3, one test executable per module, built under the `BUILD_TESTING`
+option. That option is `ON` by default, which is why a plain build produces them.
+
+`engine_add_module_tests` calls `catch_discover_tests`, so every `TEST_CASE`
+becomes its own CTest case and a failure names the behaviour that broke.
+
+`core`, `assets`, `input`, `scene`, `script` and `window` have tests. `renderer`
+and `editor` need a device and a display, and are verified by running the engine.
+
+There is no aggregate `tests` target. To build the test executables without the
+games, list them:
+
+```
+cmake --build builds/windows-msvc-debug --target engine_core_tests engine_assets_tests engine_input_tests engine_scene_tests engine_script_tests engine_window_tests
+```
+
+To drop tests from the build entirely:
+
+```
+cmake --preset windows-msvc-debug -DBUILD_TESTING=OFF
+```
 
 ## Making New Files
 
