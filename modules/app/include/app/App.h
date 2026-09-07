@@ -72,29 +72,20 @@ namespace mts
         VulkanRenderer &Renderer() { return mRenderer; }
 
         // The asset cache, loading the manifest on first use.
-        // Returns nullptr when no manifest is available - a build with no cooked
-        // assets, or an exe moved away from its cooked/ folder - so a missing
-        // manifest costs the caller an asset, not the whole application.
-        // The failure is sticky: the manifest is not retried every frame.
+        // Returns nullptr when no manifest is available
         AssetCache *Assets();
 
-        // The scene currently in the World - always populated after
-        // Initialize (an empty NewScene, if nothing else). A caller building
-        // a scene by hand (main.cpp's BuildScene, today) should register
-        // each entity it creates through CreateSceneEntity(GetWorld(),
-        // Scene(), ...) so File > Save Scene actually captures it.
+        // The scene currently in the World
         LoadedScene &Scene() { return mScene; }
 
-        // Discards mScene's entities (UnloadScene) and replaces it with an
-        // empty one. Does not touch mSceneDir - the next Save writes there.
+        // Discards mScene's entities and replaces it with an empty one
         void NewScene(std::string name = "untitled");
 
-        // Writes Scene() to mSceneDir. False on I/O failure (see SaveScene).
+        // Writes Scene() to mSceneDir. False on I/O failure
         bool SaveScene();
 
         // Discards mScene's entities and replaces it with mSceneDir's
-        // contents. False (leaving the prior scene in place) if mSceneDir
-        // has no scene.json to load.
+        // contents. False if mSceneDir has no scene.json to load.
         bool LoadScene();
 
     private:
@@ -105,10 +96,7 @@ namespace mts
         VulkanRenderer mRenderer;
         Editor mEditor;
 
-        // Before mWorld, so it is destroyed after it. mWorld holds a
-        // FrameCommands resource pointing here, and reverse-order destruction
-        // would otherwise leave that pointer dangling for the whole of ~World -
-        // which tears down resources and could reach a destroy hook.
+        // Before mWorld, so it is destroyed after it
         CommandBuffer mCommands;
 
         World mWorld;
@@ -120,9 +108,8 @@ namespace mts
         AppDesc mDesc;
         double mElapsed = 0.0;
         uint64_t mFrame = 0;
-        // mAssetCache holds a raw pointer into mAssetManifest, so the two are
-        // created and torn down together, cache first. Declared in this order so
-        // destruction (reverse of declaration) also destroys the cache first.
+
+        // maintain order of mAssetCache -> mAssetCache
         std::optional<AssetManifest> mAssetManifest;
         std::optional<AssetCache> mAssetCache;
         bool mAssetLoadFailed = false;

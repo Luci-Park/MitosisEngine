@@ -622,9 +622,8 @@ TEST_CASE("A wide subtree dies without walking a stale chain", "[ecs][transform]
 TEST_CASE("AddTransform is idempotent", "[ecs][transform][hierarchy]")
 {
     // The second call must overwrite rather than add a second Transform:
-    // World::AddComponent only asserts against a duplicate, so in a release
-    // build the entity would end up with a record naming a row that no longer
-    // exists and every later Get would read past the end of the column.
+    // AddTransform's contract is to set the given value regardless, unlike
+    // World::AddComponent which now keeps the existing value on a duplicate.
     World world;
     const Entity entity = world.CreateEntity();
 
@@ -835,7 +834,7 @@ TEST_CASE("TransformPropagateSystem refreshes every cache", "[ecs][transform][hi
     World world;
     mts::CommandBuffer commands;
     mts::SystemScheduler scheduler;
-    scheduler.Add<mts::TransformPropagateSystem>(mts::SystemPhase::PostUpdate);
+    scheduler.AddSystem<mts::TransformPropagateSystem>(mts::SystemPhase::PostUpdate);
 
     const Entity parent = MakeAt(world, glm::vec3(10.0f, 0.0f, 0.0f));
     const Entity child = MakeAt(world, glm::vec3(0.0f, 1.0f, 0.0f));

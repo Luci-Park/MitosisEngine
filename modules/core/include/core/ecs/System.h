@@ -15,7 +15,8 @@ namespace mts
     class World;
     class CommandBuffer;
 
-    // Ordering primitive : each system will execute in the order of assigned phase -> registrated order
+    // Ordering primitive:
+    // Each system will execute in the order of assigned phase -> registrated order
     enum class SystemPhase : uint8_t
     {
         PreUpdate,

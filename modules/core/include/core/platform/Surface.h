@@ -26,11 +26,16 @@ namespace mts
     {
         switch (backend)
         {
-        case WindowBackend::None:    return "None";
-        case WindowBackend::Win32:   return "Win32";
-        case WindowBackend::Xlib:    return "Xlib";
-        case WindowBackend::Wayland: return "Wayland";
-        case WindowBackend::Cocoa:   return "Cocoa";
+        case WindowBackend::None:
+            return "None";
+        case WindowBackend::Win32:
+            return "Win32";
+        case WindowBackend::Xlib:
+            return "Xlib";
+        case WindowBackend::Wayland:
+            return "Wayland";
+        case WindowBackend::Cocoa:
+            return "Cocoa";
         }
         return "Unknown";
     }
@@ -43,9 +48,7 @@ namespace mts
         void *window = nullptr;
     };
 
-    // Minimal rect type for data crossing the window boundary without
-    // pulling in a specific graphics API's headers (window links no
-    // Vulkan headers - see VkRect2D usage in the editor/renderer layer).
+    // Minimal rect type for data crossing the window boundary
     struct PixelRect
     {
         int32_t x = 0;
@@ -54,8 +57,7 @@ namespace mts
         uint32_t height = 0;
     };
 
-    // What a renderer needs from a window, and nothing else - no event pump.
-    // Window (in the window module) implements this on top of its own interface.
+    // What a renderer needs from a window
     class ISurfaceProvider
     {
     public:

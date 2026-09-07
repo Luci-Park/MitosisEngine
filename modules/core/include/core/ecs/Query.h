@@ -20,21 +20,6 @@ namespace mts
 {
     namespace detail
     {
-        /**
-         * Held for the duration of a table walk, by every walker.
-         *
-         * It stops the owning query rebuilding its match list under the walk,
-         * and tells the world to refuse structural changes while references
-         * into a table are live. It is a type rather than a pair of calls
-         * because it is the *only* way to raise World's iteration depth - see
-         * the friend declarations in World - so a walker cannot forget the
-         * matching decrement, and no caller outside these types can walk
-         * archetypes with the guard down.
-         *
-         * A depth rather than a flag: the same query may be re-entered from its
-         * own callback for a pairwise scan, and a flag would let the inner
-         * walk's destructor declare the outer one finished.
-         */
         struct QueryIterationGuard
         {
             QueryIterationGuard(uint32_t &depth, World &world) : mDepth(depth), mWorld(world)
@@ -52,7 +37,7 @@ namespace mts
             QueryIterationGuard(const QueryIterationGuard &) = delete;
             QueryIterationGuard &operator=(const QueryIterationGuard &) = delete;
 
-            uint32_t &mDepth;
+            uint32_t &mDepth; // for expressing nested iterations
             World &mWorld;
         };
 
@@ -88,13 +73,10 @@ namespace mts
 
             bool NeedsRefresh(const World &world) const { return world.Generation() != mSeenGeneration; }
 
-            // Forces the next NeedsRefresh to say yes. Needed by any owner
-            // that may add a term after the first walk - the generation stamp
-            // tracks the world's archetypes, not this matcher's own masks.
+            // forces refresh next round
             void Invalidate() { mSeenGeneration = static_cast<std::size_t>(-1); }
 
-            // Calls `onMatch(Archetype *)` for every matching table, then
-            // stamps the generation. The caller owns the cache it fills.
+            // Build matches
             template <typename Fn>
             void Refresh(World &world, Fn &&onMatch)
             {
@@ -110,7 +92,7 @@ namespace mts
             Signature mAll;
             Signature mNone;
             std::vector<Signature> mOrClauses; // one per Or term; empty for most queries
-            std::size_t mSeenGeneration = static_cast<std::size_t>(-1); // never equal to a real generation
+            std::size_t mSeenGeneration = static_cast<std::size_t>(-1);
         };
     }
 
@@ -232,8 +214,7 @@ namespace mts
                                     // limit iteration to current entities
                                     const uint32_t rows = table.RowCount();
                                     for (uint32_t row = 0; row < rows && row < table.RowCount(); ++row)
-                                        fn(table.EntityAt(row), ResolveRef<Ts>(columns[Is], row)...);
-                                });
+                                        fn(table.EntityAt(row), ResolveRef<Ts>(columns[Is], row)...); });
         }
 
         // Return target components

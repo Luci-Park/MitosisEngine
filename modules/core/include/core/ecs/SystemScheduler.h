@@ -21,15 +21,6 @@
 
 namespace mts
 {
-    /**
-     * Runs registered systems once per frame, phase by phase, flushing the
-     * command buffer at each phase boundary.
-     *
-     * Flush granularity is per phase, not per system: systems in one phase see
-     * the same world, and a spawn is observable at the next phase. An entity
-     * created this phase has a valid handle immediately but no visible
-     * components until the boundary.
-     */
     class SystemScheduler
     {
     public:
@@ -40,10 +31,9 @@ namespace mts
         SystemScheduler(SystemScheduler &&) = delete;
         SystemScheduler &operator=(SystemScheduler &&) = delete;
 
-        // Constructs S in place and returns it, so a caller can keep a typed
-        // reference for configuration. Ownership stays here.
+        // Cannot register system after Start
         template <typename S, typename... Args>
-        S &Add(SystemPhase phase, Args &&...args)
+        S &AddSystem(SystemPhase phase, Args &&...args)
         {
             static_assert(std::is_base_of_v<ISystem, S>, "SystemScheduler::Add: S must derive from ISystem");
             MTS_ASSERT(!mStarted, "SystemScheduler::Add: systems must be registered before Start");
@@ -68,7 +58,8 @@ namespace mts
             }
         }
 
-        // will call all systems in all phases in order
+        // call systems in the order of phase -> registrated order
+        // buffer is flushed after every phase
         void Update(SystemContext &context)
         {
             MTS_ASSERT(mStarted, "SystemScheduler::Update: Start was never called");
@@ -99,9 +90,8 @@ namespace mts
             mStarted = false;
         }
 
-        // Drops every registered system so Add and Start may be used again.
-        // Stop has to have run first: the systems are about to be destroyed,
-        // and OnStop is their only chance to release anything.
+        // Drops all registered system
+        // Error if Stop wasn't called yet
         void Reset()
         {
             MTS_ASSERT(!mStarted, "SystemScheduler::Reset: Stop must run before Reset");

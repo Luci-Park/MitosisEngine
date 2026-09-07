@@ -1,7 +1,7 @@
 /**
  * @file RuntimeQuery.cpp
  * @author Sumin Park
- * @brief A query whose terms are chosen at runtime rather than by template
+ * @brief Query defined at runtime
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -17,10 +17,6 @@ namespace mts
 {
     namespace
     {
-        // Anything named in a query - term or filter - has to be registered,
-        // checked here rather than left to fail quietly: an unregistered name
-        // still has a seq, so its bit would simply match no archetype and the
-        // query would return nothing.
         const ComponentOps &CheckRegistered(TypeId type)
         {
             const ComponentOps *ops = ComponentRegistry::Instance().FindBySeq(type.seq);
@@ -33,9 +29,6 @@ namespace mts
             return *ops;
         }
 
-        // A data term additionally has to have bytes to hand back. A tag has
-        // none, and silently yielding a null row pointer would push the
-        // mistake into the script, a frame later and with no name attached.
         void CheckQueryable(TypeId type)
         {
             const ComponentOps &ops = CheckRegistered(type);
@@ -46,11 +39,6 @@ namespace mts
                       type.name);
         }
 
-        // Rebuilding the match list mid-walk drops the very tables the walk is
-        // standing on: EnsureFresh would clear mTables and mColumns while the
-        // outer ForEach still holds an `Archetype &` and a column pointer into
-        // them. Debug would fire EnsureFresh's assert, whose message blames
-        // archetype creation and would send the reader somewhere else entirely.
         void CheckNotIterating(uint32_t depth, const char *what)
         {
             MTS_ASSERT(depth == 0,
@@ -88,8 +76,6 @@ namespace mts
         mMatcher.RequireAll(SignatureOfTerms(mTerms));
     }
 
-    // Filters test a signature bit, which a tag has like anything else - so
-    // unlike a data term, a filter accepts one.
     RuntimeQuery &RuntimeQuery::With(TypeId type)
     {
         CheckNotIterating(mIterationDepth, "With");
@@ -141,9 +127,6 @@ namespace mts
         mTables.clear();
         mColumns.clear();
 
-        // A matched table is guaranteed to hold every term's column - that is
-        // what the signature mask tested - so the resolved pointers are never
-        // null and the walk needs no per-term check.
         mMatcher.Refresh(*mWorld,
                          [this](Archetype *table)
                          {

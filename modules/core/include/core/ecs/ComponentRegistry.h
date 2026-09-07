@@ -141,13 +141,11 @@ namespace mts
                 ops.mGet = [](const ComponentOps &, World &world, Entity entity) -> void *
                 { return world.IsAlive(entity) ? world.GetComponent<T>(entity) : nullptr; };
 
+                // World::AddComponent is itself idempotent on a duplicate (keeps
+                // the existing value), so no has-check needed here.
                 ops.mAddCopy = [](const ComponentOps &, World &world, Entity entity, const void *value)
                 {
-                    if (!world.IsAlive(entity))
-                        return;
-                    if (T *existing = world.GetComponent<T>(entity))
-                        *existing = *static_cast<const T *>(value);
-                    else
+                    if (world.IsAlive(entity))
                         world.AddComponent<T>(entity, *static_cast<const T *>(value));
                 };
 
@@ -166,7 +164,7 @@ namespace mts
         const ComponentOps *Find(std::string_view name) const;
         const ComponentOps *FindByHash(uint32_t hash) const;
 
-        /// For a TypeId recovered from an archetype column or a signature bit.
+        // For a TypeId recovered from an archetype column or a signature bit.
         const ComponentOps *FindBySeq(uint32_t seq) const;
 
         std::size_t Count() const { return mOps.size(); }
@@ -174,10 +172,7 @@ namespace mts
     private:
         const ComponentOps &InsertNative(const ComponentOps &ops, const void *defaultValue);
 
-        /// The existing seq for this name, or a freshly allocated one. The
-        /// MTS_CHECK is where the component budget is actually enforced: the
-        /// name can come from a data file, so exceeding it must stop a release
-        /// build with a message rather than corrupt the signature bitset.
+        // get or create seq
         uint32_t SeqForHash(uint32_t hash, std::string_view name);
 
         std::string_view Intern(std::string_view name);
@@ -186,12 +181,7 @@ namespace mts
         /// not a different name that hashes the same.
         ComponentOps *FindChecked(uint32_t hash, std::string_view name);
 
-        // deque, not vector: Find hands out `const ComponentOps *` that callers
-        // hold across later registrations, and TypeId::name points into
-        // mInternedNames. A vector would reallocate and dangle both. A
-        // std::string's own buffer moves with the object when it is short
-        // enough for SSO, so interning into a vector<string> is not safe either.
-        std::deque<ComponentOps> mOps;
+        std::deque<ComponentOps> mOps; // for pointer/reference stability on insert
         std::deque<std::string> mInternedNames;
         std::deque<std::vector<FieldDesc>> mRuntimeFields;
         std::deque<std::vector<std::byte>> mDefaultValues;
@@ -200,8 +190,6 @@ namespace mts
         std::unordered_map<uint32_t, ComponentOps *> mBySeq;
     };
 
-    /// Registers every component `core` defines, with its field tables.
-    /// Idempotent; call it from the composition root before loading scripts.
-    //
+    // core component
     void RegisterCoreComponents();
 }

@@ -37,7 +37,7 @@ namespace mts
     };
 
     // One draw call's worth of data, built by RenderSystem from a
-    // WorldTransform + MeshRenderer pair.
+    // WorldTransform + MeshRenderer pair
     struct DrawItem
     {
         MeshHandle mesh;
@@ -63,9 +63,7 @@ namespace mts
         bool InitImGuiVulkanBackend();
         void ShutdownImGuiVulkanBackend();
 
-        // RenderSystem drives DrawFrame from SystemPhase::Render and has no
-        // reason to know ImGui exists, so App feeds this frame's draw data in
-        // separately, before the scheduler update that reaches DrawFrame.
+        // abstraction from imgui
         void SetImGuiDrawData(ImDrawData *drawData) { mImguiDrawData = drawData; }
 
         // Viewport/scissor rect (window pixels) the scene pass is clipped to

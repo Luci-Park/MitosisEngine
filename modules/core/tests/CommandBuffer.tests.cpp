@@ -167,7 +167,7 @@ TEST_CASE("Remove is deferred until Flush", "[ecs][commands]")
     REQUIRE_FALSE(world.Has<CHealth>(entity));
 }
 
-TEST_CASE("Adding the same component twice keeps the last value", "[ecs][commands]")
+TEST_CASE("Adding the same component twice keeps the first value", "[ecs][commands]")
 {
     World world;
     CommandBuffer commands;
@@ -178,7 +178,7 @@ TEST_CASE("Adding the same component twice keeps the last value", "[ecs][command
     commands.Flush(world);
 
     REQUIRE(world.GetComponent<CHealth>(entity) != nullptr);
-    REQUIRE(world.GetComponent<CHealth>(entity)->hp == 7);
+    REQUIRE(world.GetComponent<CHealth>(entity)->hp == 1);
 }
 
 TEST_CASE("Interleaved payloads of different alignment survive the flush", "[ecs][commands]")
@@ -235,8 +235,8 @@ TEST_CASE("A deferred tag add applies at the flush", "[ecs][commands][tag]")
 TEST_CASE("A tag deferred twice in one flush is not a duplicate add", "[ecs][commands][tag]")
 {
     // Two systems marking the same entity in one phase is legitimate. Add
-    // absorbs it by overwriting; AddTag has nothing to overwrite, so it has to
-    // absorb it by noticing the tag is already there.
+    // absorbs it by keeping the first value; AddTag has nothing to keep, so
+    // it has to absorb it by noticing the tag is already there.
     World world;
     const Entity entity = world.CreateEntity();
 

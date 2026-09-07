@@ -33,16 +33,14 @@ namespace mts
         return node.owner == entity ? &node : nullptr;
     }
 
-    HierarchyIndex::Node &HierarchyIndex::Obtain(Entity entity)
+    HierarchyIndex::Node &HierarchyIndex::GetNode(Entity entity)
     {
         if (entity.mIndex >= mNodes.size())
             mNodes.resize(entity.mIndex + 1);
 
         Node &node = mNodes[entity.mIndex];
 
-        // A different owner means the slot belongs to a destroyed entity whose
-        // index was recycled. Its edges died with it, so the slot is reset
-        // rather than inherited.
+        // override destroyed entity
         if (!(node.owner == entity))
         {
             node.owner = entity;
@@ -70,8 +68,6 @@ namespace mts
         uint32_t depth = 0;
         for (Entity cursor = ParentOf(entity); !cursor.IsNull(); cursor = ParentOf(cursor))
         {
-            // Bounded even though SetParent refuses to build past the cap: this
-            // is also what stops a walk if the graph is ever wrong.
             if (++depth >= kMaxHierarchyDepth)
                 break;
         }
@@ -94,9 +90,6 @@ namespace mts
 
     uint32_t HierarchyIndex::HeightOf(Entity entity) const
     {
-        // Recursion is safe here only because the graph is already bounded:
-        // nothing may be linked past kMaxHierarchyDepth, and the guard stops
-        // the walk anyway if that were ever violated.
         return HeightFrom(entity, 0);
     }
 
@@ -124,9 +117,7 @@ namespace mts
         if (node == nullptr)
             return;
 
-        // Order-preserving erase, not swap-and-pop: children stay in insertion
-        // order, which is what makes iteration reproducible. Both are O(n) in
-        // the child count anyway, since the search is the cost.
+        // Order-preserving erase
         const auto found = std::find(node->children.begin(), node->children.end(), child);
         if (found != node->children.end())
             node->children.erase(found);
@@ -142,17 +133,11 @@ namespace mts
             if (child == parent)
                 return false;
 
-            // Refused, not asserted: one cycle would make every upward walk in
-            // the engine non-terminating, and an assert is compiled out under
-            // NDEBUG exactly where that matters most.
+            // cycle
             if (IsAncestorOf(child, parent))
                 return false;
 
-            // The moved subtree's own height counts, not just the new
-            // parent's depth: bounding one end only would let a tall subtree
-            // land past the cap, and ResolveWorld would then silently truncate
-            // its ancestor walk and return a matrix missing the top levels.
-            // O(subtree), paid only when the moved node actually has children.
+            // deeper than maxDepth
             if (DepthOf(parent) + 1 + HeightOf(child) >= kMaxHierarchyDepth)
                 return false;
         }
@@ -164,31 +149,26 @@ namespace mts
         if (!previous.IsNull())
             Unlink(child, previous);
 
-        // Obtain may resize mNodes, so the parent's slot is taken afterwards
-        // and never held across the child's.
-        Obtain(child).parent = parent;
+        GetNode(child).parent = parent;
 
         if (!parent.IsNull())
-            Obtain(parent).children.push_back(child);
+            GetNode(parent).children.push_back(child);
 
         return true;
     }
 
-    std::vector<Entity> HierarchyIndex::TakeChildren(Entity entity)
+    std::vector<Entity> HierarchyIndex::DetachChildren(Entity entity)
     {
         Node *node = Find(entity);
         if (node == nullptr)
             return {};
 
-        // Rooted first, so that destroying one of them afterwards finds a null
-        // parent and skips the Unlink scan entirely.
         for (const Entity child : node->children)
         {
             if (Node *orphan = Find(child))
                 orphan->parent = kNullEntity;
         }
 
-        // Moved, not copied: the buffer transfers, so this allocates nothing.
         return std::move(node->children);
     }
 
@@ -203,9 +183,6 @@ namespace mts
         if (!parent.IsNull())
             Unlink(entity, parent);
 
-        // Iterated in place rather than copied out: nothing below resizes
-        // mNodes - Unlink and Find only read the slot vector - so `node` stays
-        // valid, and the graph is acyclic so no child can be `parent`.
         for (const Entity child : node->children)
         {
             if (Node *orphan = Find(child))
@@ -215,8 +192,6 @@ namespace mts
         node->owner = kNullEntity;
         node->parent = kNullEntity;
 
-        // clear() rather than shrinking: the slot will likely be reused by a
-        // recycled index, and the capacity is worth keeping.
         node->children.clear();
     }
 

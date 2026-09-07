@@ -121,7 +121,7 @@ TEST_CASE("Erased ops are total on a stale handle")
     CHECK_NOTHROW(ops.Remove(world, entity));
 }
 
-TEST_CASE("Adding twice through the erased path overwrites instead of failing")
+TEST_CASE("Adding twice through the erased path keeps the first value instead of failing")
 {
     const ComponentOps &ops = Health();
     World world;
@@ -132,7 +132,7 @@ TEST_CASE("Adding twice through the erased path overwrites instead of failing")
     ops.AddCopy(world, entity, &first);
     ops.AddCopy(world, entity, &second);
 
-    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 2);
+    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 1);
 }
 
 TEST_CASE("AddDefault installs the type's default value")
@@ -224,8 +224,9 @@ TEST_CASE("A tag added twice through the erased path stays added")
     World world;
     const Entity entity = world.CreateEntity();
 
-    // AddCopy absorbs a duplicate for a component with fields by overwriting;
-    // for a tag there is nothing to overwrite, so it must simply not assert
+    // AddCopy absorbs a duplicate for a component with fields by keeping the
+    // existing value; for a tag there is nothing to keep, so it must simply
+    // not assert
     tag.AddDefault(world, entity);
     tag.AddDefault(world, entity);
 
@@ -406,7 +407,7 @@ TEST_CASE("Interleaved erased and typed commands both survive one flush")
 
     REQUIRE(native.Has(world, entity));
     REQUIRE(script.Has(world, entity));
-    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 9);
+    CHECK(world.GetComponent<RegistryHealth>(entity)->hp == 8);
 
     int32_t readBack = 0;
     script.FindField("hp")->Read(script.GetComponent(world, entity), &readBack);

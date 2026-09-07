@@ -40,10 +40,7 @@ namespace mts
     }
 
     // Signature of multiple combinations of components
-    //
-    // const is stripped: Query<const Transform> names the same bit as
-    // Query<Transform>, and a signature that disagreed would match no archetype
-    // while looking perfectly correct at the call site.
+    // const is stripped
     template <typename... Ts>
     Signature SignatureOf()
     {

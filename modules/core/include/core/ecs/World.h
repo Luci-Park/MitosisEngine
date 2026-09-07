@@ -56,26 +56,12 @@ namespace mts
 
     namespace detail
     {
-        /**
-         * Resources are keyed on their own counter rather than TypeIdOf.
-         * ComponentBit uses TypeId::seq *directly* as a bitset index and
-         * asserts it stays under kMaxComponentTypes, so every non-component
-         * type that drew a seq would push real components toward that ceiling
-         * - an order-dependent failure a long way from its cause.
-         */
         inline uint32_t NextResourceId()
         {
             static std::atomic<uint32_t> counter{0};
             return counter.fetch_add(1, std::memory_order_relaxed);
         }
 
-        /**
-         * Normalized through remove_cvref_t so that TryResource<const T> names
-         * the same resource as TryResource<T>. Without it the const spelling
-         * is a separate instantiation with its own id, which compiles fine and
-         * then always reports the resource as absent - a silent no-op in any
-         * caller that treats nullptr as "no graph installed".
-         */
         template <typename T>
         uint32_t ResourceIdOf()
         {
@@ -248,7 +234,9 @@ namespace mts
                           "to return. Use AddTag<T>(entity).");
 
             MTS_ASSERT(mPool.IsAlive(entity), "World::AddComponent: entity is not alive");
-            MTS_ASSERT(!Has<T>(entity), "World::AddComponent: entity already has this component");
+            if (T *existing = GetComponent<T>(entity))
+                return *existing;
+
             AssertSafeToMutate("AddComponent");
 
             return AddTableComponent(entity, value);
@@ -328,20 +316,6 @@ namespace mts
         }
 #pragma endregion
 
-        /**
-         * Installs this world's single instance of T, constructed in place, and
-         * replaces any previous one.
-         *
-         * A resource is engine state that belongs to the world rather than to
-         * an entity - a camera, an input snapshot, a hierarchy index, a script
-         * VM. Unlike a component it is never relocated, so it carries none of
-         * the trivially-copyable requirement: a resource may hold vectors,
-         * strings, or anything else with a destructor.
-         *
-         * Replacing destroys the old value, which invalidates any pointer a
-         * system cached from Resource() or TryResource(). Emplace during setup,
-         * not mid-frame, unless every holder of that pointer is re-fetching.
-         */
         template <typename T, typename... Args>
         T &EmplaceResource(Args &&...args)
         {
@@ -351,10 +325,6 @@ namespace mts
             auto holder = std::make_unique<detail::ResourceHolder<T>>(std::forward<Args>(args)...);
             T &value = holder->mValue;
 
-            // The value lives inside a heap-allocated holder, so rehashing the
-            // map moves the unique_ptr and never the resource itself: a
-            // pointer taken here survives any number of later emplacements of
-            // *other* resources.
             mResources[detail::ResourceKeyOf<T>()] = std::move(holder);
             return value;
         }
@@ -382,16 +352,11 @@ namespace mts
             return &static_cast<const detail::ResourceHolder<Bare> *>(it->second.get())->mValue;
         }
 
-        // The resource, which must exist. Use TryResource where absence is a
-        // case the caller handles rather than a bug.
         template <typename T>
         T &Resource()
         {
             T *value = TryResource<T>();
 
-            // MTS_CHECK, not MTS_ASSERT: this returns a reference, so a missing
-            // resource in a release build would be a null dereference rather
-            // than a diagnosable stop.
             MTS_CHECK(value != nullptr, "World::Resource: no {} has been emplaced", TrimTypeName<T>());
             return *value;
         }
@@ -448,23 +413,6 @@ namespace mts
                        what);
         }
 
-        /**
-         * Moves an entity to the table that also holds `type`, and copies
-         * `size` bytes of `value` into the new row.
-         *
-         * Erased rather than templated because a script-declared component has
-         * no C++ type to instantiate against - only a TypeId, a size and an
-         * alignment, which is exactly what ComponentColumn's constructor has
-         * always taken. The templated overload below is a thin façade over
-         * this, so there is one implementation of the archetype move rather
-         * than two that drift.
-         *
-         * `size` 0 means a tag: the bit is set and the move happens, but no
-         * column is created, `value` is not read, and the return is nullptr.
-         *
-         * Callers are responsible for the preconditions; the public AddRaw,
-         * AddComponent and AddTag do that checking.
-         */
         void *AddTableComponentRaw(Entity entity, TypeId type, uint32_t size, uint32_t align, const void *value)
         {
             // get archetype
@@ -474,6 +422,7 @@ namespace mts
             // signature if added target component
             signature.set(ComponentBitOf(type));
 
+            // tags only live in signature of archetype, no column creation
             Archetype &target = size == 0
                                     ? GetOrCreateAdded(signature, *from.archetype)
                                     : GetOrCreateAdded(signature, *from.archetype, ComponentColumn(type, size, align));
@@ -481,7 +430,6 @@ namespace mts
             const uint32_t row = target.AddRow(entity);
             CopySharedColumns(*from.archetype, from.row, target, row);
 
-            // A tag has no column to write into, and nothing to write.
             void *slot = nullptr;
             if (size != 0)
             {
@@ -500,10 +448,9 @@ namespace mts
             return slot;
         }
 
-        // removing from archetype
-        // move entityset to different table
         void RemoveTableComponentRaw(Entity entity, TypeId type)
         {
+            // move entityset to different table
             const EntityRecord from = mRecords[entity.mIndex];
             Signature signature = from.archetype->GetSignature();
             // signature if removed target component
@@ -518,11 +465,10 @@ namespace mts
             mRecords[entity.mIndex] = EntityRecord{&target, row};
         }
 
-        // adding to archetype
-        // move entityset to different table
         template <typename T>
         T &AddTableComponent(Entity entity, const T &value)
         {
+            // move entityset to different table
             return *static_cast<T *>(
                 AddTableComponentRaw(entity, TypeIdOf<T>(), sizeof(T), alignof(T), &value));
         }
@@ -641,15 +587,7 @@ namespace mts
         std::unordered_map<uint32_t, std::unique_ptr<detail::IQuery>> mQueries; // by detail::QueryKeyOf
         std::vector<EntityDestroyHook> mDestroyHooks;
 
-        // Declared last, so it is destroyed first: reverse declaration order
-        // keeps entity storage alive while resources are torn down, which is
-        // what a resource holding entity handles needs.
-        //
-        // That is not licence to call back into the world from a resource
-        // destructor. ~World is already destroying this map, so DestroyEntity -
-        // whose hooks look resources up again - would search a container whose
-        // elements are being destroyed, in an order nothing defines. Release
-        // handles before the world goes down, not during.
+        // intentionally declared last as it must be destroyed first.
         std::unordered_map<uint32_t, std::unique_ptr<detail::IResource>> mResources; // by detail::ResourceIdOf
         std::size_t mArchetypeGeneration = 0;
         uint32_t mQueryIterationDepth = 0; // depth for nested iteration checking
