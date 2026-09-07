@@ -37,8 +37,8 @@ namespace
         std::vector<int> stopped;
     };
 
-    /// Writes its id into the recorder at every lifecycle point, so ordering is
-    /// observable without any world state.
+    // Writes its id into the recorder at every lifecycle point, so ordering is
+    // observable without any world state.
     class TagSystem final : public ISystem
     {
     public:
@@ -53,7 +53,7 @@ namespace
         int mId;
     };
 
-    /// Spawns one entity per tick through the command buffer.
+    // Spawns one entity per tick through the command buffer.
     class SpawnSystem final : public ISystem
     {
     public:
@@ -67,14 +67,15 @@ namespace
         int mNextTag = 0;
     };
 
-    /// Counts what is visible to it at the moment it runs.
+    // Counts what is visible to it at the moment it runs.
     class CountSystem final : public ISystem
     {
     public:
         void OnUpdate(SystemContext &context) override
         {
             std::size_t count = 0;
-            context.world.ForEach<SSpawned>([&](Entity, SSpawned &) { ++count; });
+            context.world.ForEach<SSpawned>([&](Entity, SSpawned &)
+                                            { ++count; });
             seen.push_back(count);
         }
 
@@ -90,10 +91,10 @@ TEST_CASE("Systems run in phase order, then registration order", "[ecs][system]"
     Recorder recorder;
 
     // registered out of phase order on purpose
-    scheduler.Add<TagSystem>(SystemPhase::Update, recorder, 1);
-    scheduler.Add<TagSystem>(SystemPhase::PostUpdate, recorder, 4);
-    scheduler.Add<TagSystem>(SystemPhase::Update, recorder, 2);
-    scheduler.Add<TagSystem>(SystemPhase::PreUpdate, recorder, 3);
+    scheduler.AddSystem<TagSystem>(SystemPhase::Update, recorder, 1);
+    scheduler.AddSystem<TagSystem>(SystemPhase::PostUpdate, recorder, 4);
+    scheduler.AddSystem<TagSystem>(SystemPhase::Update, recorder, 2);
+    scheduler.AddSystem<TagSystem>(SystemPhase::PreUpdate, recorder, 3);
 
     REQUIRE(scheduler.SystemCount() == 4);
     REQUIRE(scheduler.SystemCount(SystemPhase::Update) == 2);
@@ -114,9 +115,9 @@ TEST_CASE("OnStart runs once and OnStop runs in reverse", "[ecs][system]")
     SystemScheduler scheduler;
     Recorder recorder;
 
-    scheduler.Add<TagSystem>(SystemPhase::PreUpdate, recorder, 1);
-    scheduler.Add<TagSystem>(SystemPhase::Update, recorder, 2);
-    scheduler.Add<TagSystem>(SystemPhase::Update, recorder, 3);
+    scheduler.AddSystem<TagSystem>(SystemPhase::PreUpdate, recorder, 1);
+    scheduler.AddSystem<TagSystem>(SystemPhase::Update, recorder, 2);
+    scheduler.AddSystem<TagSystem>(SystemPhase::Update, recorder, 3);
 
     SystemContext context{world, commands};
     REQUIRE_FALSE(scheduler.Started());
@@ -145,8 +146,8 @@ TEST_CASE("Commands recorded in one phase are visible to the next", "[ecs][syste
     CommandBuffer commands;
     SystemScheduler scheduler;
 
-    scheduler.Add<SpawnSystem>(SystemPhase::PreUpdate);
-    CountSystem &counter = scheduler.Add<CountSystem>(SystemPhase::Update);
+    scheduler.AddSystem<SpawnSystem>(SystemPhase::PreUpdate);
+    CountSystem &counter = scheduler.AddSystem<CountSystem>(SystemPhase::Update);
 
     SystemContext context{world, commands};
     scheduler.Start(context);
@@ -165,8 +166,8 @@ TEST_CASE("A spawn is not visible to systems in its own phase", "[ecs][system]")
     CommandBuffer commands;
     SystemScheduler scheduler;
 
-    scheduler.Add<SpawnSystem>(SystemPhase::Update);
-    CountSystem &counter = scheduler.Add<CountSystem>(SystemPhase::Update);
+    scheduler.AddSystem<SpawnSystem>(SystemPhase::Update);
+    CountSystem &counter = scheduler.AddSystem<CountSystem>(SystemPhase::Update);
 
     SystemContext context{world, commands};
     scheduler.Start(context);
@@ -199,7 +200,7 @@ TEST_CASE("A system removes its destroy hook in OnStop, so Reset leaves none beh
 
     {
         SystemScheduler scheduler;
-        scheduler.Add<HookSystem>(SystemPhase::PreUpdate, hookCalls);
+        scheduler.AddSystem<HookSystem>(SystemPhase::PreUpdate, hookCalls);
 
         SystemContext context{world, commands};
         scheduler.Start(context);
@@ -238,7 +239,7 @@ TEST_CASE("The context carries frame timing through to systems", "[ecs][system]"
         std::vector<uint64_t> frames;
     };
 
-    TimeSystem &timing = scheduler.Add<TimeSystem>(SystemPhase::Update);
+    TimeSystem &timing = scheduler.AddSystem<TimeSystem>(SystemPhase::Update);
 
     SystemContext context{world, commands};
     scheduler.Start(context);

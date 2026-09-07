@@ -15,10 +15,6 @@ namespace mir
 {
     namespace
     {
-        /// The buffer, complaining if a defer is needed and there is none. The
-        /// assert is aimed at whoever wired the application up, not at the
-        /// script that tripped it: a binding reached during a walk with no
-        /// buffer installed has no correct action left.
         CommandBuffer *RequireFrameCommands(World &world)
         {
             CommandBuffer *commands = FrameCommandBuffer(world);

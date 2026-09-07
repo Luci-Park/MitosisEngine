@@ -1,7 +1,7 @@
 /**
  * @file ComponentFields.h
  * @author Sumin Park
- * @brief Named, typed field access into a component whose C++ type is erased
+ * @brief Named, typed field access into a type-erased component
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -22,10 +22,9 @@
 
 namespace mir
 {
-    /// The value types a script or an inspector may read and write. Deliberately
-    /// small: every one is trivially copyable and at most 4-byte aligned, so a
-    /// component built out of them satisfies 0006 by construction and can never
-    /// be over-aligned for ComponentColumn.
+    // The value types a script or an inspector may read and write.
+    // Each field should be small, at most 4-byte aligned
+    // is entered offset based
     enum class FieldKind : uint8_t
     {
         Bool,
@@ -36,33 +35,10 @@ namespace mir
         Quat,
         Mat4,
         EntityRef,
-
-        /// A resource handle shaped {index, generation} - the same layout as
-        /// Entity, deliberately kept separate from EntityRef. EntityRef names
-        /// a live entity in this World; Handle names something outside the
-        /// World entirely (today: a renderer MeshHandle). Conflating the two
-        /// would mislead a future binding that special-cases EntityRef with
-        /// World-specific behaviour - an "is this entity alive" check, an
-        /// entity picker - none of which makes sense for a mesh handle. Sized
-        /// directly as two uint32_t rather than naming any owning type, so
-        /// core never has to know what a Handle points at; a future asset or
-        /// texture handle reuses this kind as long as it keeps the same shape.
-        Handle,
-
-        /// A fixed-capacity, null-terminated byte buffer (kFieldStringCapacity
-        /// bytes, always including the terminator) rather than a dynamically
-        /// sized string - the whole field system stores fields at a fixed
-        /// offset with a fixed size known at registration, so a component
-        /// carrying a String field is exactly as trivially copyable and
-        /// relocatable as one carrying a Vec3. A name that doesn't fit is
-        /// truncated by whoever writes it (see JsonToField/LuaValueToField),
-        /// not by this type.
-        String,
+        Handle, // anything not components, not entities ex) assets
+        String, // fixed sized string, users should truncate it
     };
 
-    /// Bytes reserved for a FieldKind::String, terminator included. Matches
-    /// SceneIO's FieldBuffer (64 bytes, its largest field already) exactly,
-    /// so a String field costs that path nothing extra.
     inline constexpr uint32_t kFieldStringCapacity = 64;
 
     constexpr uint32_t FieldSize(FieldKind kind)
@@ -149,42 +125,20 @@ namespace mir
         return "?";
     }
 
-    /**
-     * One reachable value inside a component.
-     *
-     * Two backings, and the distinction is the whole reason this type is not
-     * just an offset:
-     *
-     * - **Accessor-backed** (`mGet` set). The pair of thunks is the only way in.
-     *   Transform is why: its members are private so that Version() cannot fall
-     *   behind the data, and WorldTransform detects staleness in O(1) off that
-     *   version. A generic offset write to mPosition would leave mVersion
-     *   unchanged, so every world matrix downstream keeps the old value - no
-     *   crash, no assert, just a wrong frame. Routing through SetPosition keeps
-     *   the invariant where the class enforces it, and makes a read-only field
-     *   expressible (`mSet == nullptr`) rather than a convention.
-     *
-     * - **Offset-backed** (`mGet` and `mSet` both null). A script-declared
-     *   component is plain data laid out by ComponentRegistry, with no
-     *   invariant to protect, so a memcpy at mOffset is both correct and the
-     *   cheapest thing available.
-     *
-     * An aggregate with no user-declared constructors, so a C++ component's
-     * table can be a `constexpr FieldDesc[]` sitting next to the class.
-     */
     struct FieldDesc
     {
+        // field could be accessed through Get/Set or plan members
         std::string_view mName;
         FieldKind mKind = FieldKind::Float;
 
-        uint32_t mOffset = 0; ///< byte offset into the component; used when mGet is null
+        uint32_t mOffset = 0; // byte offset into the component; used when mGet is null
 
         void (*mGet)(const void *component, void *out) = nullptr;
         void (*mSet)(void *component, const void *in) = nullptr;
 
         bool ReadOnly() const { return mGet != nullptr && mSet == nullptr; }
 
-        /// Copies FieldSize(mKind) bytes of this field into `out`.
+        // Copies FieldSize(mKind) bytes of this field into `out`.
         void Read(const void *component, void *out) const
         {
             if (mGet != nullptr)
@@ -193,7 +147,7 @@ namespace mir
                 std::memcpy(out, static_cast<const std::byte *>(component) + mOffset, FieldSize(mKind));
         }
 
-        /// False when the field is read-only, in which case nothing is written.
+        // False when the field is read-only, in which case nothing is written.
         bool Write(void *component, const void *in) const
         {
             if (mSet != nullptr)

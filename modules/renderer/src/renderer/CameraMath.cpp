@@ -1,6 +1,5 @@
-// Vulkan clip space is 0..1, not OpenGL's -1..1: this must be defined before
-// matrix_transform.hpp is parsed, in this translation unit specifically, so
-// glm::perspective builds the matrix this engine's pipeline actually expects.
+
+// GLM set to Vulkan clip space (0 ~ 1) vs OpenGL(-1 ~ 1)
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include "renderer/CameraMath.h"

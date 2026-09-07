@@ -76,7 +76,7 @@ namespace mir
         Query<const WorldTransform, const MeshRenderer> *mMeshQuery = nullptr;
         Query<const WorldTransform, const Camera> *mCameraQuery = nullptr;
 
-        /// Rebuilt every frame but keeps its capacity to steady allocation,
+        // Rebuilt every frame but keeps its capacity to steady allocation,
         std::vector<DrawItem> mDrawItems;
 
         bool mWarnedNoCamera = false;

@@ -59,8 +59,9 @@ No engine dependencies. Links `spdlog` privately.
 - `platform/Surface.h` - `NativeWindowHandle`, `ISurfaceProvider`.
 
 Entities are `{index, generation}` handles, the generation guarding against ABA.
-Components are POD, in one of two storages: archetype tables by default, sparse
-sets for churny components via `MIR_COMPONENT_SPARSE(T)`.
+Components are POD and live in archetype tables - one storage model, no opt-out.
+A component with no fields is a tag: one signature bit, no column, added with
+`World::AddTag<T>` and used as a filter rather than read.
 `Signature` is a 256-bit bitset over sequence-numbered types and keys the
 archetype map. `Query<Ts...>` caches matching archetypes, re-resolving when the
 world's archetype generation changes; filters are `With`, `Without`, `Or`.

@@ -68,7 +68,7 @@ namespace mir
     void ScriptSystem::OnEntityDestroyed(World &world, Entity entity, void *user)
     {
         auto *self = static_cast<ScriptSystem *>(user);
-        if (const ScriptRef *ref = world.Get<ScriptRef>(entity); ref != nullptr && ref->instanceRef >= 0)
+        if (const ScriptRef *ref = world.GetComponent<ScriptRef>(entity); ref != nullptr && ref->instanceRef >= 0)
             self->mHost.DestroyInstance(ref->instanceRef);
     }
 }

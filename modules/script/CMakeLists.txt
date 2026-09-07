@@ -24,3 +24,7 @@ target_sources(engine_script PRIVATE
     src/script/bindings/EntityBindings.cpp
     src/script/bindings/WorldBindings.cpp
 )
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

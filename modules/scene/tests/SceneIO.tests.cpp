@@ -59,6 +59,11 @@ namespace
         static const RuntimeFieldDecl fields[] = {{"target", FieldKind::EntityRef}};
         return ComponentRegistry::Instance().RegisterRuntime("SceneIOTestRef", fields);
     }
+
+    const ComponentOps &SceneTagOps()
+    {
+        return ComponentRegistry::Instance().RegisterRuntime("SceneIOTestTag", {});
+    }
 }
 
 TEST_CASE("SaveScene then LoadScene round-trips a Transform", "[scene]")
@@ -80,7 +85,7 @@ TEST_CASE("SaveScene then LoadScene round-trips a Transform", "[scene]")
     REQUIRE(loaded.mEntities.size() == 1);
     Entity loadedEntity = loaded.mEntities.at(1);
 
-    const Transform *transform = loadedWorld.Get<Transform>(loadedEntity);
+    const Transform *transform = loadedWorld.GetComponent<Transform>(loadedEntity);
     REQUIRE(transform != nullptr);
     CHECK(transform->Position() == glm::vec3(1.0f, 2.0f, 3.0f));
     CHECK(transform->Rotation() == glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
@@ -145,7 +150,7 @@ TEST_CASE("SaveScene then LoadScene round-trips an EntityRef field", "[scene]")
     Entity target = CreateSceneEntity(world, scene);
     Entity referrer = CreateSceneEntity(world, scene);
     sceneRefOps.AddDefault(world, referrer);
-    sceneRefOps.FindField("target")->Write(sceneRefOps.Get(world, referrer), &target);
+    sceneRefOps.FindField("target")->Write(sceneRefOps.GetComponent(world, referrer), &target);
 
     TempSceneDir dir("entity_ref_roundtrip");
     REQUIRE(mir::SaveScene(world, dir.mPath, scene));
@@ -157,7 +162,7 @@ TEST_CASE("SaveScene then LoadScene round-trips an EntityRef field", "[scene]")
     Entity loadedReferrer = loaded.mEntities.at(2);
 
     Entity resolved{};
-    sceneRefOps.FindField("target")->Read(sceneRefOps.Get(loadedWorld, loadedReferrer), &resolved);
+    sceneRefOps.FindField("target")->Read(sceneRefOps.GetComponent(loadedWorld, loadedReferrer), &resolved);
     CHECK(resolved == loadedTarget);
 }
 
@@ -180,7 +185,7 @@ TEST_CASE("SaveScene writes an unset EntityRef as kNullStableId, and it loads ba
 
     Entity resolved{};
     resolved.mIndex = 0; // poison, so a no-op Write would be caught
-    sceneRefOps.FindField("target")->Read(sceneRefOps.Get(loadedWorld, loadedReferrer), &resolved);
+    sceneRefOps.FindField("target")->Read(sceneRefOps.GetComponent(loadedWorld, loadedReferrer), &resolved);
     CHECK(resolved.IsNull());
 }
 
@@ -212,7 +217,7 @@ TEST_CASE("LoadScene skips a component name it does not recognise", "[scene]")
 
     REQUIRE(loaded.mEntities.size() == 1);
     Entity loadedEntity = loaded.mEntities.at(1);
-    const Transform *transform = loadedWorld.Get<Transform>(loadedEntity);
+    const Transform *transform = loadedWorld.GetComponent<Transform>(loadedEntity);
     REQUIRE(transform != nullptr);
     CHECK(transform->Position() == glm::vec3(4.0f, 5.0f, 6.0f));
 }
@@ -267,8 +272,8 @@ TEST_CASE("LoadScene's nextId survives a save, even past a deleted entity's id",
 
     World world;
     LoadedScene scene = NewScene("test");
-    Entity first = CreateSceneEntity(world, scene);  // id 1
-    CreateSceneEntity(world, scene);                 // id 2, kept
+    Entity first = CreateSceneEntity(world, scene); // id 1
+    CreateSceneEntity(world, scene);                // id 2, kept
 
     scene.mEntities.erase(1);
     world.DestroyEntity(first);
@@ -282,4 +287,32 @@ TEST_CASE("LoadScene's nextId survives a save, even past a deleted entity's id",
 
     mir::StableId next = AllocateStableId(loaded);
     CHECK(next == 3); // not 2 (already used) and not reset to 1
+}
+
+TEST_CASE("SaveScene then LoadScene round-trips a tag", "[scene]")
+{
+    mir::RegisterCoreComponents();
+    const ComponentOps &tag = SceneTagOps();
+
+    World world;
+    LoadedScene scene = NewScene("test");
+    Entity tagged = CreateSceneEntity(world, scene);
+    Entity plain = CreateSceneEntity(world, scene);
+    tag.AddDefault(world, tagged);
+
+    REQUIRE(tag.Has(world, tagged));
+    REQUIRE_FALSE(tag.Has(world, plain));
+
+    TempSceneDir dir("tag_roundtrip");
+    REQUIRE(mir::SaveScene(world, dir.mPath, scene));
+
+    World loadedWorld;
+    LoadedScene loaded = mir::LoadScene(loadedWorld, dir.mPath);
+
+    Entity loadedTagged = loaded.mEntities.at(1);
+    Entity loadedPlain = loaded.mEntities.at(2);
+
+    CHECK(tag.Has(loadedWorld, loadedTagged));
+    CHECK_FALSE(tag.Has(loadedWorld, loadedPlain));
+    CHECK(tag.GetComponent(loadedWorld, loadedTagged) == nullptr);
 }

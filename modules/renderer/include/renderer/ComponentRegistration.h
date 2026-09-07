@@ -10,9 +10,5 @@
 
 namespace mir
 {
-    /// Mirrors core::RegisterCoreComponents, one level up: core cannot name
-    /// MeshRenderer, so the renderer registers its own components instead of
-    /// folding them into the core call. App links both modules and is where
-    /// the two calls sit side by side - see App::Initialize.
     void RegisterRendererComponents();
 }

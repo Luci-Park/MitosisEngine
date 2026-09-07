@@ -13,6 +13,7 @@
 
 #include <bitset>
 #include <cstddef>
+#include <type_traits>
 
 namespace mir
 {
@@ -20,7 +21,7 @@ namespace mir
     inline constexpr std::size_t kMaxComponentTypes = 256;
     using Signature = std::bitset<kMaxComponentTypes>;
 
-    // check seq < kMaxComponentTypes
+    // check seq -> bitset idx (< kMaxComponentTypes)
     inline std::size_t ComponentBitOf(uint32_t seq)
     {
         MIR_CHECK(seq < kMaxComponentTypes,
@@ -38,30 +39,13 @@ namespace mir
         return ComponentBitOf(TypeIdOf<T>().seq);
     }
 
-    namespace detail
-    {
-        // mask of components in sparse set
-        inline Signature &SparseSeqMask()
-        {
-            static Signature mask;
-            return mask;
-        }
-    }
-
-    // turns on bit of seq in SparseSeqMask
-    inline void NoteSparseComponentSeq(uint32_t seq) { detail::SparseSeqMask().set(ComponentBitOf(seq)); }
-
-    inline bool IsSparseComponentSeq(uint32_t seq)
-    {
-        return seq < kMaxComponentTypes && detail::SparseSeqMask().test(seq);
-    }
-
     // Signature of multiple combinations of components
+    // const is stripped
     template <typename... Ts>
     Signature SignatureOf()
     {
         Signature signature;
-        (signature.set(ComponentBit<Ts>()), ...);
+        (signature.set(ComponentBit<std::remove_const_t<Ts>>()), ...);
         return signature;
     }
 }

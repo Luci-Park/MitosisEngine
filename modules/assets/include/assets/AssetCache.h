@@ -14,11 +14,11 @@
 
 namespace mir
 {
-    /// view.content is a span into this entry's own raw buffer, so the two must
-    /// travel together. Moving is safe - vector's move steals the buffer, so the
-    /// span keeps pointing at live bytes - but copying would allocate a fresh
-    /// buffer and leave view.content aliasing the original, dangling as soon as
-    /// the source dies. Hence move-only.
+    // view.content is a span into this entry's own raw buffer, so the two must
+    // travel together. Moving is safe - vector's move steals the buffer, so the
+    // span keeps pointing at live bytes - but copying would allocate a fresh
+    // buffer and leave view.content aliasing the original, dangling as soon as
+    // the source dies. Hence move-only.
     struct AssetCacheEntry
     {
         AssetCacheEntry(std::vector<std::byte> rawBytes, AssetBlobView blobView)

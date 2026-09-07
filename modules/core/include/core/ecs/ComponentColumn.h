@@ -48,7 +48,7 @@ namespace mir
 
         // component of row's entity
         // casting to T should be done outside of this class
-        void *At(uint32_t row)
+        void *GetComponent(uint32_t row)
         {
             MIR_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
             return mBytes.data() + static_cast<std::size_t>(row) * mElementSize;
@@ -56,7 +56,7 @@ namespace mir
 
         // component of row's entity
         // casting to T should be done outside of this class
-        const void *At(uint32_t row) const
+        const void *GetComponent(uint32_t row) const
         {
             MIR_ASSERT(row < Count(), "ComponentColumn::At: row {} out of range ({})", row, Count());
             return mBytes.data() + static_cast<std::size_t>(row) * mElementSize;
@@ -74,7 +74,7 @@ namespace mir
         uint32_t PushBackFrom(const void *value)
         {
             const uint32_t row = PushBackUninitialized();
-            std::memcpy(At(row), value, mElementSize);
+            std::memcpy(GetComponent(row), value, mElementSize);
             return row;
         }
 
@@ -85,7 +85,7 @@ namespace mir
 
             const uint32_t lastRow = Count() - 1;
             if (row != lastRow)
-                std::memcpy(At(row), At(lastRow), mElementSize);
+                std::memcpy(GetComponent(row), GetComponent(lastRow), mElementSize);
 
             mBytes.resize(mBytes.size() - mElementSize);
         }

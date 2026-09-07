@@ -4,6 +4,6 @@
 
 namespace mir
 {
-    /// Registers the Entity usertype
+    // Registers the Entity usertype
     void RegisterEntityBindings(sol::state &lua);
 }

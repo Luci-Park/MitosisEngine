@@ -1,7 +1,7 @@
 /**
  * @file ComponentRegistry.cpp
  * @author Sumin Park
- * @brief Name -> component operations, for callers that have no C++ type
+ * @brief Bridge between string -> component operations, for scripting
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -25,12 +25,6 @@ namespace mir
             return (n + alignment - 1) & ~(alignment - 1);
         }
 
-        // -- the erased operations, shared by every script-declared component --
-        //
-        // One set of functions for all of them, rather than one instantiation
-        // per type: everything that varies is already in the ComponentOps they
-        // are handed.
-
         void *RuntimeGet(const ComponentOps &ops, World &world, Entity entity)
         {
             return world.GetRaw(entity, ops.mType);
@@ -46,9 +40,7 @@ namespace mir
             if (!world.IsAlive(entity))
                 return;
 
-            if (void *existing = world.GetRaw(entity, ops.mType))
-                std::memcpy(existing, value, ops.mSize);
-            else
+            if (!world.HasRaw(entity, ops.mType))
                 world.AddRaw(entity, ops.mType, ops.mSize, ops.mAlign, value);
         }
 
@@ -68,8 +60,7 @@ namespace mir
             commands.RemoveRaw(entity, ops.mType);
         }
 
-        /// Whether a re-declaration describes the same component. Names and
-        /// kinds in order, because the offsets are derived from exactly that.
+        // Whether a re-declaration describes the same component in same structure
         bool SameLayout(const ComponentOps &existing, std::span<const RuntimeFieldDecl> fields)
         {
             if (existing.mFields.size() != fields.size())
@@ -102,10 +93,6 @@ namespace mir
         if (it == mByHash.end())
             return nullptr;
 
-        // The debug-only check in TypeIdOf is not enough any more: a name can
-        // now arrive from a data file, so a collision is a shipping-build data
-        // bug and silently aliasing two components would be far worse than
-        // stopping.
         MIR_CHECK(it->second->mType.name == name,
                   "ComponentRegistry: name hash collision - \"{}\" and \"{}\" both hash to {}; "
                   "component names must be globally unique",
@@ -136,34 +123,19 @@ namespace mir
                       "components before loading any script.",
                       ops.mType.name);
 
-            // MIR_CHECK, not MIR_ASSERT. TypeId::name is the *bare* name -
-            // BareNameOffset strips the namespace - so a::Foo and b::Foo carry
-            // the same name and the same hash, and sail through FindChecked's
-            // name comparison. Compiled out, this would hand the second
-            // registration the first one's entry, whose thunks are instantiated
-            // for the wrong type: mAddCopy calls AddComponent<a::Foo> and the
-            // field thunks static_cast bytes that are really a b::Foo. Silent
-            // type confusion is not something to leave to Debug.
             MIR_CHECK(existing->mType.seq == ops.mType.seq && existing->mSize == ops.mSize,
                       "ComponentRegistry: two different components are both named \"{}\". TypeId hashes "
                       "the bare name, so component names must be unique across namespaces.",
                       ops.mType.name);
 
             // A registration that arrives with a field table wins over one that
-            // did not have it. Registration is idempotent by design, so the
-            // order two callers happen to run in should not decide whether a
-            // component's values are reachable by name - and silently having no
-            // fields is a failure with nothing to notice it by. Two *different*
-            // non-empty tables is a real disagreement.
+            // did not have it.
             if (existing->mFields.empty())
             {
                 existing->mFields = ops.mFields;
             }
             else
             {
-                // Also MIR_CHECK: whichever call ran first would otherwise win
-                // silently, which is the same "failure with nothing to notice it
-                // by" the paragraph above argues against.
                 MIR_CHECK(ops.mFields.empty() || ops.mFields.data() == existing->mFields.data(),
                           "ComponentRegistry: \"{}\" registered twice with different field tables",
                           ops.mType.name);
@@ -177,15 +149,9 @@ namespace mir
                   "Raise kMaxComponentTypes in Signature.h.",
                   ops.mType.name, ops.mType.seq, kMaxComponentTypes);
 
-        // Published before the entry is reachable, so no erased caller can hold
-        // this TypeId before the mask knows what it is. This is the only place
-        // storage kind and seq are both in hand for a type someone may later
-        // name at runtime.
-        if (ops.mStorage == StorageKind::SparseSet)
-            NoteSparseComponentSeq(ops.mType.seq);
-
         mDefaultValues.emplace_back(ops.mSize);
-        std::memcpy(mDefaultValues.back().data(), defaultValue, ops.mSize);
+        if (ops.mSize != 0)
+            std::memcpy(mDefaultValues.back().data(), defaultValue, ops.mSize);
 
         mOps.push_back(ops);
         ComponentOps *stored = &mOps.back();
@@ -208,9 +174,6 @@ namespace mir
             MIR_CHECK(existing->mRuntime,
                       "ComponentRegistry: \"{}\" is a C++ component; a script may not redeclare it", name);
 
-            // The hot-reload path. Same fields means the same layout, so every
-            // archetype already built out of this component still means what it
-            // meant and the reload is free.
             MIR_CHECK(SameLayout(*existing, fields),
                       "ComponentRegistry: \"{}\" is already declared with a different field list. "
                       "Live archetypes hold rows of the old layout, and migrating them is not "
@@ -219,10 +182,7 @@ namespace mir
             return *existing;
         }
 
-        // Fields are laid out in declaration order rather than sorted by
-        // alignment: a script author can predict the result, and the padding a
-        // reorder would save is not worth a layout that changes when a field is
-        // renamed.
+        // declaration order rather than sorted by alignment
         std::vector<FieldDesc> descs;
         descs.reserve(fields.size());
 
@@ -245,28 +205,22 @@ namespace mir
             desc.mName = Intern(decl.mName);
             desc.mKind = decl.mKind;
             desc.mOffset = offset;
-            // mGet and mSet stay null: a script component is plain data with no
-            // invariant to protect, so a memcpy at the offset is both correct
-            // and the cheapest thing available
             descs.push_back(desc);
 
             offset += FieldSize(decl.mKind);
             maxAlign = std::max(maxAlign, align);
         }
 
-        // A fieldless tag still needs one byte: ComponentColumn::Count divides
-        // the byte count by the element size.
-        const uint32_t size = std::max(AlignUp(offset, maxAlign), 1u);
+        // set tag to zero unless it was an EntityRef
+        const bool tag = fields.empty();
+        const uint32_t size = tag ? 0 : AlignUp(offset, maxAlign);
+        const uint32_t align = tag ? 0 : maxAlign;
 
         const uint32_t seq = SeqForHash(hash, name);
 
         mRuntimeFields.push_back(std::move(descs));
         mDefaultValues.emplace_back(size); // value-initialised: a script component defaults to zeroes
 
-        // ...except EntityRef, whose "unset" value is kNullEntity, not zero
-        // bytes. Entity's null sentinel is mIndex == UINT32_MAX (Entity.h), so
-        // a zeroed field reads back as a handle to slot 0 generation 0 - a
-        // reference that looks live instead of one that looks unset.
         for (const FieldDesc &desc : mRuntimeFields.back())
         {
             if (desc.mKind == FieldKind::EntityRef)
@@ -276,8 +230,7 @@ namespace mir
         ComponentOps ops{};
         ops.mType = TypeId{seq, hash, Intern(name)};
         ops.mSize = size;
-        ops.mAlign = maxAlign;
-        ops.mStorage = StorageKind::Table;
+        ops.mAlign = align;
         ops.mRuntime = true;
         ops.mGet = &RuntimeGet;
         ops.mHas = &RuntimeHas;
@@ -300,8 +253,6 @@ namespace mir
     {
         const ComponentOps *ops = FindByHash(Fnv1a32(name));
 
-        // a colliding name reports "no such component" rather than handing back
-        // the wrong one; RegisterRuntime is where a collision stops the process
         return (ops != nullptr && ops->mType.name == name) ? ops : nullptr;
     }
 

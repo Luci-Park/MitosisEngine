@@ -48,8 +48,8 @@ The rename is applied but not committed.
 
 - Components are POD. `MIR_ASSERT_COMPONENT(T)` next to the declaration.
 - Component names must be globally unique - `TypeIdOf` hashes the bare name.
-- `MIR_COMPONENT_SPARSE(T)` for churny components, outside any namespace, same
-  header as the component.
+- A component with no fields is a tag. Add it with `AddTag<T>`, filter on it
+  with `With`/`Without`/`Or`, never name it as a query data term.
 - Never add, remove or destroy while iterating. Use the `CommandBuffer`.
 - Systems cache queries in `OnStart`.
 - Ordering between systems is a phase, never registration order.
@@ -87,6 +87,12 @@ Everything through `vcpkg.json`; nothing vendored or fetched at build time. Link
 `PRIVATE` unless a type appears in a public header, and say why in a comment.
 
 The one exception is `third_party/imgui`, a git submodule.
+
+## Comments
+
+Plain `//` only, for everything - doc comment or inline note. No `///`: we
+don't run Doxygen, and IDE hover shows `//` the same as `///`, so the split
+buys nothing and just drifts inconsistent.
 
 ## Tests
 

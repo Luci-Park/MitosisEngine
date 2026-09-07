@@ -89,17 +89,12 @@ namespace mir
         // defers structural change
         mWorld.EmplaceResource<FrameCommands>(FrameCommands{&mCommands});
 
-        // Scripts read this frame's settled state (last frame's PostUpdate/
-        // Render already ran) and anything they spawn or mutate is visible to
-        // this frame's later phases as soon as PreUpdate's boundary flushes.
-        mScheduler.Add<ScriptSystem>(SystemPhase::PreUpdate, mScriptHost);
+        mScheduler.AddSystem<ScriptSystem>(SystemPhase::PreUpdate, mScriptHost);
 
         // should be before any other system in PostUpdate
-        mScheduler.Add<TransformPropagateSystem>(SystemPhase::PostUpdate);
+        mScheduler.AddSystem<TransformPropagateSystem>(SystemPhase::PostUpdate);
 
-        // Render runs after PostUpdate, so every WorldTransform it reads is
-        // already current for this frame - see RenderSystem's own comment.
-        mScheduler.Add<RenderSystem>(SystemPhase::Render, mRenderer);
+        mScheduler.AddSystem<RenderSystem>(SystemPhase::Render, mRenderer);
 
         mSplash.SetProgress("Loading scene...", 0.9f);
         mScene = mir::NewScene("untitled");
@@ -122,10 +117,7 @@ namespace mir
 
     bool App::LoadScene()
     {
-        // Checked here, not left to LoadScene: this must not touch mWorld or
-        // mScene at all when there is nothing to load, so a Load click with
-        // mSceneDir pointing nowhere leaves the current scene exactly as it
-        // was rather than replacing it with an empty one.
+        // scene hardcoded at the moment
         if (!std::filesystem::exists(mDesc.mSceneDir / "scene.json"))
         {
             MIR_LOG_ERROR("App::LoadScene: no scene.json in '{}'", mDesc.mSceneDir.string());
@@ -207,9 +199,6 @@ namespace mir
                 }
             }
 
-            // RenderSystem calls VulkanRenderer::DrawFrame from inside
-            // Update (SystemPhase::Render), so this frame's draw data has to
-            // be handed to the renderer before Update runs, not after.
             mRenderer.SetImGuiDrawData(mEditor.EndFrame());
             mRenderer.SetSceneViewport(mEditor.SceneViewportRect());
 
@@ -233,26 +222,16 @@ namespace mir
         SystemContext stopContext = MakeContext(0.0f);
         mScheduler.Stop(stopContext);
 
-        // Dropped, not kept: Initialize may run again (see below), and it
-        // registers TransformPropagateSystem unconditionally. Keeping the old
-        // list would run a second copy of it, and of every game system, on
-        // every frame of the next session.
         mScheduler.Reset();
 
-        // Cache before manifest: the cache points at the manifest, and Initialize
-        // may be called again afterwards. Leaving the cache engaged over a
-        // destroyed manifest would leave a dangling pointer behind.
+        // Cache before manifest
         mAssetCache.reset();
         mAssetManifest.reset();
         mAssetLoadFailed = false;
 
-        // Reverse of Initialize: Editor's Vulkan backend needs mDevice still
-        // alive, so it goes before mRenderer.Shutdown(); its GLFW backend
-        // needs mWindow still alive, so it goes before mWindow.reset().
         mEditor.Shutdown(mRenderer);
 
         mRenderer.Shutdown();
-        // Renderer holds the surface built from the window: window dies last.
         mWindow.reset();
         mInitialized = false;
         MIR_LOG_INFO("App shut down");

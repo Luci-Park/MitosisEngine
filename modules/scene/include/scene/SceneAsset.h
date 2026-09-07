@@ -28,8 +28,8 @@ namespace mir
      */
     using StableId = uint64_t;
 
-    /// The "no entity" value for a StableId field - an unset parent, or an
-    /// EntityRef that was null (or pointed outside the scene) when saved.
+    // The "no entity" value for a StableId field - an unset parent, or an
+    // EntityRef that was null (or pointed outside the scene) when saved.
     inline constexpr StableId kNullStableId = 0;
 
     /**
@@ -53,17 +53,17 @@ namespace mir
         std::string mName;
         std::map<StableId, Entity> mEntities;
 
-        /// High-water mark: the next id AllocateStableId hands out. Persisted
-        /// in scene.json across saves so a deleted entity's id is never
-        /// reissued, even though it no longer appears in mEntities - a stale
-        /// reference to it elsewhere (an EntityRef in another entity file that
-        /// hasn't been resaved yet) must resolve to "gone", never to whatever
-        /// new entity happens to reuse the id.
+        // High-water mark: the next id AllocateStableId hands out. Persisted
+        // in scene.json across saves so a deleted entity's id is never
+        // reissued, even though it no longer appears in mEntities - a stale
+        // reference to it elsewhere (an EntityRef in another entity file that
+        // hasn't been resaved yet) must resolve to "gone", never to whatever
+        // new entity happens to reuse the id.
         StableId mNextId = 1;
     };
 
-    /// An empty scene ready for authoring - AllocateStableId/CreateSceneEntity
-    /// then SaveScene. Not backed by any file until the first save.
+    // An empty scene ready for authoring - AllocateStableId/CreateSceneEntity
+    // then SaveScene. Not backed by any file until the first save.
     inline LoadedScene NewScene(std::string name)
     {
         LoadedScene scene;
@@ -71,9 +71,9 @@ namespace mir
         return scene;
     }
 
-    /// A fresh id for `scene`, bumping its high-water mark so it is never
-    /// handed out again - not by this scene, even if the entity holding it is
-    /// later deleted.
+    // A fresh id for `scene`, bumping its high-water mark so it is never
+    // handed out again - not by this scene, even if the entity holding it is
+    // later deleted.
     inline StableId AllocateStableId(LoadedScene &scene) { return scene.mNextId++; }
 
     /**

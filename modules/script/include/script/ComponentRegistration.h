@@ -10,10 +10,10 @@
 
 namespace mir
 {
-    /// Mirrors core::RegisterCoreComponents / RegisterRendererComponents - core
-    /// cannot name ScriptRef, so script registers its own. Must run before any
-    /// scene is loaded (SceneIO looks ScriptRef up by name through the
-    /// registry), same ordering requirement as the other two calls - see
-    /// App::Initialize.
+    // Mirrors core::RegisterCoreComponents / RegisterRendererComponents - core
+    // cannot name ScriptRef, so script registers its own. Must run before any
+    // scene is loaded (SceneIO looks ScriptRef up by name through the
+    // registry), same ordering requirement as the other two calls - see
+    // App::Initialize.
     void RegisterScriptComponents();
 }

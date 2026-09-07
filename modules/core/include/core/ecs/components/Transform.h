@@ -18,22 +18,6 @@
 
 namespace mir
 {
-    /**
-     * The transform a game *writes*. Stored as TRS rather than a mat4 because
-     * TRS is what gameplay edits, is smaller, and cannot drift into a
-     * non-affine or sheared state the way a hand-edited matrix can.
-     *
-     * Members are private and reached through mutators only so that Version()
-     * cannot fall behind the data. World::Get<T> hands out a raw T*, so there
-     * is no hook on the ECS side to stamp a write - the component is the last
-     * place the invariant can be enforced rather than remembered. That version
-     * is what lets WorldTransform detect staleness in O(1) instead of the
-     * parent having to dirty its whole subtree.
-     *
-     * Still trivially copyable and standard layout: all members share one
-     * access level, and copy/move/destroy stay defaulted, so ComponentColumn
-     * may keep relocating rows with memcpy.
-     */
     class Transform
     {
     public:
@@ -50,7 +34,7 @@ namespace mir
         const glm::quat &Rotation() const { return mRotation; }
         const glm::vec3 &Scale() const { return mScale; }
 
-        /// Bumped on every mutation. Never 0, so 0 can mean "no such transform".
+        // Bumped on every mutation. Never 0, so 0 can mean "no such transform".
         uint32_t Version() const { return mVersion; }
 
         void SetPosition(const glm::vec3 &position)
@@ -77,20 +61,16 @@ namespace mir
             Touch();
         }
 
-        /// Applies `delta` on top of the current rotation, in local space.
+        // Applies `delta` on top of the current rotation, in local space.
         void Rotate(const glm::quat &delta)
         {
             mRotation = glm::normalize(mRotation * delta);
             Touch();
         }
 
-        /// Column-major TRS: translate * rotate * scale, applied right to left.
+        // Column-major TRS: translate * rotate * scale, applied right to left.
         glm::mat4 Matrix() const
         {
-            // mat4_cast builds the rotation basis, then each basis column is
-            // scaled in place. Cheaper than mat4(1) * translate * rotate *
-            // scale, which would be three full 4x4 multiplies for a result
-            // whose bottom row is always (0,0,0,1).
             glm::mat4 m = glm::mat4_cast(mRotation);
             m[0] *= mScale.x;
             m[1] *= mScale.y;
@@ -108,25 +88,15 @@ namespace mir
         }
 
         glm::vec3 mPosition{0.0f};
-        glm::quat mRotation{1.0f, 0.0f, 0.0f, 0.0f}; ///< w, x, y, z - identity
+        glm::quat mRotation{1.0f, 0.0f, 0.0f, 0.0f}; // w, x, y, z - identity
         glm::vec3 mScale{1.0f};
         uint32_t mVersion = 1;
     };
 
     MIR_ASSERT_COMPONENT(Transform);
 
-    /**
-     * Transform as a script or an inspector sees it.
-     *
-     * Accessor thunks, not offsets, and that is the entire point of FieldDesc
-     * carrying thunks at all. The members are private so Version() cannot fall
-     * behind the data, and WorldTransform detects staleness in O(1) off that
-     * version. A generic offset write to mPosition would move the object and
-     * leave mVersion untouched, so every world matrix downstream would keep
-     * rebuilding from a version it still considers current - no crash, no
-     * assert, just a frame drawn in the old place. Routing through SetPosition
-     * keeps the invariant where the class enforces it.
-     */
+    // Transform as a script or inspector sees it
+    // Accessor thunks
     inline constexpr FieldDesc kTransformFields[] = {
         {"position", FieldKind::Vec3, 0,
          [](const void *component, void *out)
@@ -147,6 +117,3 @@ namespace mir
          { static_cast<Transform *>(component)->SetScale(*static_cast<const glm::vec3 *>(in)); }},
     };
 }
-
-// Storage is left at the Table default: a transform is dense - most entities
-// have one and systems sweep every row - which is the case tables are for.

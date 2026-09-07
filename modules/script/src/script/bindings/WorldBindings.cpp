@@ -22,8 +22,8 @@ namespace mir
 {
     namespace
     {
-        /// Mirrors FieldKind::Handle's layout ({index, generation}, 8 bytes) -
-        /// core never names what a Handle points at, so neither does this.
+        // Mirrors FieldKind::Handle's layout ({index, generation}, 8 bytes) -
+        // core never names what a Handle points at, so neither does this.
         struct RawHandle
         {
             uint32_t index = 0;
@@ -176,7 +176,7 @@ namespace mir
                     return false;
                 const sol::table t = value.as<sol::table>();
                 scratch.asVec4 = glm::vec4(t.get_or("x", 0.0f), t.get_or("y", 0.0f), t.get_or("z", 0.0f),
-                                            t.get_or("w", 0.0f));
+                                           t.get_or("w", 0.0f));
                 return true;
             }
             case FieldKind::Quat:
@@ -185,7 +185,7 @@ namespace mir
                     return false;
                 const sol::table t = value.as<sol::table>();
                 scratch.asQuat = glm::quat(t.get_or("w", 1.0f), t.get_or("x", 0.0f), t.get_or("y", 0.0f),
-                                            t.get_or("z", 0.0f));
+                                           t.get_or("z", 0.0f));
                 return true;
             }
             case FieldKind::Mat4:
@@ -284,7 +284,7 @@ namespace mir
                 return sol::nil;
             }
 
-            void *component = ops->Get(world, entity);
+            void *component = ops->GetComponent(world, entity);
             if (component == nullptr)
                 return sol::nil;
 
@@ -304,7 +304,7 @@ namespace mir
                 return false;
             }
 
-            void *component = ops->Get(world, entity);
+            void *component = ops->GetComponent(world, entity);
             if (component == nullptr)
                 return false; // dead entity or missing component - routine, not an error
 
@@ -422,6 +422,12 @@ namespace mir
                     MIR_LOG_ERROR("script: world:each unknown component '{}'", name);
                     return;
                 }
+                if (ops->mSize == 0)
+                {
+                    MIR_LOG_ERROR("script: world:each - '{}' is a tag and has no value to hand back", name);
+                    return;
+                }
+
                 termOps.push_back(ops);
 
                 if (!cacheKey.empty())
@@ -540,14 +546,14 @@ namespace mir
     void RegisterWorldBindings(sol::state &lua)
     {
         lua.new_usertype<World>("World",
-                                 "has", &WorldHas,
-                                 "get", &WorldGet,
-                                 "set", &WorldSet,
-                                 "spawn", &WorldSpawn,
-                                 "destroy", &WorldDestroy,
-                                 "add", &WorldAdd,
-                                 "remove", &WorldRemove,
-                                 "each", &WorldEach,
-                                 "declare", &WorldDeclare);
+                                "has", &WorldHas,
+                                "get", &WorldGet,
+                                "set", &WorldSet,
+                                "spawn", &WorldSpawn,
+                                "destroy", &WorldDestroy,
+                                "add", &WorldAdd,
+                                "remove", &WorldRemove,
+                                "each", &WorldEach,
+                                "declare", &WorldDeclare);
     }
 }

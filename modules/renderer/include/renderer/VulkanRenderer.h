@@ -36,21 +36,21 @@ namespace mir
         bool enableValidation;
     };
 
-    /// One draw call's worth of data, built by RenderSystem from a
-    /// WorldTransform + MeshRenderer pair.
+    // One draw call's worth of data, built by RenderSystem from a
+    // WorldTransform + MeshRenderer pair
     struct DrawItem
     {
         MeshHandle mesh;
 
-        /// model * view projection
+        // model * view projection
         glm::mat4 model{1.0f};
 
-        /// transpose(inverse(mat3(model)))
+        // transpose(inverse(mat3(model)))
         glm::mat3 normalMatrix{1.0f};
 
         glm::vec4 tint{1.0f, 1.0f, 1.0f, 1.0f};
 
-        /// kNullMaterial means "use the renderer's default material".
+        // kNullMaterial means "use the renderer's default material".
         MaterialHandle material;
     };
 
@@ -63,12 +63,10 @@ namespace mir
         bool InitImGuiVulkanBackend();
         void ShutdownImGuiVulkanBackend();
 
-        /// RenderSystem drives DrawFrame from SystemPhase::Render and has no
-        /// reason to know ImGui exists, so App feeds this frame's draw data in
-        /// separately, before the scheduler update that reaches DrawFrame.
+        // abstraction from imgui
         void SetImGuiDrawData(ImDrawData *drawData) { mImguiDrawData = drawData; }
 
-        /// Viewport/scissor rect (window pixels) the scene pass is clipped to
+        // Viewport/scissor rect (window pixels) the scene pass is clipped to
         void SetSceneViewport(VkRect2D rect) { mSceneViewportRect = rect; }
 
         // Uploads geometry and returns a handle to it.
@@ -76,12 +74,12 @@ namespace mir
         MeshHandle CreateMesh(std::span<const Vertex> vertices,
                               std::span<const uint32_t> indices);
 
-        /// Handle of a pipeline
-        /// kNullMaterial means default material
+        // Handle of a pipeline
+        // kNullMaterial means default material
         MaterialHandle CreateMaterial(const MaterialDesc &desc);
 
-        /// Width/height of whatever the scene actually renders into: the
-        /// editor viewport once one is set, else the full swapchain.
+        // Width/height of whatever the scene actually renders into: the
+        // editor viewport once one is set, else the full swapchain.
         float AspectRatio() const
         {
             const VkExtent2D extent = HasSceneViewport()
@@ -123,7 +121,7 @@ namespace mir
         bool CreateRenderCompleteSemaphores();
         void DestroyRenderCompleteSemaphores();
         bool CreatePipelineLayout();
-        /// Builds one VkPipeline from a desc.
+        // Builds one VkPipeline from a desc.
         VkPipeline BuildPipeline(const MaterialDesc &desc);
         void DestroyMeshes();
         void DestroyMaterials();
@@ -178,8 +176,8 @@ namespace mir
         // dont start at 0 or 1 or else underflows
         uint64_t mNextSignalValue = kFramesInFlight + 1;
 
-        /// Shared among materials as all inputs are shaped the same
-        /// = DrawItem + Vertex format
+        // Shared among materials as all inputs are shaped the same
+        // = DrawItem + Vertex format
         VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
 
         // One buffer pair per mesh

@@ -19,8 +19,8 @@ namespace mir
     template <typename... Ts>
     class Query;
 
-    // filter terms: type-only carriers, passed as empty instances so the
-    // pack can be deduced from a call argument list
+    // distingushed by type so can be empty structs
+
     template <typename... Es>
     struct With
     {
@@ -42,7 +42,7 @@ namespace mir
         template <typename T>
         using Bare = std::remove_const_t<T>;
 
-        // groups the data terms so a query key can never be mistaken for a filter pack
+        // groups the data terms, distinguishes it from filters
         template <typename... Ts>
         struct TypeList
         {
@@ -60,21 +60,12 @@ namespace mir
             return counter.fetch_add(1, std::memory_order_relaxed);
         }
 
-        // distinct integer per Component + Filter<Component> combinations
+        // distinct id per component + filter combination
         template <typename... Key>
         uint32_t QueryKeyOf()
         {
             static const uint32_t id = NextQueryKey();
             return id;
         }
-
-        // a sparse filter member is erased at Query construction (filters are not
-        // Query's template parameters), so the Has() call is bound through a thunk
-        struct SparseFilterCheck
-        {
-            bool (*has)(const void *storage, Entity entity);
-            const void *storage;
-            bool wantPresent; // With -> must be present, Without -> must be absent
-        };
     }
 }
