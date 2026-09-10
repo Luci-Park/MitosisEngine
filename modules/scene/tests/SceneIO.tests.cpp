@@ -1,7 +1,7 @@
 /**
  * @file SceneIO.tests.cpp
  * @author Sumin Park
- * @brief Round-trip tests for scene save/load and StableId authoring (0030, 0031).
+ * @brief Round-trip tests for scene save/load and StableId authoring.
  *
  * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
  *
@@ -111,7 +111,7 @@ TEST_CASE("SaveScene writes a clean decimal for a float that isn't exactly repre
     // 1.8f promoted straight to double and printed at double precision reads
     // as 1.7999999523162842 - exactly what CleanFloat exists to avoid, since
     // every re-save would otherwise jitter a value that never actually
-    // changed, defeating the diff-friendliness the per-entity split (0030)
+    // changed, defeating the diff-friendliness the per-entity split
     // is for.
     CHECK(text.find("1.7999999") == std::string::npos);
     CHECK(text.find("1.8") != std::string::npos);
@@ -243,7 +243,7 @@ TEST_CASE("UnloadScene destroys exactly the entities it loaded", "[scene]")
     mir::UnloadScene(world, loaded);
 
     CHECK_FALSE(world.IsAlive(loaded.mEntities.at(1)));
-    CHECK_FALSE(world.IsAlive(loaded.mEntities.at(2))); // cascaded via parent destroy (0020)
+    CHECK_FALSE(world.IsAlive(loaded.mEntities.at(2))); // cascaded via parent destroy
     CHECK(world.IsAlive(outsider));
 }
 

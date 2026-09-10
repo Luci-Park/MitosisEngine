@@ -1,262 +1,260 @@
 # core
 
-- **Maintainer:** Sumin Park
-- **Depends on:** nothing in the engine; `spdlog` privately
-- **Public API:** `modules/core/include/core/`
-- **Last reviewed:** 2026-09-01
+The ECS, logging and asserts, executable-relative paths, and the surface contract
+between a window and a renderer. It knows nothing about windows, graphics APIs or
+assets, and has to stay that way.
 
-Also the worked example for [the template](TEMPLATE.md) - aim for this depth.
+`mir::core` · depends nothing engine-side; `glm` (public, in component headers), `spdlog` (private) · API `modules/core/include/core/` · maintainer Sumin Park · reviewed 2026-09-06
 
-## Purpose
+## Model
 
-Everything the rest of the engine may depend on: the ECS, logging and assertions,
-executable-relative paths, and the surface contract between a window and a
-renderer. It knows nothing about windows, graphics APIs or assets, and must stay
-that way.
+Four pieces share one library because they share one property: no engine
+dependencies.
 
-## Mental model
-
-Four independent pieces sharing one library because they share one property - no
-engine dependencies.
-
-- `ecs/` - world, entities, components, systems. By far the largest part.
-- `log/` - logging and asserts without exposing a logging library.
-- `fs/` - paths resolved against the executable, not the working directory.
-- `platform/` - `ISurfaceProvider`, so a renderer can take a drawing surface from
-  something without knowing it is a window.
-
-## Key types
-
-| Type | Header | Role |
-|---|---|---|
-| `Entity` | `ecs/Entity.h` | `{index, generation}` handle, 8 bytes |
-| `EntityPool` | `ecs/EntityPool.h` | Allocates and recycles slots, bumps generations |
-| `TypeId` | `ecs/TypeId.h` | Per-type `{seq, hash, name}` |
-| `Signature` | `ecs/Signature.h` | 256-bit component set, the archetype key |
-| `ComponentColumn` | `ecs/ComponentColumn.h` | One type's data in one archetype |
-| `Archetype` | `ecs/Archetype.h` | Rows of entities sharing a signature |
-| `World` | `ecs/World.h` | Owns entities, archetypes, resources |
-| `HierarchyIndex` | `ecs/HierarchyIndex.h` | The scene graph, held as a resource |
-| `Transform` | `ecs/components/Transform.h` | Authored local TRS, versioned on write |
-| `WorldTransform` | `ecs/components/WorldTransform.h` | Derived world matrix plus staleness stamps |
-| `Query<Ts...>` | `ecs/Query.h` | Cached view over matching archetypes |
-| `RuntimeQuery` | `ecs/RuntimeQuery.h` | The same walk for terms known only at runtime |
-| `ComponentRegistry` | `ecs/ComponentRegistry.h` | Name -> `ComponentOps`, for callers with no C++ type |
-| `FieldDesc` | `ecs/ComponentFields.h` | One named, typed value inside a component |
-| `FrameCommands` | `ecs/DeferredAccess.h` | The frame's `CommandBuffer`, published as a resource |
-| `CommandBuffer` | `ecs/CommandBuffer.h` | Deferred structural changes |
-| `ISystem`, `SystemContext` | `ecs/System.h` | Per-frame work and its inputs |
-| `SystemScheduler` | `ecs/SystemScheduler.h` | Owns systems, runs them by phase |
-| `ISurfaceProvider` | `platform/Surface.h` | Native handle plus dimensions |
-
-### Type identity
-
-`TypeIdOf<T>()` gives `seq` (process-local, used for bit positions and indices),
-`hash` (FNV-1a of the name, stable across runs, for serialisation) and `name`
-(logs, future editor).
-
-The name is extracted from `__FUNCSIG__` or `__PRETTY_FUNCTION__` at compile time
-and normalised - keywords stripped, spaces collapsed, namespaces removed - so
-every compiler produces the same string. Because namespaces are stripped,
-**component names must be globally unique**; a Debug registry asserts on a
-collision and names both offenders.
+`ecs/` is by far the largest. `log/` gives logging and asserts without putting a
+logging library in a public header. `fs/` resolves paths against the executable
+rather than the working directory, so a copied build tree still runs.
+`platform/` declares `ISurfaceProvider`, which lets a renderer take a drawing
+surface from something without knowing that it is a window.
 
 ### Storage
 
-**One model.** Entities with the same component set share an `Archetype`
-holding one `ComponentColumn` per type. Add or remove computes a new signature,
-finds or creates that archetype, and moves the row - a `memcpy` per column, which
-is why components are POD. Removing swaps the last row into the hole and fixes up
-the moved entity's record.
+Storage is archetype tables, and only that.
 
-**Tags.** A component with no fields gets a signature bit and no column at all -
-nothing is stored per row, so `AddTag<T>` only moves the entity to the archetype
-carrying that bit. It has no bytes to read, so it filters (`With`, `Without`,
-`Or`) rather than appearing as a query term, and `ComponentOps::mSize` is 0,
-which is how the erased paths recognise one.
+Entities with the same component set share an `Archetype`, which holds one
+`ComponentColumn` per type. Adding or removing a component computes a new
+signature, finds or creates the archetype for it, and moves the row. That move is
+a `memcpy` per column, which is why components are POD. Removing a row swaps the
+last row into the hole it left.
 
-#### Resources
+A component with no fields is a **tag**. It gets a signature bit and no column at
+all, so `AddTag<T>` only moves the entity into the archetype carrying that bit.
 
-State that belongs to a world but not to an entity - the scene graph, a camera,
-an asset cache, a script VM - lives in `World` keyed by type:
+### Resources
+
+Some state belongs to a world but not to any entity — the scene graph, a camera,
+an asset cache, a script VM. That state lives in `World`, keyed by type.
+
+Resources are not components and carry none of the POD constraints. Nothing ever
+relocates one, so a resource may own heap memory and have a destructor.
 
 ```cpp
 world.EmplaceResource<HierarchyIndex>();
 HierarchyIndex *index = world.TryResource<HierarchyIndex>();
 ```
 
-Resources are not components and carry none of the POD constraints: nothing
-relocates one, so they may own heap memory and have destructors. They are
-invisible to queries and have no per-entity form.
+### Access by name
 
-## Queries
+Some callers have a name rather than a type — a script binding, an inspector, a
+deserializer. Those go through `ComponentRegistry::Instance()`.
 
-`GetOrCreateQuery<Ts...>(filters...)` returns a cached `Query&` that resolves
-matching archetypes and re-resolves when `World::Generation()` changes. Filters
-are `With`, `Without`, `Or`; each `Or` is its own clause, ORed within, and a tag
-is a member like any other because it has a bit. `ForEach` passes
-`(Entity, Ts&...)`, with `const T` arriving as `const T&`.
+The registry maps a name to a `ComponentOps`, which carries get, has, add,
+remove and the two deferred forms, and to a `FieldDesc` table for named values.
 
-`RuntimeQuery` is the same walk for terms that are only `TypeId`s at runtime. It
-shares `detail::ArchetypeMatcher` with `Query`, so the match test and the cache
-rule have one implementation, and it hands the callback
-`(Entity, std::span<void *const>)` - one pointer per term, valid for that call
-only. Every term must be a registered table component. Unlike `Query`, the caller
-owns it.
-
-## Erased access
-
-For a caller that has a name rather than a type - a script binding, an editor
-inspector, a deserializer. `ComponentRegistry::Instance()` maps a name to
-`ComponentOps`, whose operations are total on a stale handle, and to a
-`FieldDesc` table for named values.
-
-```cpp
-const ComponentOps *ops = ComponentRegistry::Instance().Find("Transform");
-if (ops == nullptr)
-    return;                                       // a script named something we do not have
-
-// Immediate outside a walk, recorded into the frame's CommandBuffer inside one.
-// The binding cannot know which it is in; World::IsIterating can.
-AddDefaultComponentOrDefer(world, entity, *ops);
-
-if (void *component = ops->Get(world, entity))
-{
-    const FieldDesc *position = ops->FindField("position");
-    const glm::vec3 target{1.0f, 0.0f, 0.0f};
-    position->Write(component, &target);           // through SetPosition, so the version moves
-}
-```
-
-A script declares its own component the same way, and it lands in the same
-archetype tables:
+A script declares its own component through the same registry, and it lands in
+the same archetype tables as a C++ one:
 
 ```cpp
 constexpr RuntimeFieldDecl fields[] = {{"hp", FieldKind::Int}, {"speed", FieldKind::Float}};
 const ComponentOps &health = ComponentRegistry::Instance().RegisterRuntime("Health", fields);
 ```
 
-## Usage
+## API
 
-```cpp
-class MovementSystem final : public ISystem
-{
-public:
-    void OnStart(SystemContext &context) override
-    {
-        mQuery = &context.world.GetOrCreateQuery<Position, const Velocity>();
-    }
+| Type | Header | Role |
+|---|---|---|
+| `Entity` | `ecs/Entity.h` | `{index, generation}` handle, 8 bytes |
+| `TypeId` | `ecs/TypeId.h` | Per-type `{seq, hash, name}` |
+| `Signature` | `ecs/Signature.h` | 256-bit component set, the archetype key |
+| `Archetype`, `ComponentColumn` | `ecs/Archetype.h` | Rows sharing a signature; one type's data in one |
+| `World` | `ecs/World.h` | Owns entities, archetypes, resources |
+| `HierarchyIndex` | `ecs/HierarchyIndex.h` | The scene graph, held as a resource |
+| `Transform`, `WorldTransform` | `ecs/components/` | Authored local TRS; derived world matrix plus staleness stamps |
+| `Query<Ts...>` | `ecs/Query.h` | Cached view over matching archetypes |
+| `RuntimeQuery` | `ecs/RuntimeQuery.h` | The same walk for terms known only at runtime |
+| `ComponentRegistry`, `FieldDesc` | `ecs/ComponentRegistry.h`, `ecs/ComponentFields.h` | Name to erased ops; one named, typed value |
+| `CommandBuffer` | `ecs/CommandBuffer.h` | Deferred structural changes |
+| `ISystem`, `SystemScheduler` | `ecs/System.h`, `ecs/SystemScheduler.h` | Per-frame work, and running it by phase |
+| `ISurfaceProvider` | `platform/Surface.h` | Native handle plus dimensions |
 
-    void OnUpdate(SystemContext &context) override
-    {
-        mQuery->ForEach([&](Entity entity, Position &position, const Velocity &velocity)
-        {
-            position.x += velocity.x * context.dt;
-            if (position.x > 100.0f)
-                context.commands.Destroy(entity);   // never immediate
-        });
-    }
+`TypeIdOf<T>()` returns three things. `seq` is process-local and is used directly
+as a signature bit position. `hash` is FNV-1a of the name, stable across runs,
+which is what serialisation uses. `name` is the type name itself.
 
-private:
-    Query<Position, const Velocity> *mQuery = nullptr;
-};
-```
+That name is extracted from `__FUNCSIG__` or `__PRETTY_FUNCTION__` at compile
+time and then normalised — keywords stripped, spaces collapsed, namespaces
+removed — so every compiler produces the same string. Namespaces being stripped
+is why component names have to be globally unique.
 
-## Invariants
+`GetOrCreateQuery<Ts...>(filters...)` returns a cached `Query&`, which
+re-resolves its matching archetypes when `World::Generation()` changes. Filters
+are `With`, `Without` and `Or`, and each `Or` is its own clause.
 
-- **Components are POD.** Enforced twice. Anything owning memory belongs
-  elsewhere, referenced by handle.
-- **Component names are globally unique.** A collision asserts in Debug and would
-  silently alias in Release.
-- **No structural change during iteration.** `AddComponent`, `RemoveComponent`
-  and `DestroyEntity` assert if a `Query` is walking; use the `CommandBuffer`.
-  `World::IsIterating()` reports it, so a binding layer can route rather than
-  guess. `CreateEntity` is deliberately exempt - the new entity lands in the
-  empty archetype, so no matched table moves.
-- **A resource destructor must not call back into `World`.** `~World` is already
-  destroying the resource map. Anything holding entity handles needs an explicit
-  shutdown call.
-- **Scene structure is not in components.** Parent and child edges live in the
-  `HierarchyIndex` resource, so `RemoveComponent` cannot tear them apart.
-  `SetParent` refuses cycles and anything past `kMaxHierarchyDepth`, returning
-  `false` rather than asserting. Destroying an entity destroys its subtree.
-- **`Transform` is written through its setters.** Each bumps a version that
-  `WorldTransform` compares against; a raw write leaves descendants stale
-  permanently. `ResolveWorld` is correct at any point in the frame, so no reader
-  needs to reason about phase order.
-- **At most 256 component types**, C++ and script-declared together. The budget
-  is charged per distinct name for the life of the process, so a script reload
-  costs nothing. Overflow stops the process in every build, at allocation
-  (`ComponentRegistry`) and again on use (`ComponentBitOf`) - the second catches
-  a C++ component that was never registered.
-- **The erased `*Raw` API needs no carve-out.** There is one storage model, so
-  every registered TypeId goes down the same path; a tag is `size == 0`, which
-  reads back as `nullptr` from `GetRaw` and answers normally from `HasRaw`.
-- **A component is reachable by name only once registered.** Forgetting is not an
-  error, just a name scripts cannot find.
-- **Erased operations are total.** `ComponentOps` answers for a dead entity
-  instead of asserting - unlike the typed `World` API, because a script holding a
-  stale handle is ordinary.
-- **A stale `Entity` is detected, not honoured.** `GetComponent` returns `nullptr`
-  for a dead handle; `AddComponent` and friends assert.
-- **A signature is the full component set**, tags included - what a tag lacks is
-  a column, not a bit.
-- **Systems register before `Start`.**
-- **`World` is neither copyable nor movable** - archetypes hold pointers back into
-  it.
+`RuntimeQuery` shares `detail::ArchetypeMatcher` with `Query`, so the match test
+and the cache rule have one implementation between them. It hands its callback
+`(Entity, std::span<void *const>)`, valid for that call only. Unlike `Query`, the
+caller owns it.
 
-## Implementation notes
+## Rules
 
-- `TypeIdOf<T>` builds its name in a `constexpr` buffer and returns a view into
-  static storage, so a `TypeId` is cheap to copy.
-- `Start` flushes at every phase boundary too, so an entity spawned in `OnStart`
-  is visible to the next phase's `OnStart`. `OnStop` runs in reverse order.
-- Logging is initialised in `main`, so construction failures are still visible.
-- Trace and Debug compile out in Release and are free to leave in hot paths.
+**Components are POD.** `MIR_ASSERT_COMPONENT` checks it at the declaration and
+storage checks it again. Anything that owns memory belongs in a resource, with
+the component holding a handle to it.
 
-## Current state
+**Component names are globally unique.** A collision asserts in Debug and would
+silently alias in Release. `ComponentRegistry` re-checks with `MIR_CHECK`,
+because a name that comes from data can collide in a Release build too.
 
-*As of 2026-09-02.* Enough to build systems on: entities, both storages, filtered
-queries, deferred structural change and phase scheduling all work and are tested.
-Since 2026-09-01: typed resources on `World`, a transform hierarchy with lazy
-world-matrix resolution, and cascading destruction through a `World` destroy
-hook.
+**No structural change during iteration.** An add moves the entity to another
+table and swap-removes its old row, so an entity you have not visited yet slides
+into a row you already passed and is skipped without any sign. `AddComponent`,
+`RemoveComponent` and `DestroyEntity` assert if a query is walking. Use the
+`CommandBuffer` instead, and call `World::IsIterating()` if you are writing a
+binding layer that has to route between the two.
 
-Since then: a component registry with erased operations and named field access,
-script-declared component types, and runtime queries - the ECS-side groundwork
-for scripting.
+`CreateEntity` is exempt. A new entity lands in the empty archetype, so no table
+that a walk is matching against moves.
+
+**A resource destructor must not call back into `World`.** By then `~World` is
+already destroying the resource map. Anything holding entity handles needs an
+explicit shutdown call rather than destructor cleanup.
+
+**Re-emplacing a resource replaces and destroys the old one**, which invalidates
+cached pointers to that resource. Emplace during setup, not mid-frame.
+
+Other resources keep their addresses. Each one lives in its own heap holder, so
+systems can safely cache a pointer in `OnStart`.
+
+**Scene structure is not in components.** Parent and child edges live in
+`HierarchyIndex`, where `RemoveComponent` cannot reach them.
+
+`SetParent` refuses rather than asserts. It returns `false` on a cycle, on
+self-parenting, and on a chain that would pass `kMaxHierarchyDepth`. Asserts
+compile out under `NDEBUG`, and a single cycle makes every upward walk in the
+engine non-terminating, so the graph has to stay bounded and acyclic in every
+build.
+
+Destroying an entity destroys its subtree. That is the only policy — detaching a
+subtree instead is not expressible today.
+
+**`Transform` is written through its setters.** Each setter bumps a version that
+`WorldTransform` compares against, so a raw write leaves every descendant stale
+permanently. That is why the members are private, and why reflection over raw
+field offsets does not work on this type.
+
+`ResolveWorld` refreshes an entity and every stale ancestor before returning, so
+a read is correct at any point in the frame.
+`TransformPropagateSystem` resolves everything once in `PostUpdate`, which is a
+batching optimisation rather than the correctness mechanism.
+
+The cost is that `ResolveWorld` mutates on read, so it is neither `const` nor
+thread-safe.
+
+**At most 256 component types**, counting C++ and script-declared ones together.
+The budget is charged per distinct name for the life of the process, so a script
+reload costs nothing.
+
+Overflow stops the process in every build, checked once at allocation and again
+on use. The second check is what catches a C++ component that was never
+registered and drew its `seq` straight from `TypeIdOf`. As an assert it would
+reach `std::bitset::set` in Release and throw out of `World::AddComponent`, in a
+codebase that does not use exceptions.
+
+**Erased operations are total.** `ComponentOps` answers for a dead entity instead
+of asserting. The typed API asserts because touching a destroyed entity is a bug
+in engine code, but a script holding a handle across the frame that destroyed it
+is ordinary.
+
+**A component is reachable by name only once registered**, and registration is
+explicit rather than a static initialiser. `engine_core` is a static library, so
+a self-registering object in a translation unit that nothing references gets
+dropped by the linker, and the component would be present in Debug and missing in
+Release.
+
+**`FieldDesc` uses accessor thunks, not offsets**, for any component with an
+invariant. An offset write to `mPosition` moves the object and leaves `mVersion`
+untouched, which produces no crash and no assert, just one wrong frame in
+everything downstream. Script-declared components have no invariant to protect
+and are offset-backed.
+
+**A stale `Entity` is detected, not honoured.** `GetComponent` returns `nullptr`
+for a dead handle. `AddComponent` and the rest assert.
+
+**Systems register before `Start`.** `Start` flushes at every phase boundary, so
+an entity spawned in one `OnStart` is visible to the next phase's `OnStart`.
+`OnStop` runs in reverse order.
+
+**`World` is neither copyable nor movable.** Archetypes hold pointers back into
+it.
+
+**Logging is initialised in `main`, outside `App`**, so a construction failure
+inside `App` is still visible. `Trace` and `Debug` compile out in Release and are
+free to leave in hot paths.
+
+## State
+
+*As of 2026-09-06.* Working: entities, archetype storage with tags, filtered and
+runtime queries, deferred structural change, phase scheduling, typed resources,
+the transform hierarchy with lazy world-matrix resolution, the component registry
+with named field access, and script-declared component types.
+
+Tests in `modules/core/tests/`: `Archetype`, `Query`, `CommandBuffer`,
+`Resources`, `Transform`, `TransformHierarchy`, `System`, `ComponentRegistry`,
+`RuntimeQuery`, `Paths`.
+
+Logging and asserts have no tests of their own. Every other test exercises them,
+and their failure mode is loud.
 
 Missing: parallelism, dependency ordering, change detection, component lifecycle
-hooks, serialisation (the stable hash and the field tables exist, nothing uses
-them), row migration when a script component's layout changes, and debugging
-tools. `SystemPhase::Render` is unused - the ECS-to-renderer bridge is a pair of
-calls in `App::Run`.
+hooks, and row migration when a script component's layout changes.
 
-## Tests
+## Backlog
 
-`modules/core/tests/`:
+1. **Row migration for a changed script component.** Changing a script
+   component's field list needs the world restarted today, and the error message
+   says so. The fix is to rebuild each holding archetype's column field by field,
+   matching on name.
+2. **Change detection.** Nothing tells a renderer which transforms moved this
+   frame, though `WorldTransform::Version` already carries the information.
+3. **Declared access for resources.** A parallel scheduler needs each system's
+   read and write set. Resources are invisible to the query machinery that would
+   otherwise report it, so either resources gain declared access, or systems that
+   touch them stay serial.
+4. **Reparenting is O(children)**, because stable child order rules out
+   swap-and-pop erase. Tombstones plus a stored index would make it O(1). Waiting
+   on a profile.
+5. Undecided: whether systems should be forbidden from calling
+   `World::AddComponent` directly, rather than it being convention.
 
-| File | Covers |
-|---|---|
-| `Archetype.tests.cpp` | Row add/remove, signature transitions |
-| `Query.tests.cpp` | Matching, filters, cache invalidation |
-| `CommandBuffer.tests.cpp` | Recording and flush semantics |
-| `Resources.tests.cpp` | Type keying, pointer stability, destruction |
-| `Transform.tests.cpp` | TRS composition and the memcpy traits |
-| `TransformHierarchy.tests.cpp` | Linking, walking, cascade destroy, staleness |
-| `System.tests.cpp` | Phase ordering, lifecycle, spawn visibility |
-| `ComponentRegistry.tests.cpp` | Erased ops, field thunks, script-declared components |
-| `RuntimeQuery.tests.cpp` | Runtime terms, filters, cache refresh, mixed components |
-| `Paths.tests.cpp` | Executable-relative path resolution |
+## Changed
 
-Logging and asserts are untested - every other test exercises them, and their
-failure mode is loud.
+*2026-09-05* — **Sparse sets dropped; a fieldless component is a tag.** Was: two
+storage models, opted into per type with `MIR_COMPONENT_SPARSE`. Now: archetype
+tables only, with `kIsTagComponent<T> = std::is_empty_v<T>`.
 
-## Open questions
+Sparse was invisible to the typed API and refused by six erased paths, and the
+erased surface is the one being grown. It had no callers outside tests. Its
+intended use was empty tags on few entities, which is the case it handles worst:
+with a signature bit, `Query<Transform>().With<Player>()` rejects a 99,995-row
+table outright, and a sparse component owns no bit, so nothing can be rejected.
+Removing it made `Or` accept a tag and let scripts declare tags, neither of which
+needed new code.
 
-- 256 component types is arbitrary. Nothing is near it, but scripts declaring
-  their own is the first thing that could get there.
-- Changing a script component's field list needs the world restarted. Migrating
-  live rows field-by-field by name is the obvious fix and is not written.
-- Whether systems should be forbidden from calling `World::AddComponent`
-  directly, rather than it being convention.
+Accepted knowingly: tags multiply archetype count, approaching 2^T for T
+independently combining tags.
+
+*2026-09-02* — **Scene structure moved out of components into a resource.** Was:
+an intrusive POD chain, `Hierarchy{parent, firstChild, nextSibling, prevSibling}`.
+Now: `HierarchyIndex`, a `World` resource with private mutators.
+
+The chain was correct in isolation and failed repeatedly in place.
+`RemoveComponent<Hierarchy>` on a mid-chain node truncated the parent's child
+walk and dropped every later sibling silently, and no hook can intercept a
+template that deletes invariants it has never heard of. The redundancy was never
+the problem; storing it where the generic ECS could independently mutate it was.
+
+*2026-09-02* — **`kMaxComponentTypes` raised from 128 to 256**, when scripts
+gained the ability to declare component types and the set stopped being something
+an author could count. It stays a static bitset: `Signature` is a by-value key
+copied on every archetype transition, so heap-allocating it would cost far more
+than the extra 16 bytes.

@@ -184,19 +184,15 @@ namespace mir
             return false;
         }
 
-        // Entity -> StableId, so parent and EntityRef fields can be written
-        // as ids instead of runtime handles (0030). Entity has no std::hash,
-        // so it is keyed by PackEntity - the same encoding Entity.h names as
-        // the one for handing an Entity to a save file.
+        // Entity -> StableId for the parent and EntityRef fields. Entity has no
+        // std::hash, so it is keyed by PackEntity.
         std::unordered_map<uint64_t, StableId> toStableId;
         toStableId.reserve(scene.mEntities.size());
         for (const auto &[id, entity] : scene.mEntities)
             toStableId[PackEntity(entity)] = id;
 
-        // scene.mEntities is a std::map, so this iterates in ascending
-        // StableId order - the manifest array's order is deterministic run to
-        // run, and a newly added entity (a higher id) appends rather than
-        // reshuffling (see LoadedScene).
+        // mEntities is a std::map, so the manifest comes out in ascending id
+        // order every run
         json manifest;
         manifest["name"] = scene.mName;
         manifest["nextId"] = scene.mNextId;
@@ -289,9 +285,7 @@ namespace mir
 
         ComponentRegistry &registry = ComponentRegistry::Instance();
 
-        // Pass 1's fields resolve immediately except EntityRef, which needs
-        // every entity in the scene to exist first - so it is recorded here
-        // and patched in pass 3 instead.
+        // recorded in pass 1, applied in pass 3
         struct PendingRef
         {
             Entity mEntity;
@@ -308,8 +302,7 @@ namespace mir
         };
         std::vector<PendingParent> pendingParents;
 
-        // --- pass 1: spawn, add every listed component, write every
-        // non-EntityRef field ---
+        // 1. spawn every entity, add its components, write every non-EntityRef field
         for (const auto &idJson : manifest.value("entities", json::array()))
         {
             StableId id = idJson.get<StableId>();
@@ -337,7 +330,7 @@ namespace mir
                 if (ops == nullptr)
                 {
                     MIR_LOG_WARN("LoadScene: unknown component '{}', skipped", typeName);
-                    continue; // forward compatibility (0031): a name this build doesn't know
+                    continue; // forward compatibility: a name this build doesn't know
                 }
 
                 ops->AddCopy(world, entity, ops->mDefaultValue.data());
@@ -363,7 +356,7 @@ namespace mir
             }
         }
 
-        // --- pass 2: parent, now that every entity exists ---
+        // 2. resolve parent ids
         for (const auto &p : pendingParents)
         {
             auto it = loaded.mEntities.find(p.mParent);
@@ -375,8 +368,7 @@ namespace mir
             SetParent(world, p.mEntity, it->second);
         }
 
-        // --- pass 3: EntityRef fields, now that every entity exists and no
-        // more structural change is coming, so GetComponent()'s pointer holds ---
+        // 3. patch EntityRef fields
         for (const auto &r : pendingRefs)
         {
             Entity resolved = kNullEntity;
@@ -395,9 +387,8 @@ namespace mir
                 field->Write(component, &resolved);
         }
 
-        // Defensive: a hand-edited or older-format manifest may carry a
-        // nextId that doesn't clear every id actually present. AllocateStableId
-        // must never hand out one already in use.
+        // a hand-edited manifest may carry a nextId that doesn't clear every id
+        // present
         if (!loaded.mEntities.empty())
             loaded.mNextId = std::max(loaded.mNextId, loaded.mEntities.rbegin()->first + 1);
 
@@ -408,9 +399,8 @@ namespace mir
     {
         for (const auto &[id, entity] : loaded.mEntities)
         {
-            // Destroying a parent cascades to its children (0020), so a child
-            // reached later in this map may already be dead - guard, don't
-            // assert.
+            // destroying a parent cascades, so a child reached later may
+            // already be dead
             if (world.IsAlive(entity))
                 world.DestroyEntity(entity);
         }

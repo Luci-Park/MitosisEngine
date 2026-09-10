@@ -1,3 +1,12 @@
+/**
+ * @file LogHistory.cpp
+ * @author Rahul Nair
+ * @brief In-memory ring buffer of recent log entries, for UI consumption.
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
+
 #include "core/log/LogHistory.h"
 
 #include <deque>

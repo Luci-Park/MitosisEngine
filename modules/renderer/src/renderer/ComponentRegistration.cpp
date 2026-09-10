@@ -1,3 +1,12 @@
+/**
+ * @file ComponentRegistration.cpp
+ * @author Rahul Nair
+ * @brief Registers every component the renderer module defines.
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
+
 #include "renderer/ComponentRegistration.h"
 
 #include "renderer/components/Camera.h"

@@ -1,3 +1,13 @@
+/**
+ * @file Editor.cpp
+ * @author Sumin Park
+ * @brief Owns the ImGui context, backend, and the Slate editor shell
+ *        (dockspace, Hierarchy/Inspector/Output panels, Debug menu).
+ *
+ * @copyright Copyright (c) 2026 DigiPen (USA) Corporation
+ *
+ */
+
 #include <editor/Editor.h>
 
 #include <core/fs/Paths.h>
@@ -14,13 +24,9 @@
 
 namespace mir
 {
-    Editor::~Editor()
-    {
-        // Shutdown needs a VulkanRenderer& it doesn't have here, so a caller
-        // that skips the explicit Shutdown() leaks the ImGui context rather
-        // than crash into a dangling device - same tradeoff App makes for
-        // its own owned subsystems.
-    }
+    // Shutdown needs a VulkanRenderer this doesn't have, so skipping it leaks
+    // the ImGui context rather than crashing into a dangling device.
+    Editor::~Editor() {}
 
     bool Editor::Initialize(Window &window, VulkanRenderer &renderer, std::filesystem::path projectSettingsPath)
     {

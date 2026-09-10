@@ -1,7 +1,7 @@
 # Resolves the vcpkg toolchain file from the VCPKG_ROOT environment variable.
 #
 # vcpkg is NOT vendored in this repository; each developer installs it once and
-# shares it across projects. See docs/SETUP.md.
+# shares it across projects. See docs/build.md.
 #
 # Must be included BEFORE project(), because CMake only reads
 # CMAKE_TOOLCHAIN_FILE while the first project() call runs.
@@ -23,7 +23,7 @@ if(_mir_vcpkg_root STREQUAL "")
         "    setx VCPKG_ROOT C:/dev/vcpkg\n"
         "Then restart your terminal (and VS Code entirely) so the variable is "
         "visible, and configure again.\n"
-        "Full instructions: docs/SETUP.md")
+        "Full instructions: docs/build.md")
 endif()
 
 file(TO_CMAKE_PATH "${_mir_vcpkg_root}" _mir_vcpkg_root)
@@ -36,7 +36,7 @@ if(NOT EXISTS "${_mir_toolchain}")
         "Expected: ${_mir_toolchain}\n"
         "Either the path is wrong, or the clone was never bootstrapped:\n"
         "    ${_mir_vcpkg_root}/bootstrap-vcpkg.bat\n"
-        "Full instructions: docs/SETUP.md")
+        "Full instructions: docs/build.md")
 endif()
 
 set(CMAKE_TOOLCHAIN_FILE "${_mir_toolchain}"

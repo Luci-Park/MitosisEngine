@@ -1,37 +1,18 @@
 # Mjolnir Engine
 
-A modular 3D engine: an archetype ECS, a Vulkan 1.3 renderer, and an offline
-asset pipeline. This is a CMake project built with VSCode. Everything is driven
-through presets and VSCode tasks.
+A modular 3D engine. It has an archetype ECS, a Vulkan 1.3 renderer, an offline
+asset pipeline, a Lua scripting layer and an ImGui editor shell, and every part
+of it is its own static library.
 
-Each game is its own directory under `games/`, defined by configs, assets and Lua
-scripts rather than by C++ - one shared runtime loads them, so making a game needs
-no rebuild.
+A game is data, not a build target. Each game is a directory under `games/`
+holding configuration, assets, Lua scripts and scenes. One shared runtime loads
+that directory, so changing a game needs no rebuild.
 
-# Document Structure
-
-| Document | What it answers |
-|---|---|
-| [docs/SETUP.md](docs/SETUP.md) | Getting it building on your machine |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | What the engine is today, and how it fits together |
-| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | How to write code that fits in |
-| [docs/EXTENDING.md](docs/EXTENDING.md) | Adding a module, component, system, shader or asset |
-| [docs/README.md](docs/README.md) | The full documentation index, and where your own docs go |
-
-The rest of this file is the short version.
-
-# Requirement
-- CMake >= 3.26
-- Ninja
-- MSVC (Visual Studio 2026 or Build Tools)
-- Vulkan SDK >= 1.4.309 (supplies `slangc` for shader builds)
-- VSCode extensions: `ms-vscode.cmake-tools`, `ms-vscode.cpptools`
-
-# File Structure
+## Folder structure
 
 ```
 CMakeLists.txt        root build: module list, HelloWorld target
-CMakePresets.json     Debug / Release presets, the only supported configure path
+CMakePresets.json     Debug / Release, the only supported configure path
 vcpkg.json            dependency manifest
 main.cpp              HelloWorld entry point
 
@@ -40,114 +21,82 @@ cmake/                build helpers
   EnginePlatform.cmake  ENGINE_PLATFORM and family flags
   Shaders.cmake         slangc compilation
   Assets.cmake          asset cooking
+  Fonts.cmake           font copying
+  Branding.cmake        icon and splash copying
   VcpkgToolchain.cmake  resolves vcpkg from VCPKG_ROOT
 
-third_party/          vendored (not vcpkg) - see Dependencies below
-  imgui/                submodule, docking branch, pinned tag
-  imgui_config/         repo-owned imconfig.h override (IMGUI_USER_CONFIG)
-  IconFontCppHeaders/   icon codepoint header for Font Awesome
-
 modules/              one static library each, mir::<name>
-  core/                 ECS, logging, paths, surface contract
+  core/                 ECS, logging, paths, the surface contract
   window/               GLFW window behind an interface
-  renderer/             Vulkan 1.3 renderer
-  editortheme/          the Slate ImGui theme
-  assets/               cooked asset blobs, manifest, cache
+  renderer/             Vulkan 1.3 renderer, render components, RenderSystem
+  assets/               cooked blobs, manifest, cache
+  scene/                scene save and load
+  script/               Lua embedding and ECS bindings
+  editor/               ImGui context, backends, editor shell
+  editortheme/          the Slate ImGui theme, data only
   app/                  composition root and main loop
-    include/<name>/       public API - the whole surface of the module
+    include/<name>/       public API — the whole surface of the module
     src/<name>/           implementation and private headers
     tests/                Catch2 tests, one CTest case per TEST_CASE
 
-games/                one directory per game - planned, none exist yet
-  <name>/
-    game.config           boot parameters: title, resolution, entry script
-    assets/               its own source assets, cooked separately
-    scripts/              Lua: components, systems, scenes, gameplay
+games/                one directory per game — no C++
+  HelloWorld/
+    assets/               meshes and Lua scripts, cooked separately
+    scenes/               scene.json plus one file per entity
 
 tools/                AssetCooker, new_module.ps1, new_file.ps1
 templates/            what the scaffolding scripts stamp out
-assets/               source assets, cooked into the build tree
-fonts/                editor UI fonts, copied to fonts/ next to the exe
-docs/                 setup, architecture, conventions, module docs
-builds/               build trees, gitignored
-logs/                 engine.log, gitignored
+third_party/          imgui (submodule), imgui_config, IconFontCppHeaders
+assets/               engine source assets and shaders, cooked into the build tree
+fonts/, branding/     copied next to the executable
+docs/                 build, architecture, conventions, extending, per module
+builds/, logs/        gitignored
 ```
 
-Module details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+How the modules depend on each other, and why:
+[docs/architecture.md](docs/architecture.md#module-graph).
 
-# Getting the Source
+## Read next
+
+| Document | Answers |
+|---|---|
+| [docs/build.md](docs/build.md) | How do I build, run and debug it? |
+| [docs/architecture.md](docs/architecture.md) | What exists, how does it fit, why this shape? |
+| [docs/conventions.md](docs/conventions.md) | How do I write code that fits in? |
+| [docs/extending.md](docs/extending.md) | How do I add a module, component, system, shader, asset? |
+| [docs/modules/](docs/modules/) | How does one module work? |
+
+## Requirements
+
+Windows only. CMake >= 3.26, Ninja, MSVC (VS 2026 or Build Tools), Vulkan SDK
+>= 1.4.309, a bootstrapped vcpkg with `VCPKG_ROOT` set, and VS Code with
+`ms-vscode.cmake-tools` + `ms-vscode.cpptools`.
+
+## Quick start
 
 ```
-git clone <repo-url>
+git clone --recurse-submodules <repo-url>
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug
+ctest --test-dir builds/windows-msvc-debug --output-on-failure
 ```
 
-Dependencies come from vcpkg, which is not vendored here. You install it once
-per machine and set `VCPKG_ROOT`. Prerequisites, setup and troubleshooting:
-[docs/SETUP.md](docs/SETUP.md). Configure stops with an explanatory error if
-`VCPKG_ROOT` is missing.
+Run those from a Developer PowerShell, or from a plain one after
+`vcvars64.bat`. In VS Code, select the `windows-msvc-debug` configure preset,
+then `F7` to build and `F5` to debug.
 
-First configure builds all dependencies and takes a few minutes. Downloads and
-prebuilt packages are cached in `%LOCALAPPDATA%\vcpkg` and shared with every other
-vcpkg project on the machine, so later configures are fast.
+This assumes vcpkg and the Vulkan SDK are already set up. Full setup,
+troubleshooting and the VS Code workflow are in [docs/build.md](docs/build.md).
 
-One dependency is vendored instead: Dear ImGui, as a `third_party/imgui` git
-submodule, MIT-licensed, `LICENSE.txt` ships inside the submodule. Clone with
-`git clone --recurse-submodules`, or after the fact:
-`git submodule update --init --recursive`.
+## Third-party notices
 
-The editor UI font, `fonts/Inter.ttf`, is Inter by Rasmus Andersson,
-SIL Open Font License, `fonts/Inter-OFL.txt`.
+Dear ImGui is a `third_party/imgui` submodule, MIT licensed, with `LICENSE.txt`
+inside it.
 
-Icon glyphs come from Font Awesome Free, `fonts/fa-solid-900.ttf`
-(`fonts/FontAwesome-LICENSE.txt`), addressed through the codepoint macros in
-`third_party/IconFontCppHeaders/IconsFontAwesome6.h` (zlib license).
+`fonts/Inter.ttf` is Inter by Rasmus Andersson, SIL OFL, `fonts/Inter-OFL.txt`.
 
-# Adding Modules and Files
-This engine is aiming for modularity, therefore each part of the engine is its own static library. To make things easier VSCode tasks have been added.
+Icon glyphs are Font Awesome Free, `fonts/fa-solid-900.ttf`, licensed in
+`fonts/FontAwesome-LICENSE.txt` and addressed through
+`third_party/IconFontCppHeaders/IconsFontAwesome6.h`, zlib.
 
-## Adding Modules
-1. `Ctrl + Shift + P` -> `Tasks: Run Task`
-2. Select `New Module`
-3. Give it a name
-
-## Adding Files
-1. `Ctrl + Shift + P` -> `Tasks: Run Task`
-2. Select `New File`
-3. Type the target module
-4. Give it a name
-5. Select class(.h + .cpp) or header(.h)
-
-## Building
-1. `Ctrl + Shift + P` -> CMake: Select Configure Preset -> `Debug` or `Release`
-2. `F7` to build
-3. `Ctrl + Shift + P` -> CMake: Set Launch/Debug Target
-4. `Ctrl+F5` (run) / `F5` (debug)
--> after setting configure and target once `F7` -> `F5` will be enough
-
-A new module has no sources yet, and CMake cannot build an empty library. Add at
-least one file to it before building.
-
-# Assets
-
-Source assets live under `assets/`. Building `HelloWorld` cooks them automatically:
-`AssetCooker` builds first, runs over every configured source root, and its output
-is copied to `cooked/` next to the executable, alongside `shaders/`. Editing an
-asset triggers a recook on the next build; a file whose cooked output is already
-newer than the source is skipped.
-
-Any target can cook roots of its own - a game cooks its own `assets/` this way:
-
-```cmake
-engine_cook_assets(MyGame
-    SOURCE_ROOTS games/mygame/assets/
-    OUT_DIR ${CMAKE_BINARY_DIR}/mygame_cooked)
-```
-
-To run the cook step by hand:
-```
-AssetCooker --source <dir> [--source <dir> ...] --out <dir>
-```
-
-`SOURCE_ROOTS` and `--source` must both be relative to the repo root, never
-absolute: the root string is hashed into every asset id, so an absolute path
-bakes one machine's checkout location into ids that have to match everywhere.
+Everything else comes from vcpkg, through `vcpkg.json`.

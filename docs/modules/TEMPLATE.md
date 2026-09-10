@@ -1,54 +1,56 @@
-# <module>
+# module_name
 
-- **Maintainer:**
-- **Depends on:** `mir::` modules and third-party libraries
-- **Public API:** `modules/<module>/include/<module>/`
-- **Last reviewed:** YYYY-MM-DD
+A sentence or two on what this module owns, and what it stays out of.
 
-## Purpose
+`mir::<module>` · depends `mir::core`, `thirdparty` (private) · API `modules/<module>/include/<module>/` · maintainer <name> · reviewed YYYY-MM-DD
 
-What this module is responsible for, and what it deliberately does not do.
+## Model
 
-## Mental model
+What someone needs to know before they open a header.
 
-The paragraph a reader needs before opening a header: the central abstraction,
-what flows through it, what owns what.
+Name the main abstraction, say what flows through it and what owns what, then
+say why it ended up that shape.
 
-## Key types
+Drop in the shortest snippet that shows the module in use. Copy it from a test
+or a real call site, so it does not rot into something that no longer compiles.
+
+## API
 
 | Type | Header | Role |
 |---|---|---|
 | `Foo` | `<module>/Foo.h` | one line |
 
-Expand only on the types that are not self-explanatory, and on how they relate -
-the header says what each method does.
+Only expand on the types that are not obvious from their name, and on how they
+fit together. The header already says what each method does, so there is no need
+to repeat a signature here.
 
-## Usage
+## Rules
 
-The shortest representative example. Copy it from a test so it stays compilable.
+One block per rule: what the rule is, what goes wrong if someone breaks it, and
+why it exists. If something in `src/` would surprise a reader, it goes here too.
 
-```cpp
-```
+This is usually the most useful part of the document — it is the stuff that
+otherwise only lives in your head.
 
-## Invariants
+## State
 
-Rules a caller must not break, each with the consequence of breaking it. The most
-valuable section - this is what otherwise lives only in the maintainer's head.
+*As of YYYY-MM-DD.* What works today. What is stubbed out or missing. Where the
+tests live and what they cover, and anything you left untested on purpose.
 
-## Implementation notes
+Aim for enough detail that a reader can tell whether the thing they came looking
+for actually exists yet.
 
-Anything surprising in `src/`: a layout chosen for a reason, an ordering that
-matters, a workaround. Why, not what.
+## Backlog
 
-## Current state
+What you want next, roughly in order.
 
-*As of YYYY-MM-DD.* What works, what is stubbed, what is broken - specific enough
-that a reader can tell whether what they need exists.
+If something is still undecided, put it here with a note on what would settle
+it.
 
-## Tests
+## Changed
 
-Where they are, what they cover, what is deliberately untested and why.
+Things that used to work differently, newest first, a few lines each. What the
+rule was, what it is now, and what made you change it. Keep the last ten or so
+and let the older ones go.
 
-## Open questions
-
-Undecided things, and what would settle them.
+*YYYY-MM-DD* — **Short title.** Was … Now … Because …
